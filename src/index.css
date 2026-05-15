@@ -20,15 +20,39 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* 严格控制 16:9 比例的设计画布 */
+/* 充满全屏的画布布局，后续接入 Tauri 后定制窗口外观 */
 .design-canvas {
-  width: 1280px;
-  height: 720px;
+  width: 100vw;
+  height: 100vh;
   background-color: var(--color-bg-main);
   display: flex;
-  border-radius: 12px;
-  box-shadow: 0 24px 48px rgba(0,0,0,0.1);
   overflow: hidden;
-  margin: 0 auto;
-  margin-top: 5vh;
+  margin: 0;
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror h1 {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 24px;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror p {
+  font-size: 15px;
+  line-height: 1.625;
+  color: #374151; /* gray-700 */
+  margin-bottom: 16px;
 }
