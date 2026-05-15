@@ -1,27 +1,72 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { useEditorStore } from '../../store'
-import { useEffect, useState, useRef } from 'react'
+import { useEditorStore, type HeadingItem } from '../../store'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
+import type { Editor as TiptapEditor } from '@tiptap/core'
 
 interface BubblePos {
   top: number
   left: number
 }
 
+// 从 ProseMirror 文档树中提取标题列表
+function extractHeadings(editor: TiptapEditor): HeadingItem[] {
+  const items: HeadingItem[] = []
+  const counter: Record<string, number> = {}
+  editor.state.doc.forEach((node) => {
+    if (node.type.name === 'heading') {
+      const text = node.textContent
+      const key = text.slice(0, 20)
+      counter[key] = (counter[key] ?? 0) + 1
+      const id = `heading-${key.replace(/\s+/g, '-')}-${counter[key]}`
+      items.push({ level: node.attrs.level as number, text, id })
+    }
+  })
+  return items
+}
+
+// 给编辑器 DOM 里的标题元素打上 data-heading-id，用于点击大纲滚动
+function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) {
+  if (!editorEl) return
+  const domHeadings = editorEl.querySelectorAll('h1,h2,h3,h4,h5,h6')
+  domHeadings.forEach((el, i) => {
+    if (headings[i]) {
+      el.setAttribute('data-heading-id', headings[i].id)
+    }
+  })
+}
+
 export default function Editor() {
   const content = useEditorStore((state) => state.content)
   const setContent = useEditorStore((state) => state.setContent)
   const setSelectedText = useEditorStore((state) => state.setSelectedText)
+  const setHeadings = useEditorStore((state) => state.setHeadings)
 
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
   const timerRef = useRef<number | null>(null)
+  const editorContainerRef = useRef<HTMLDivElement>(null)
+
+  // 解析并同步标题到 Zustand，然后给 DOM 打标记
+  const syncHeadings = useCallback((editor: TiptapEditor) => {
+    const headings = extractHeadings(editor)
+    setHeadings(headings)
+    // 等 DOM 更新完再打 id（RAF 保证在渲染后执行）
+    requestAnimationFrame(() => {
+      const editorEl = editorContainerRef.current?.querySelector('.ProseMirror') as HTMLElement | null
+      stampHeadingIds(editorEl, headings)
+    })
+  }, [setHeadings])
 
   const editor = useEditor({
     extensions: [StarterKit],
     content: content,
+    onCreate: ({ editor }) => {
+      syncHeadings(editor)
+    },
     onUpdate: ({ editor }) => {
       setContent(editor.getHTML())
+      syncHeadings(editor)
     },
     onSelectionUpdate: ({ editor }) => {
       const { from, to } = editor.state.selection
@@ -73,7 +118,7 @@ export default function Editor() {
   }, [content, editor])
 
   return (
-    <div className="flex-1 px-16 py-10 overflow-y-auto relative">
+    <div ref={editorContainerRef} className="flex-1 px-16 py-10 overflow-y-auto relative">
       {/* 气泡菜单：fixed 定位跟随选区，并加入弹出动画 */}
       {bubblePos && (
         <div

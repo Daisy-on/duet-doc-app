@@ -1,10 +1,18 @@
 import { create } from 'zustand';
 
+export interface HeadingItem {
+  level: number;   // 1 | 2 | 3 | 4 | 5 | 6
+  text: string;
+  id: string;      // 用于滚动锚点
+}
+
 interface EditorState {
   content: string;
   setContent: (content: string) => void;
   selectedText: string;
   setSelectedText: (text: string) => void;
+  headings: HeadingItem[];
+  setHeadings: (headings: HeadingItem[]) => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -19,4 +27,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setContent: (content) => set({ content }),
   selectedText: '',
   setSelectedText: (text) => set({ selectedText: text }),
+  headings: [],
+  setHeadings: (headings) => set({ headings }),
 }));
