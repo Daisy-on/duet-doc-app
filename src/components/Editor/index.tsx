@@ -99,11 +99,14 @@ export default function Editor() {
           const selection = window.getSelection()
           if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0)
-            const rect = range.getBoundingClientRect()
-            // 气泡显示在选区右上角：left 对齐选区右侧，top 在选区上方
+            const rects = range.getClientRects()
+            // 获取第一行选区的矩形，如果不存在则退回到 getBoundingClientRect
+            const firstRect = rects[0] || range.getBoundingClientRect()
+            
+            // 气泡显示在第一行选区右上角：left 对齐第一行选区右侧，top 在第一行选区上方
             setBubblePos({
-              top: rect.top - 12,   // 距离选区上沿 12px（留给三角箭头）
-              left: rect.right,
+              top: firstRect.top - 12,   // 距离第一行选区上沿 12px（留给三角箭头）
+              left: firstRect.right,
             })
           }
         }, 500)
