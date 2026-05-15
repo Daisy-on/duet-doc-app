@@ -72,3 +72,88 @@ body {
 .animate-pop-in {
   animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* --- TipTap 节点还原样式 (对抗 Tailwind Preflight) --- */
+
+/* 列表 */
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.ProseMirror li p {
+  margin-bottom: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+/* 链接 */
+.ProseMirror a {
+  color: #4F46E5; /* indigo-600 */
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 行内代码 */
+.ProseMirror code {
+  background-color: #F3F4F6; /* gray-100 */
+  color: #EF4444; /* red-500 */
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875em;
+}
+
+/* 代码块 */
+.ProseMirror pre {
+  background-color: #1F2937; /* gray-800 */
+  color: #F9FAFB; /* gray-50 */
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+.ProseMirror pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  font-size: 0.875rem;
+}
+
+/* 表格 */
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.ProseMirror table td,
+.ProseMirror table th {
+  min-width: 1em;
+  border: 1px solid var(--color-border-color);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+.ProseMirror table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: var(--color-bg-panel);
+}
+.ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--color-accent);
+  pointer-events: none;
+}
+

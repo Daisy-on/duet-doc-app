@@ -5,6 +5,10 @@ import TextAlign from '@tiptap/extension-text-align'
 import Superscript from '@tiptap/extension-superscript'
 import Subscript from '@tiptap/extension-subscript'
 import { Link } from '@tiptap/extension-link'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table'
+import { TableCell } from '@tiptap/extension-table'
+import { TableHeader } from '@tiptap/extension-table'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
@@ -72,6 +76,10 @@ export default function Editor() {
       Subscript,
       Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: content,
     onCreate: ({ editor }) => {

@@ -6,7 +6,7 @@ import {
   Superscript, Subscript, Code,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Link, CodeSquare, Table,
-  ChevronDown, Type,
+  ChevronDown, Type, Trash2, Columns, Rows
 } from 'lucide-react'
 
 // ─── 通用工具按钮 ─────────────────────────────────────────────
@@ -233,6 +233,148 @@ function AlignDropdown({ editor }: { editor: Editor }) {
   )
 }
 
+// ─── 表格操作下拉 ─────────────────────────────────────────────
+function TableActionsDropdown({ editor }: { editor: Editor }) {
+  const { open, setOpen, ref } = useDropdown()
+
+  if (!editor.isActive('table')) return null
+
+  const items = [
+    { label: '在上方插入行', action: () => editor.chain().focus().addRowBefore().run(), icon: <Rows size={13} /> },
+    { label: '在下方插入行', action: () => editor.chain().focus().addRowAfter().run(), icon: <Rows size={13} /> },
+    { label: '删除该行', action: () => editor.chain().focus().deleteRow().run(), icon: <Trash2 size={13} className="text-red-500" /> },
+    { label: '在左侧插入列', action: () => editor.chain().focus().addColumnBefore().run(), icon: <Columns size={13} /> },
+    { label: '在右侧插入列', action: () => editor.chain().focus().addColumnAfter().run(), icon: <Columns size={13} /> },
+    { label: '删除该列', action: () => editor.chain().focus().deleteColumn().run(), icon: <Trash2 size={13} className="text-red-500" /> },
+    { label: '删除表格', action: () => editor.chain().focus().deleteTable().run(), icon: <Trash2 size={13} className="text-red-500" /> },
+  ]
+
+  return (
+    <>
+      <Sep />
+      <div className="relative" ref={ref}>
+        <button
+          title="表格操作"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1 px-2 h-7 rounded text-[13px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer whitespace-nowrap"
+        >
+          表格操作 <ChevronDown size={12} />
+        </button>
+        {open && (
+          <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-border-color rounded-lg shadow-lg z-50 py-1">
+            {items.map((it) => (
+              <button
+                key={it.label}
+                onMouseDown={(e) => { e.preventDefault(); it.action(); setOpen(false) }}
+                className="w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors flex items-center gap-2 text-text-primary"
+              >
+                {it.icon}{it.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ─── 链接插入弹出框 ─────────────────────────────────────────────
+function LinkPopover({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const [url, setUrl] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  const handleOpen = () => {
+    // 聚焦编辑器，确保我们能拿到正确的选区
+    editor.commands.focus()
+    const { from } = editor.state.selection
+    const coords = editor.view.coordsAtPos(from)
+    
+    // 获取之前的链接（如果有的话）
+    const previousUrl = editor.getAttributes('link').href || ''
+    setUrl(previousUrl)
+    
+    setPos({ top: coords.top + 20, left: coords.left }) // 在光标下方 20px
+    setOpen(true)
+    
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
+  }
+
+  const handleSubmit = () => {
+    if (url) {
+      const { from, to } = editor.state.selection
+      if (from === to) {
+        // 选区为空时，直接插入带有链接属性的文本
+        editor.chain().focus().insertContent(`<a href="${url}">${url}</a>`).run()
+      } else {
+        editor.chain().focus().setLink({ href: url }).run()
+      }
+    } else {
+      editor.chain().focus().unsetLink().run()
+    }
+    setOpen(false)
+  }
+
+  // 点击外部关闭
+  useEffect(() => {
+    if (!open) return
+    const onClickOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  // 按下 Esc 或 Enter
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSubmit()
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+      editor.commands.focus()
+    }
+  }
+
+  return (
+    <>
+      <ToolBtn title="插入链接" active={editor.isActive('link')} onClick={handleOpen}>
+        <Link size={15} />
+      </ToolBtn>
+      
+      {open && (
+        <div 
+          ref={popoverRef}
+          className="fixed z-[100] bg-white border border-border-color rounded-lg shadow-xl p-3 flex gap-2 w-72 animate-pop-in"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          <input
+            ref={inputRef}
+            type="url"
+            placeholder="输入链接地址 (https://...)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1 border border-border-color rounded px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+          <button
+            onClick={handleSubmit}
+            className="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            确定
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── 主工具栏 ─────────────────────────────────────────────────
 interface ToolbarProps {
   editor: Editor | null
@@ -311,18 +453,18 @@ export default function Toolbar({ editor }: ToolbarProps) {
       <Sep />
 
       {/* 8. 插入类 */}
-      <ToolBtn title="插入链接" onClick={() => {
-        const url = window.prompt('输入链接地址')
-        if (url) editor.chain().focus().setLink({ href: url }).run()
-      }}>
-        <Link size={15} />
-      </ToolBtn>
+      <LinkPopover editor={editor} />
+      
       <ToolBtn title="插入代码块" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
         <CodeSquare size={15} />
       </ToolBtn>
       <ToolBtn title="插入表格" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
         <Table size={15} />
       </ToolBtn>
+
+      {/* 9. 表格专有操作 (当激活时显示) */}
+      <TableActionsDropdown editor={editor} />
     </div>
   )
 }
+
