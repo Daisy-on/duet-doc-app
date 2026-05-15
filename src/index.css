@@ -56,3 +56,19 @@ body {
   color: #374151; /* gray-700 */
   margin-bottom: 16px;
 }
+
+/* 气泡菜单弹出动画 */
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: translate(-100%, -90%) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-100%, -100%) scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

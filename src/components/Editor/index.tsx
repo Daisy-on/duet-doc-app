@@ -1,7 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useEditorStore } from '../../store'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
 
 interface BubblePos {
@@ -15,6 +15,7 @@ export default function Editor() {
   const setSelectedText = useEditorStore((state) => state.setSelectedText)
 
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
+  const timerRef = useRef<number | null>(null)
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -25,28 +26,44 @@ export default function Editor() {
     onSelectionUpdate: ({ editor }) => {
       const { from, to } = editor.state.selection
 
+      // 清除先前的定时器
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+
       if (from !== to) {
         // 同步选中文本到 Zustand
         const text = editor.state.doc.textBetween(from, to, ' ')
         setSelectedText(text)
 
-        // 计算气泡位置：获取浏览器选区的 bounding rect
-        const selection = window.getSelection()
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0)
-          const rect = range.getBoundingClientRect()
-          // 气泡显示在选区右上角：left 对齐选区右侧，top 在选区上方
-          setBubblePos({
-            top: rect.top - 12,   // 距离选区上沿 12px（留给三角箭头）
-            left: rect.right,
-          })
-        }
+        // 延迟 500ms 显示气泡
+        timerRef.current = window.setTimeout(() => {
+          const selection = window.getSelection()
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0)
+            const rect = range.getBoundingClientRect()
+            // 气泡显示在选区右上角：left 对齐选区右侧，top 在选区上方
+            setBubblePos({
+              top: rect.top - 12,   // 距离选区上沿 12px（留给三角箭头）
+              left: rect.right,
+            })
+          }
+        }, 500)
       } else {
         setSelectedText('')
         setBubblePos(null)
       }
     },
   })
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
 
   // 同步外部 content 状态
   useEffect(() => {
@@ -57,17 +74,16 @@ export default function Editor() {
 
   return (
     <div className="flex-1 px-16 py-10 overflow-y-auto relative">
-      {/* 气泡菜单：fixed 定位跟随选区 */}
+      {/* 气泡菜单：fixed 定位跟随选区，并加入弹出动画 */}
       {bubblePos && (
         <div
-          className="fixed z-50"
+          className="fixed z-50 animate-pop-in"
           style={{
             top: bubblePos.top,
             left: bubblePos.left,
-            transform: 'translate(-100%, -100%)',
           }}
         >
-          <div className="bg-gray-800 text-white rounded-lg p-1.5 flex items-center gap-1 shadow-xl relative">
+          <div className="bg-gray-800 text-white rounded-lg p-1.5 flex items-center gap-1 shadow-xl relative whitespace-nowrap w-max">
             <div
               className="px-3 py-1.5 text-[13px] font-medium rounded-md cursor-pointer flex items-center gap-1.5 text-indigo-200 hover:bg-gray-700 transition-colors"
               onMouseDown={(e) => {
