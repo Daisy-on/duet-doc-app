@@ -1,13 +1,15 @@
 import CatalogPanel from '../components/CatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
 import Editor from '../components/Editor';
+import Toolbar from '../components/Toolbar';
+import { useEditorStore } from '../store';
 import { 
   CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal,
-  Undo2, Redo2, ChevronDown, Bold, Italic, Underline, Strikethrough,
-  Link, Code, Image, Table
 } from 'lucide-react';
 
 export default function Edit() {
+  const editorInstance = useEditorStore((state) => state.editorInstance);
+
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* 2. 中间目录面板 */}
@@ -38,27 +40,7 @@ export default function Edit() {
         </header>
 
         {/* 工具栏 */}
-        <div className="p-3 px-6 border-b border-border-color flex items-center gap-4 text-text-secondary text-sm shrink-0">
-          <div className="flex items-center gap-3 border-r border-border-color pr-4">
-            <Undo2 size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Redo2 size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-          </div>
-          <div className="flex items-center gap-3 border-r border-border-color pr-4">
-            <span className="cursor-pointer hover:text-text-primary transition-colors flex items-center gap-1">正文 <ChevronDown size={14} /></span>
-          </div>
-          <div className="flex items-center gap-3 border-r border-border-color pr-4">
-            <Bold size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Italic size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Underline size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Strikethrough size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Link size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Code size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Image size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-            <Table size={16} className="cursor-pointer hover:text-text-primary transition-colors" />
-          </div>
-        </div>
+        <Toolbar editor={editorInstance} />
 
         {/* 编辑内容区 */}
         <Editor />

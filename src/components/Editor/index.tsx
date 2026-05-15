@@ -1,5 +1,10 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Superscript from '@tiptap/extension-superscript'
+import Subscript from '@tiptap/extension-subscript'
+import { Link } from '@tiptap/extension-link'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
@@ -42,6 +47,7 @@ export default function Editor() {
   const setContent = useEditorStore((state) => state.setContent)
   const setSelectedText = useEditorStore((state) => state.setSelectedText)
   const setHeadings = useEditorStore((state) => state.setHeadings)
+  const setEditorInstance = useEditorStore((state) => state.setEditorInstance)
 
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
   const timerRef = useRef<number | null>(null)
@@ -59,7 +65,14 @@ export default function Editor() {
   }, [setHeadings])
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      Underline,
+      Superscript,
+      Subscript,
+      Link.configure({ openOnClick: false }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    ],
     content: content,
     onCreate: ({ editor }) => {
       syncHeadings(editor)
@@ -100,6 +113,14 @@ export default function Editor() {
       }
     },
   })
+
+  // 同步 editor 实例到全局 store
+  useEffect(() => {
+    setEditorInstance(editor)
+    return () => {
+      setEditorInstance(null)
+    }
+  }, [editor, setEditorInstance])
 
   // 组件卸载时清理定时器
   useEffect(() => {
