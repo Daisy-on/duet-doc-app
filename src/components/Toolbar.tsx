@@ -403,8 +403,6 @@ function LinkPopover({ editor }: { editor: Editor }) {
 function TablePicker({ editor }: { editor: Editor }) {
   const { open, setOpen, ref } = useDropdown()
   const [hovered, setHovered] = useState({ r: 0, c: 0 })
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-  const btnRef = useRef<HTMLButtonElement>(null)
   
   const MAX_ROWS = 8
   const MAX_COLS = 8
@@ -419,31 +417,20 @@ function TablePicker({ editor }: { editor: Editor }) {
   }
 
   const handleToggle = () => {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      // 弹窗从按钮的左侧边缘向右展开，确保不会溢出视口左侧
-      const popupWidth = 220 // 8 * 22px + gaps + padding 的估计宽度
-      let left = rect.left
-      // 如果弹窗会超出右侧视口，就靠右边缘对齐
-      if (left + popupWidth > window.innerWidth) {
-        left = rect.right - popupWidth
-      }
-      setPos({ top: rect.bottom + 4, left })
-    }
     setOpen((o) => !o)
   }
 
   return (
-    <div className="relative" ref={ref} onMouseLeave={() => setHovered({ r: 0, c: 0 })}>
-      <div ref={btnRef}>
+    <div className="relative flex items-center" ref={ref}>
+      <div>
         <ToolBtn title="插入表格" onClick={handleToggle}>
           <Table size={15} />
         </ToolBtn>
       </div>
       {open && (
         <div 
-          className="fixed bg-[#252525] border border-[#333] rounded-lg shadow-xl z-[100] p-3 animate-pop-in select-none"
-          style={{ top: pos.top, left: pos.left }}
+          className="absolute top-full right-0 mt-1 bg-[#252525] border border-[#333] rounded-lg shadow-lg z-50 p-3 select-none"
+          onMouseLeave={() => setHovered({ r: 0, c: 0 })}
         >
           <div className="flex flex-col gap-[2px]">
             {rows.map((_, rIndex) => {
