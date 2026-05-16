@@ -82,7 +82,7 @@ export default function Editor() {
       Underline,
       Superscript,
       Subscript,
-      Link.configure({ openOnClick: false }),
+      Link.configure({ openOnClick: false, autolink: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({ resizable: true }),
       TableRow,

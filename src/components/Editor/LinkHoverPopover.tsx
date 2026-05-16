@@ -70,6 +70,13 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
     <div 
       className="link-hover-popover fixed z-[100] flex items-center gap-1 p-1 bg-[#252525] border border-[#333] rounded shadow-xl"
       style={{ top: pos.top, left: pos.left }}
+      onMouseEnter={() => {
+        // 鼠标进入弹窗时，取消延时关闭
+        if (hoverRef.current.timeout) {
+          clearTimeout(hoverRef.current.timeout)
+          hoverRef.current.timeout = null
+        }
+      }}
       onMouseLeave={() => {
         if (hoverRef.current.anchor) hoverRef.current.anchor.style.backgroundColor = ''
         setOpen(false)
@@ -113,10 +120,18 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
         className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-[#333] rounded transition-colors"
         title="取消链接"
         onClick={() => {
-          if (editor) {
-            editor.chain().focus().unsetLink().run()
+          if (editor && hoverRef.current.anchor) {
+            try {
+              const pos = editor.view.posAtDOM(hoverRef.current.anchor, 0)
+              editor.commands.setTextSelection(pos)
+              editor.chain().focus().extendMarkRange('link').unsetLink().run()
+            } catch(e) {
+              editor.chain().focus().unsetLink().run()
+            }
           }
+          if (hoverRef.current.anchor) hoverRef.current.anchor.style.backgroundColor = ''
           setOpen(false)
+          hoverRef.current.anchor = null
         }}
       >
         <Unlink size={14} />

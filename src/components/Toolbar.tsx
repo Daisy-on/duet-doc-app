@@ -308,17 +308,28 @@ function LinkPopover({ editor }: { editor: Editor }) {
     if (url) {
       const { from, to } = editor.state.selection
       if (from === to) {
-        // 选区为空时，先插入纯文本，选中它，然后再应用链接样式
+        // 选区为空时：使用结构化内容插入带有 link mark 的文本
         editor.chain().focus()
-          .insertContent(url)
-          .setTextSelection({ from, to: from + url.length })
-          .setLink({ href: url })
+          .insertContent({
+            type: 'text',
+            text: url,
+            marks: [
+              {
+                type: 'link',
+                attrs: { href: url },
+              },
+            ],
+          })
           .run()
       } else {
-        editor.chain().focus().setLink({ href: url }).run()
+        // 有选区时：对选中的文字应用链接
+        editor.chain().focus()
+          .extendMarkRange('link')
+          .setLink({ href: url })
+          .run()
       }
     } else {
-      editor.chain().focus().unsetLink().run()
+      editor.chain().focus().extendMarkRange('link').unsetLink().run()
     }
     setOpen(false)
   }
@@ -410,7 +421,14 @@ function TablePicker({ editor }: { editor: Editor }) {
   const handleToggle = () => {
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, left: rect.left })
+      // 弹窗从按钮的左侧边缘向右展开，确保不会溢出视口左侧
+      const popupWidth = 220 // 8 * 22px + gaps + padding 的估计宽度
+      let left = rect.left
+      // 如果弹窗会超出右侧视口，就靠右边缘对齐
+      if (left + popupWidth > window.innerWidth) {
+        left = rect.right - popupWidth
+      }
+      setPos({ top: rect.bottom + 4, left })
     }
     setOpen((o) => !o)
   }
