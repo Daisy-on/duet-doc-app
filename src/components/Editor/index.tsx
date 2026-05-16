@@ -106,6 +106,13 @@ export default function Editor() {
       }
 
       if (from !== to) {
+        // 如果选区在代码块内，不显示润色气泡
+        if (editor.isActive('codeBlock')) {
+          setSelectedText('')
+          setBubblePos(null)
+          return
+        }
+
         // 同步选中文本到 Zustand
         const text = editor.state.doc.textBetween(from, to, ' ')
         setSelectedText(text)

@@ -23,6 +23,7 @@ function ToolBtn({ title, active, disabled, onClick, children }: ToolBtnProps) {
       title={title}
       disabled={disabled}
       onClick={onClick}
+      tabIndex={-1}
       className={[
         'flex items-center justify-center w-7 h-7 rounded transition-colors text-[14px]',
         'hover:bg-gray-100 hover:text-text-primary',
@@ -70,6 +71,7 @@ function DropItem({ label, active, onClick, className = '' }: DropItemProps) {
   return (
     <button
       onMouseDown={(e) => { e.preventDefault(); onClick() }}
+      tabIndex={-1}
       className={[
         'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors',
         active ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-text-primary',
@@ -110,6 +112,7 @@ function BlockTypeDropdown({ editor }: { editor: Editor }) {
       <button
         title="段落样式"
         onClick={() => setOpen((o) => !o)}
+        tabIndex={-1}
         className="flex items-center gap-1 px-2 h-7 rounded text-[13px] font-medium text-text-primary hover:bg-gray-100 transition-colors cursor-pointer whitespace-nowrap"
       >
         <Type size={13} className="text-text-secondary" />
@@ -168,6 +171,7 @@ function TextStyleDropdown({ editor }: { editor: Editor }) {
           {items.map((it) => (
             <button
               key={it.label}
+              tabIndex={-1}
               onMouseDown={(e) => { e.preventDefault(); it.action(); setOpen(false) }}
               className={[
                 'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors flex items-center gap-2',
@@ -202,6 +206,7 @@ function AlignDropdown({ editor }: { editor: Editor }) {
       <button
         title="对齐方式"
         onClick={() => setOpen((o) => !o)}
+        tabIndex={-1}
         className="flex items-center gap-0.5 w-8 h-7 rounded text-text-secondary hover:bg-gray-100 hover:text-text-primary transition-colors cursor-pointer justify-center"
       >
         {activeIcon}
@@ -212,6 +217,7 @@ function AlignDropdown({ editor }: { editor: Editor }) {
           {alignments.map((a) => (
             <button
               key={a.value}
+              tabIndex={-1}
               onMouseDown={(e) => {
                 e.preventDefault()
                 editor.chain().focus().setTextAlign(a.value).run()
@@ -256,6 +262,7 @@ function TableActionsDropdown({ editor }: { editor: Editor }) {
         <button
           title="表格操作"
           onClick={() => setOpen((o) => !o)}
+          tabIndex={-1}
           className="flex items-center gap-1 px-2 h-7 rounded text-[13px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer whitespace-nowrap"
         >
           表格操作 <ChevronDown size={12} />
@@ -265,6 +272,7 @@ function TableActionsDropdown({ editor }: { editor: Editor }) {
             {items.map((it) => (
               <button
                 key={it.label}
+                tabIndex={-1}
                 onMouseDown={(e) => { e.preventDefault(); it.action(); setOpen(false) }}
                 className="w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors flex items-center gap-2 text-text-primary"
               >
@@ -381,6 +389,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
           <input
             ref={inputRef}
             type="url"
+            tabIndex={-1}
             placeholder="输入链接地址 (https://...)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -389,6 +398,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
           />
           <button
             onClick={handleSubmit}
+            tabIndex={-1}
             className="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-indigo-700 transition-colors"
           >
             确定

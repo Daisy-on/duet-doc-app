@@ -22,12 +22,12 @@ export default function Sidebar() {
       {/* Nav Menu */}
       <ul className="list-none mb-6 space-y-1">
         <li>
-          <NavLink to="/" end className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink to="/" end tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
             <Home size={16} /> 开始
           </NavLink>
         </li>
         <li>
-          <NavLink to="/edit" className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink to="/edit" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
             {({ isActive }) => (
               <>
                 <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> AI 写作
@@ -36,12 +36,12 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/memo" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors">
+          <NavLink to="/memo" tabIndex={-1} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors">
             <StickyNote size={16} /> 小记
           </NavLink>
         </li>
         <li>
-          <NavLink to="/favorites" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors">
+          <NavLink to="/favorites" tabIndex={-1} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors">
             <Star size={16} /> 收藏
           </NavLink>
         </li>

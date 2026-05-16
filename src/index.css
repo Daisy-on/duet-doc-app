@@ -263,3 +263,14 @@ body {
 [data-theme="dark"] .custom-scrollbar {
   scrollbar-color: #4b5563 transparent;
 }
+/* --- TipTap 节点选中样式优化 --- */
+.ProseMirror-selectednode.code-block {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important; /* Indigo-500 with opacity */
+  border-color: #6366f1 !important;
+}
+
+/* 防止代码块在被选中时产生默认的灰色遮罩 */
+.ProseMirror-selectednode {
+  background: transparent !important;
+}

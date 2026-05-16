@@ -85,6 +85,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
       {/* 极简展开按钮 (折叠状态显示) */}
       {collapsed && (
         <button 
+          tabIndex={-1}
           className={`absolute top-2 right-2 p-1.5 rounded-lg z-10 transition-colors ${
             isDark ? 'text-[#A0A0A0] hover:text-white hover:bg-[#333]' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
           }`}
@@ -102,6 +103,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
         }`}>
           <div className="flex items-center gap-3 flex-1">
             <button 
+              tabIndex={-1}
               className={`p-1 rounded-md transition-colors ${isDark ? 'hover:text-white hover:bg-[#444]' : 'hover:text-gray-900 hover:bg-gray-300'}`}
               onClick={() => setCollapsed(true)}
               title="折叠工具栏"
@@ -111,6 +113,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
             
             <input
               type="text"
+              tabIndex={-1}
               className={`bg-transparent border-none outline-none text-sm w-48 font-medium ${
                 isDark ? 'text-[#D4D4D4] placeholder-[#666]' : 'text-gray-800 placeholder-gray-400'
               }`}
@@ -124,6 +127,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
             {/* Language Dropdown */}
             <div className="relative" ref={langRef}>
               <button 
+                tabIndex={-1}
                 onClick={() => setLangOpen(!langOpen)}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
                   isDark ? 'hover:text-white hover:bg-[#444]' : 'hover:text-gray-900 hover:bg-gray-300'
@@ -142,6 +146,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
                     return (
                       <button
                         key={lang}
+                        tabIndex={-1}
                         className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
                           isDark 
                             ? (isActive ? 'bg-[#3E3E3E] text-white' : 'hover:bg-[#3E3E3E] hover:text-white') 
@@ -164,6 +169,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
             {/* Theme Dropdown */}
             <div className="relative" ref={themeRef}>
               <button 
+                tabIndex={-1}
                 onClick={() => setThemeOpen(!themeOpen)}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
                   isDark ? 'hover:text-white hover:bg-[#444]' : 'hover:text-gray-900 hover:bg-gray-300'
@@ -181,6 +187,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
                     return (
                       <button
                         key={t}
+                        tabIndex={-1}
                         className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
                           isDark 
                             ? (isActive ? 'bg-[#3E3E3E] text-white' : 'hover:bg-[#3E3E3E] hover:text-white') 
@@ -203,6 +210,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
             <div className={`w-px h-4 mx-1 ${isDark ? 'bg-[#444]' : 'bg-gray-300'}`}></div>
 
             <button 
+              tabIndex={-1}
               className={`p-1.5 rounded-md transition-colors ${isDark ? 'hover:text-white hover:bg-[#444]' : 'hover:text-gray-900 hover:bg-gray-300'}`}
               title="复制代码区块"
               onClick={handleCopy}
