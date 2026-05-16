@@ -93,9 +93,10 @@ body {
 
 /* 链接 */
 .ProseMirror a {
-  color: #4F46E5; /* indigo-600 */
-  text-decoration: underline;
+  color: #3b82f6 !important; /* blue-500 */
+  text-decoration: underline !important;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 /* 行内代码 */
@@ -108,30 +109,26 @@ body {
   font-size: 0.875em;
 }
 
-/* 代码块 */
-.ProseMirror pre {
-  background-color: #1F2937; /* gray-800 */
-  color: #F9FAFB; /* gray-50 */
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-}
-.ProseMirror pre code {
-  color: inherit;
+/* -- TipTap Code Block NodeView 内部不应用行内代码样式 -- */
+.ProseMirror .code-block code {
+  background-color: transparent !important;
+  color: inherit !important;
   padding: 0;
-  background: none;
-  font-size: 0.875rem;
+  border-radius: 0;
 }
 
-/* 表格 */
+/* -- TipTap 表格样式 -- */
+.tableWrapper {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-color);
+}
 .ProseMirror table {
   border-collapse: collapse;
   table-layout: fixed;
   width: 100%;
   margin: 0;
-  overflow: hidden;
-  margin-bottom: 1rem;
 }
 .ProseMirror table td,
 .ProseMirror table th {
@@ -157,3 +154,81 @@ body {
   pointer-events: none;
 }
 
+/* --- Highlight.js 语法高亮样式 --- */
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote {
+  color: #6a9955;
+}
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-template-variable,
+[data-theme="dark"] .hljs-attribute,
+[data-theme="dark"] .hljs-tag,
+[data-theme="dark"] .hljs-name,
+[data-theme="dark"] .hljs-regexp,
+[data-theme="dark"] .hljs-link,
+[data-theme="dark"] .hljs-name,
+[data-theme="dark"] .hljs-selector-id,
+[data-theme="dark"] .hljs-selector-class {
+  color: #d16969;
+}
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-meta,
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-builtin-name,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-type,
+[data-theme="dark"] .hljs-params {
+  color: #b5cea8;
+}
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet {
+  color: #ce9178;
+}
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-section {
+  color: #dcdcaa;
+}
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag {
+  color: #569cd6;
+}
+
+[data-theme="light"] .hljs-comment,
+[data-theme="light"] .hljs-quote {
+  color: #008000;
+}
+[data-theme="light"] .hljs-variable,
+[data-theme="light"] .hljs-template-variable,
+[data-theme="light"] .hljs-attribute,
+[data-theme="light"] .hljs-tag,
+[data-theme="light"] .hljs-name,
+[data-theme="light"] .hljs-regexp,
+[data-theme="light"] .hljs-link,
+[data-theme="light"] .hljs-name,
+[data-theme="light"] .hljs-selector-id,
+[data-theme="light"] .hljs-selector-class {
+  color: #0000ff;
+}
+[data-theme="light"] .hljs-number,
+[data-theme="light"] .hljs-meta,
+[data-theme="light"] .hljs-built_in,
+[data-theme="light"] .hljs-builtin-name,
+[data-theme="light"] .hljs-literal,
+[data-theme="light"] .hljs-type,
+[data-theme="light"] .hljs-params {
+  color: #098658;
+}
+[data-theme="light"] .hljs-string,
+[data-theme="light"] .hljs-symbol,
+[data-theme="light"] .hljs-bullet {
+  color: #a31515;
+}
+[data-theme="light"] .hljs-title,
+[data-theme="light"] .hljs-section {
+  color: #795e26;
+}
+[data-theme="light"] .hljs-keyword,
+[data-theme="light"] .hljs-selector-tag {
+  color: #0000ff;
+}

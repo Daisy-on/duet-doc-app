@@ -308,8 +308,12 @@ function LinkPopover({ editor }: { editor: Editor }) {
     if (url) {
       const { from, to } = editor.state.selection
       if (from === to) {
-        // 选区为空时，直接插入带有链接属性的文本
-        editor.chain().focus().insertContent(`<a href="${url}">${url}</a>`).run()
+        // 选区为空时，先插入纯文本，选中它，然后再应用链接样式
+        editor.chain().focus()
+          .insertContent(url)
+          .setTextSelection({ from, to: from + url.length })
+          .setLink({ href: url })
+          .run()
       } else {
         editor.chain().focus().setLink({ href: url }).run()
       }
@@ -330,6 +334,15 @@ function LinkPopover({ editor }: { editor: Editor }) {
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [open])
+
+  // 监听外部触发的编辑事件
+  useEffect(() => {
+    const onCustomEdit = () => {
+      handleOpen()
+    }
+    window.addEventListener('duet-edit-link', onCustomEdit)
+    return () => window.removeEventListener('duet-edit-link', onCustomEdit)
+  }, [editor])
 
   // 按下 Esc 或 Enter
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -372,6 +385,79 @@ function LinkPopover({ editor }: { editor: Editor }) {
         </div>
       )}
     </>
+  )
+}
+
+// ─── 表格插入弹出选择器 ─────────────────────────────────────────────
+function TablePicker({ editor }: { editor: Editor }) {
+  const { open, setOpen, ref } = useDropdown()
+  const [hovered, setHovered] = useState({ r: 0, c: 0 })
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+  
+  const MAX_ROWS = 8
+  const MAX_COLS = 8
+
+  const rows = Array.from({ length: MAX_ROWS })
+  const cols = Array.from({ length: MAX_COLS })
+
+  const handleInsert = (r: number, c: number) => {
+    editor.chain().focus().insertTable({ rows: r, cols: c, withHeaderRow: true }).run()
+    setOpen(false)
+    setHovered({ r: 0, c: 0 })
+  }
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, left: rect.left })
+    }
+    setOpen((o) => !o)
+  }
+
+  return (
+    <div className="relative" ref={ref} onMouseLeave={() => setHovered({ r: 0, c: 0 })}>
+      <div ref={btnRef}>
+        <ToolBtn title="插入表格" onClick={handleToggle}>
+          <Table size={15} />
+        </ToolBtn>
+      </div>
+      {open && (
+        <div 
+          className="fixed bg-[#252525] border border-[#333] rounded-lg shadow-xl z-[100] p-3 animate-pop-in select-none"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          <div className="flex flex-col gap-[2px]">
+            {rows.map((_, rIndex) => {
+              const r = rIndex + 1
+              return (
+                <div key={r} className="flex gap-[2px]">
+                  {cols.map((_, cIndex) => {
+                    const c = cIndex + 1
+                    const isHovered = r <= hovered.r && c <= hovered.c
+                    return (
+                      <div
+                        key={c}
+                        onMouseEnter={() => setHovered({ r, c })}
+                        onClick={() => handleInsert(r, c)}
+                        className={`w-[22px] h-[22px] rounded-[2px] border cursor-pointer transition-colors ${
+                          isHovered 
+                            ? 'bg-[#1e3a5f] border-[#2c5282]' 
+                            : 'bg-[#111] border-[#333] hover:border-[#555]'
+                        }`}
+                      />
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+          <div className="text-sm text-gray-300 mt-3 text-left font-medium">
+            {hovered.r > 0 ? `${hovered.c} × ${hovered.r}` : '表格'}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -458,9 +544,7 @@ export default function Toolbar({ editor }: ToolbarProps) {
       <ToolBtn title="插入代码块" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
         <CodeSquare size={15} />
       </ToolBtn>
-      <ToolBtn title="插入表格" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
-        <Table size={15} />
-      </ToolBtn>
+      <TablePicker editor={editor} />
 
       {/* 9. 表格专有操作 (当激活时显示) */}
       <TableActionsDropdown editor={editor} />

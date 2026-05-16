@@ -9,6 +9,9 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table'
 import { TableCell } from '@tiptap/extension-table'
 import { TableHeader } from '@tiptap/extension-table'
+import { CustomCodeBlock } from './CodeBlockExtension'
+import LinkHoverPopover from './LinkHoverPopover'
+import { common, createLowlight } from 'lowlight'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
@@ -70,7 +73,12 @@ export default function Editor() {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false,
+      }),
+      CustomCodeBlock.configure({
+        lowlight: createLowlight(common),
+      }),
       Underline,
       Superscript,
       Subscript,
@@ -194,6 +202,8 @@ export default function Editor() {
           </div>
         </div>
       )}
+      
+      <LinkHoverPopover editor={editor} containerRef={editorContainerRef} />
 
       <EditorContent editor={editor} />
     </div>
