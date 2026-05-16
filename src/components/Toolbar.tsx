@@ -429,7 +429,7 @@ function TablePicker({ editor }: { editor: Editor }) {
       </div>
       {open && (
         <div 
-          className="absolute top-full right-0 mt-1 bg-[#252525] border border-[#333] rounded-lg shadow-lg z-50 p-3 select-none"
+          className="absolute top-full left-0 mt-1 bg-white border border-border-color rounded-lg shadow-lg z-50 p-3 select-none"
           onMouseLeave={() => setHovered({ r: 0, c: 0 })}
         >
           <div className="flex flex-col gap-[2px]">
@@ -447,8 +447,8 @@ function TablePicker({ editor }: { editor: Editor }) {
                         onClick={() => handleInsert(r, c)}
                         className={`w-[22px] h-[22px] rounded-[2px] border cursor-pointer transition-colors ${
                           isHovered 
-                            ? 'bg-[#1e3a5f] border-[#2c5282]' 
-                            : 'bg-[#111] border-[#333] hover:border-[#555]'
+                            ? 'bg-indigo-100 border-indigo-400' 
+                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                         }`}
                       />
                     )
@@ -457,8 +457,8 @@ function TablePicker({ editor }: { editor: Editor }) {
               )
             })}
           </div>
-          <div className="text-sm text-gray-300 mt-3 text-left font-medium">
-            {hovered.r > 0 ? `${hovered.c} × ${hovered.r}` : '表格'}
+          <div className="text-sm text-gray-500 mt-3 text-center font-medium">
+            {hovered.r > 0 ? `${hovered.c} × ${hovered.r}` : '插入表格'}
           </div>
         </div>
       )}
