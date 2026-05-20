@@ -1,10 +1,8 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { ReactNodeViewRenderer } from '@tiptap/react'
-import { common, createLowlight } from 'lowlight'
 import CodeBlockNodeView from './CodeBlockNodeView'
 import { TextSelection } from 'prosemirror-state'
 
-const lowlight = createLowlight(common)
 
 const INDENT = '  '
 const INDENT_SIZE = INDENT.length
@@ -32,6 +30,113 @@ function getLineRange(text: string, lineStarts: number[]) {
   const nextNewline = text.indexOf('\n', lastStart)
   const rangeEnd = nextNewline === -1 ? text.length : nextNewline
   return { rangeStart, rangeEnd }
+}
+
+function getAllLineStarts(text: string): number[] {
+  const starts: number[] = []
+  let pos = 0
+  while (pos <= text.length) {
+    starts.push(pos)
+    const nextNewline = text.indexOf('\n', pos)
+    if (nextNewline === -1) {
+      break
+    }
+    pos = nextNewline + 1
+  }
+  return starts
+}
+
+function calculateNewOffsets(
+  text: string,
+  fromOffset: number,
+  toOffset: number,
+  allLineStarts: number[],
+  lineChanges: { start: number; change: number }[]
+) {
+  const changesMap = new Map<number, number>()
+  for (const start of allLineStarts) {
+    changesMap.set(start, 0)
+  }
+  for (const c of lineChanges) {
+    changesMap.set(c.start, c.change)
+  }
+
+  const cumulativeChanges = new Map<number, number>()
+  let currentCumulative = 0
+  for (const start of allLineStarts) {
+    cumulativeChanges.set(start, currentCumulative)
+    currentCumulative += changesMap.get(start) || 0
+  }
+
+  const getLineIndex = (offset: number) => {
+    let low = 0
+    let high = allLineStarts.length - 1
+    let ans = 0
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2)
+      if (allLineStarts[mid] <= offset) {
+        ans = mid
+        low = mid + 1
+      } else {
+        high = mid - 1
+      }
+    }
+    return ans
+  }
+
+  // Calculate new fromOffset
+  const fromLineIdx = getLineIndex(fromOffset)
+  const fromLineStart = allLineStarts[fromLineIdx]
+  const d_from = changesMap.get(fromLineStart) || 0
+  const C_from = cumulativeChanges.get(fromLineStart) || 0
+
+  let newFromOffset = fromOffset
+  if (d_from > 0) {
+    if (fromOffset === fromLineStart) {
+      newFromOffset = fromLineStart + C_from
+    } else {
+      newFromOffset = fromOffset + C_from + d_from
+    }
+  } else if (d_from < 0) {
+    const x = -d_from
+    if (fromOffset - fromLineStart < x) {
+      newFromOffset = fromLineStart + C_from
+    } else {
+      newFromOffset = fromOffset + C_from + d_from
+    }
+  } else {
+    newFromOffset = fromOffset + C_from
+  }
+
+  // Calculate new toOffset
+  const toLineIdx = getLineIndex(toOffset)
+  const toLineStart = allLineStarts[toLineIdx]
+  const d_to = changesMap.get(toLineStart) || 0
+  const C_to = cumulativeChanges.get(toLineStart) || 0
+
+  let newToOffset = toOffset
+  if (d_to > 0) {
+    if (toOffset === toLineStart) {
+      newToOffset = toLineStart + C_to
+    } else {
+      newToOffset = toOffset + C_to + d_to
+    }
+  } else if (d_to < 0) {
+    const y = -d_to
+    if (toOffset - toLineStart < y) {
+      newToOffset = toLineStart + C_to
+    } else {
+      newToOffset = toOffset + C_to + d_to
+    }
+  } else {
+    newToOffset = toOffset + C_to
+  }
+
+  const newTextLength = text.length + currentCumulative
+  newFromOffset = Math.max(0, Math.min(newFromOffset, newTextLength))
+  newToOffset = Math.max(0, Math.min(newToOffset, newTextLength))
+
+  return { newFromOffset, newToOffset }
 }
 
 export const CustomCodeBlock = CodeBlockLowlight.extend({
@@ -88,10 +193,22 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
             nodeStart + rangeStart,
             nodeStart + rangeEnd,
           )
-          const totalAdded = INDENT_SIZE * lines.length
-          const newFrom = nodeStart + fromOffset + INDENT_SIZE
-          const newTo = nodeStart + toOffset + totalAdded
-          tr.setSelection(TextSelection.create(tr.doc, newFrom, newTo))
+
+          const allLineStarts = getAllLineStarts(text)
+          const lineChanges = lineStarts.map(start => ({
+            start,
+            change: INDENT_SIZE
+          }))
+
+          const { newFromOffset, newToOffset } = calculateNewOffsets(
+            text,
+            fromOffset,
+            toOffset,
+            allLineStarts,
+            lineChanges
+          )
+
+          tr.setSelection(TextSelection.create(tr.doc, nodeStart + newFromOffset, nodeStart + newToOffset))
 
           if (dispatch) {
             dispatch(tr)
@@ -157,11 +274,22 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
             nodeStart + rangeStart,
             nodeStart + rangeEnd,
           )
-          const totalRemoved = removedCounts.reduce((sum, n) => sum + n, 0)
-          const firstRemoved = removedCounts[0] ?? 0
-          const newFrom = nodeStart + fromOffset - firstRemoved
-          const newTo = nodeStart + toOffset - totalRemoved
-          tr.setSelection(TextSelection.create(tr.doc, newFrom, newTo))
+
+          const allLineStarts = getAllLineStarts(text)
+          const lineChanges = lineStarts.map((start, idx) => ({
+            start,
+            change: -removedCounts[idx]
+          }))
+
+          const { newFromOffset, newToOffset } = calculateNewOffsets(
+            text,
+            fromOffset,
+            toOffset,
+            allLineStarts,
+            lineChanges
+          )
+
+          tr.setSelection(TextSelection.create(tr.doc, nodeStart + newFromOffset, nodeStart + newToOffset))
 
           if (dispatch) {
             dispatch(tr)

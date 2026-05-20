@@ -38,7 +38,6 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
     }
 
     const handleMouseOut = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
       // If we are moving to the popover itself, don't close
       const related = e.relatedTarget as HTMLElement
       if (related?.closest('.link-hover-popover')) return
@@ -84,6 +83,7 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
       }}
     >
       <button 
+        tabIndex={-1}
         className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors"
         title="打开链接"
         onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}
@@ -91,6 +91,7 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
         <ExternalLink size={14} />
       </button>
       <button 
+        tabIndex={-1}
         className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors"
         title="编辑链接"
         onClick={() => {
@@ -107,6 +108,7 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
         <Edit2 size={14} />
       </button>
       <button 
+        tabIndex={-1}
         className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors"
         title="复制链接"
         onClick={() => {
@@ -117,6 +119,7 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
         <Copy size={14} />
       </button>
       <button 
+        tabIndex={-1}
         className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-[#333] rounded transition-colors"
         title="取消链接"
         onClick={() => {
