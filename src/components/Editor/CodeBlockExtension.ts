@@ -1,7 +1,9 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockNodeView from './CodeBlockNodeView'
-import { TextSelection, Selection, Plugin, PluginKey } from 'prosemirror-state'
+import { TextSelection, Plugin, PluginKey } from 'prosemirror-state'
+import { DOMSerializer } from 'prosemirror-model'
+import { Decoration, DecorationSet } from 'prosemirror-view'
 
 
 const INDENT = '  '
@@ -141,13 +143,15 @@ function calculateNewOffsets(
 
 export const CustomCodeBlock = CodeBlockLowlight.extend({
   addAttributes() {
+    const parentAttrs = (this.parent?.() || {}) as Record<string, any>
     return {
-      ...this.parent?.(),
+      ...parentAttrs,
+      language: {
+        ...parentAttrs.language,
+        default: 'plaintext',
+      },
       name: {
         default: '',
-      },
-      language: {
-        default: 'plaintext',
       },
       theme: {
         default: 'dark',
@@ -304,6 +308,7 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
 
   addProseMirrorPlugins() {
     return [
+      ...(this.parent?.() || []),
       new Plugin({
         key: new PluginKey('codeBlockSelectionRestriction'),
         appendTransaction(transactions, _oldState, newState) {
@@ -312,7 +317,7 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
           }
 
           const { selection } = newState
-          if (selection.empty || !selection.$anchor || !selection.$head) {
+          if (!(selection instanceof TextSelection)) {
             return null
           }
 
@@ -330,6 +335,8 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
           }
 
           const anchorInfo = getCodeBlockInfo(selection.$anchor)
+          const headInfo = getCodeBlockInfo(selection.$head)
+
           if (anchorInfo) {
             // Rule 1: Anchor is inside code block. Clamp head to the same code block.
             let newHead = selection.head
@@ -347,31 +354,176 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
               tr.setSelection(TextSelection.create(newState.doc, selection.anchor, newHead))
               return tr
             }
-          } else {
-            // Rule 2: Anchor is outside. If head is inside a code block, clamp it to the edge.
-            const headInfo = getCodeBlockInfo(selection.$head)
-            if (headInfo) {
-              let newHead = selection.head
-              if (selection.anchor <= headInfo.start) {
-                const searchStart = newState.doc.resolve(headInfo.start)
-                const fallbackSel = Selection.findFrom(searchStart, -1, true)
-                newHead = fallbackSel ? fallbackSel.head : headInfo.start
-              } else if (selection.anchor >= headInfo.end) {
-                const searchEnd = newState.doc.resolve(headInfo.end)
-                const fallbackSel = Selection.findFrom(searchEnd, 1, true)
-                newHead = fallbackSel ? fallbackSel.head : headInfo.end
-              }
+          } else if (headInfo) {
+            // Rule 2: Anchor is outside, head is inside code block. Snap head to the boundary.
+            let newHead = selection.head
+            if (selection.anchor < headInfo.start) {
+              newHead = headInfo.end - 1
+            } else if (selection.anchor > headInfo.end) {
+              newHead = headInfo.start + 1
+            }
 
-              if (newHead !== selection.head) {
-                const tr = newState.tr
-                tr.setSelection(TextSelection.create(newState.doc, selection.anchor, newHead))
-                return tr
-              }
+            if (newHead !== selection.head) {
+              const tr = newState.tr
+              tr.setSelection(TextSelection.create(newState.doc, selection.anchor, newHead))
+              return tr
             }
           }
 
           return null
         },
+        props: {
+          decorations(state) {
+            const { selection } = state
+            if (selection.empty) {
+              return null
+            }
+            
+            const decos: Decoration[] = []
+            
+            state.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+              if (node.type.name === 'codeBlock') {
+                const anchorPos = selection.$anchor.pos
+                const isAnchorOutside = anchorPos < pos || anchorPos > pos + node.nodeSize
+                if (isAnchorOutside && selection.from <= pos + 1 && selection.to >= pos + node.nodeSize - 1) {
+                  decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'is-fully-selected' }))
+                }
+              }
+            })
+            
+            return decos.length ? DecorationSet.create(state.doc, decos) : null
+          },
+          handleDOMEvents: {
+            copy(view, event) {
+              const { state } = view
+              const { selection } = state
+              if (selection.empty) {
+                return false
+              }
+
+              const slice = selection.content()
+              
+              let hasCodeBlock = false
+              slice.content.forEach((node) => {
+                if (node.type.name === 'codeBlock') {
+                  hasCodeBlock = true
+                }
+                node.descendants((child) => {
+                  if (child.type.name === 'codeBlock') {
+                    hasCodeBlock = true
+                  }
+                })
+              })
+
+              if (!hasCodeBlock) {
+                return false
+              }
+
+              let plainText = ''
+              slice.content.forEach((node) => {
+                if (node.type.name === 'codeBlock') {
+                  const lang = node.attrs.language || ''
+                  plainText += `\`\`\`${lang}\n${node.textContent}\n\`\`\`\n`
+                } else {
+                  const serializeNode = (n: any): string => {
+                    if (n.type.name === 'codeBlock') {
+                      const lang = n.attrs.language || ''
+                      return `\`\`\`${lang}\n${n.textContent}\n\`\`\`\n`
+                    }
+                    if (n.isText) {
+                      return n.text || ''
+                    }
+                    let text = ''
+                    n.content.forEach((child: any) => {
+                      text += serializeNode(child)
+                    })
+                    if (n.isBlock) {
+                      text += '\n'
+                    }
+                    return text
+                  }
+                  plainText += serializeNode(node)
+                }
+              })
+
+              plainText = plainText.trim()
+
+              const serializer = view.someProp('clipboardSerializer') || DOMSerializer.fromSchema(state.schema)
+              const dom = serializer.serializeFragment(slice.content)
+              const div = document.createElement('div')
+              div.appendChild(dom)
+              const htmlText = div.innerHTML
+
+              if (event.clipboardData) {
+                event.clipboardData.clearData()
+                event.clipboardData.setData('text/plain', plainText)
+                event.clipboardData.setData('text/html', htmlText)
+                event.preventDefault()
+                return true
+              }
+
+              return false
+            },
+            mousedown(_view, event) {
+              const target = event.target as HTMLElement
+              const codeBlockEl = target.closest('.code-block')
+              if (codeBlockEl) {
+                document.body.classList.add('is-selecting-codeblock')
+                
+                let anchorNode: Node | null = null
+                let anchorOffset = 0
+                
+                const handleWindowMouseMove = (moveEvent: MouseEvent) => {
+                  const sel = window.getSelection()
+                  if (!sel) return
+                  
+                  if (!anchorNode && sel.anchorNode) {
+                    if (codeBlockEl.contains(sel.anchorNode)) {
+                      anchorNode = sel.anchorNode
+                      anchorOffset = sel.anchorOffset
+                    }
+                  }
+                  
+                  if (!anchorNode) return
+
+                  const rect = codeBlockEl.getBoundingClientRect()
+                  const isOutside = moveEvent.clientY < rect.top ||
+                                    moveEvent.clientY > rect.bottom ||
+                                    moveEvent.clientX < rect.left ||
+                                    moveEvent.clientX > rect.right
+
+                  if (isOutside) {
+                    moveEvent.preventDefault()
+                    moveEvent.stopPropagation()
+                    
+                    const codeEl = codeBlockEl.querySelector('code')
+                    if (codeEl) {
+                      if (moveEvent.clientY < rect.top || (moveEvent.clientY <= rect.bottom && moveEvent.clientX < rect.left)) {
+                        sel.setBaseAndExtent(anchorNode, anchorOffset, codeEl, 0)
+                      } else {
+                        sel.setBaseAndExtent(anchorNode, anchorOffset, codeEl, codeEl.childNodes.length)
+                      }
+                    }
+                  }
+                }
+                
+                const handleWindowMouseUp = () => {
+                  document.body.classList.remove('is-selecting-codeblock')
+                  window.removeEventListener('mousemove', handleWindowMouseMove, { capture: true })
+                  window.removeEventListener('mouseup', handleWindowMouseUp, { capture: true })
+                }
+                
+                window.addEventListener('mousemove', handleWindowMouseMove, { capture: true })
+                window.addEventListener('mouseup', handleWindowMouseUp, { capture: true })
+              }
+              return false
+            },
+            mouseup() {
+              document.body.classList.remove('is-selecting-codeblock')
+              return false
+            }
+          }
+        }
       }),
     ]
   },

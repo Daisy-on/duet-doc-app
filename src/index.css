@@ -264,13 +264,47 @@ body {
   scrollbar-color: #4b5563 transparent;
 }
 /* --- TipTap 节点选中样式优化 --- */
-.ProseMirror-selectednode.code-block {
+.ProseMirror-selectednode .code-block,
+.is-fully-selected .code-block {
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important; /* Indigo-500 with opacity */
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4) !important; /* Indigo-500 with higher opacity */
   border-color: #6366f1 !important;
+  position: relative;
+}
+
+.ProseMirror-selectednode .code-block::after,
+.is-fully-selected .code-block::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(99, 102, 241, 0.12); /* A beautiful premium indigo overlay */
+  border-radius: inherit; /* matches the node wrapper's rounded-xl border-radius */
+  pointer-events: none; /* Let clicks pass through */
+  z-index: 10;
+}
+
+/* Hide native selection highlight for text inside code block when it is fully selected */
+.is-fully-selected .code-block *::selection,
+.is-fully-selected .code-block::selection {
+  background: transparent !important;
 }
 
 /* 防止代码块在被选中时产生默认的灰色遮罩 */
 .ProseMirror-selectednode {
   background: transparent !important;
+}
+
+/* Rule 1 selection restriction: disable text selection outside code block when dragging starts inside */
+body.is-selecting-codeblock *:not(.code-block, .code-block *) {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.is-selecting-codeblock .code-block,
+body.is-selecting-codeblock .code-block * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
