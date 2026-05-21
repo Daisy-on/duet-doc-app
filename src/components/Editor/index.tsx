@@ -106,8 +106,12 @@ export default function Editor() {
       }
 
       if (from !== to) {
-        // 如果选区在代码块内，不显示润色气泡
-        if (editor.isActive('codeBlock')) {
+        // 如果选区在代码块内，或者是代码块的节点选择，不显示润色气泡
+        const selection = editor.state.selection
+        const isCodeBlockSelection = editor.isActive('codeBlock') ||
+          ('node' in selection && (selection as any).node?.type.name === 'codeBlock')
+
+        if (isCodeBlockSelection) {
           setSelectedText('')
           setBubblePos(null)
           return

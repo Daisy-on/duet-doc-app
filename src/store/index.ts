@@ -27,6 +27,16 @@ export const useEditorStore = create<EditorState>((set) => ({
     <p>Vite 的核心思想是将开发服务器作为 ESM 的载体，在开发环境下直接返回原生 ES 模块，浏览器按需加载，从而跳过了打包这一耗时步骤。</p>
     <h2>二、依赖预构建</h2>
     <p>Vite 使用 esbuild 对依赖进行预构建，将 CommonJS 或 UMD 格式的依赖转换为 ESM 格式，缓存在 node_modules/.vite 中。</p>
+    <h2>三、代码示例</h2>
+    <pre><code class="language-javascript">&lt;script setup lang="ts" name="Category"&gt;
+import {reactive} from 'vue'
+let games = reactive([
+  {id:'asgdytsa01',name:'英雄联盟'},
+  {id:'asgdytsa02',name:'王者荣耀'},
+  {id:'asgdytsa03',name:'红色警戒'},
+  {id:'asgdytsa04',name:'斗罗大陆'}
+])
+&lt;/script&gt;</code></pre>
   `,
   setContent: (content) => set({ content }),
   selectedText: '',

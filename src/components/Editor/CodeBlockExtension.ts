@@ -1,7 +1,7 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockNodeView from './CodeBlockNodeView'
-import { TextSelection } from 'prosemirror-state'
+import { TextSelection, Selection, Plugin, PluginKey } from 'prosemirror-state'
 
 
 const INDENT = '  '
@@ -300,6 +300,80 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
         return false
       },
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('codeBlockSelectionRestriction'),
+        appendTransaction(transactions, _oldState, newState) {
+          if (!transactions.some((tr) => tr.selectionSet)) {
+            return null
+          }
+
+          const { selection } = newState
+          if (selection.empty || !selection.$anchor || !selection.$head) {
+            return null
+          }
+
+          const getCodeBlockInfo = ($pos: any) => {
+            for (let d = $pos.depth; d > 0; d--) {
+              if ($pos.node(d).type.name === 'codeBlock') {
+                return {
+                  node: $pos.node(d),
+                  start: $pos.before(d),
+                  end: $pos.after(d),
+                }
+              }
+            }
+            return null
+          }
+
+          const anchorInfo = getCodeBlockInfo(selection.$anchor)
+          if (anchorInfo) {
+            // Rule 1: Anchor is inside code block. Clamp head to the same code block.
+            let newHead = selection.head
+            const minPos = anchorInfo.start + 1
+            const maxPos = anchorInfo.end - 1
+
+            if (selection.head < minPos) {
+              newHead = minPos
+            } else if (selection.head > maxPos) {
+              newHead = maxPos
+            }
+
+            if (newHead !== selection.head) {
+              const tr = newState.tr
+              tr.setSelection(TextSelection.create(newState.doc, selection.anchor, newHead))
+              return tr
+            }
+          } else {
+            // Rule 2: Anchor is outside. If head is inside a code block, clamp it to the edge.
+            const headInfo = getCodeBlockInfo(selection.$head)
+            if (headInfo) {
+              let newHead = selection.head
+              if (selection.anchor <= headInfo.start) {
+                const searchStart = newState.doc.resolve(headInfo.start)
+                const fallbackSel = Selection.findFrom(searchStart, -1, true)
+                newHead = fallbackSel ? fallbackSel.head : headInfo.start
+              } else if (selection.anchor >= headInfo.end) {
+                const searchEnd = newState.doc.resolve(headInfo.end)
+                const fallbackSel = Selection.findFrom(searchEnd, 1, true)
+                newHead = fallbackSel ? fallbackSel.head : headInfo.end
+              }
+
+              if (newHead !== selection.head) {
+                const tr = newState.tr
+                tr.setSelection(TextSelection.create(newState.doc, selection.anchor, newHead))
+                return tr
+              }
+            }
+          }
+
+          return null
+        },
+      }),
+    ]
   },
 
   addNodeView() {
