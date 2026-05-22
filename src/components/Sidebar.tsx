@@ -1,12 +1,32 @@
 import { Home, Sparkles, StickyNote, Star, Folder, Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { NavLink, useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
   const { knowledgeBases, groups, documents } = useKnowledgeBaseStore();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedKbs, setExpandedKbs] = useState<Record<string, boolean>>({});
+
+  // Auto-expand the active KB when navigation happens
+  useEffect(() => {
+    if (activeKbId) {
+      setExpandedKbs((prev) => ({
+        ...prev,
+        [activeKbId]: true,
+      }));
+    }
+  }, [activeKbId]);
+
+  const toggleKb = (kbId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedKbs((prev) => ({
+      ...prev,
+      [kbId]: !prev[kbId],
+    }));
+  };
 
   const toggleGroup = (groupId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -74,29 +94,49 @@ export default function Sidebar() {
 
             return (
               <li key={kb.id} className="space-y-0.5">
-                <NavLink
-                  to={`/kb/${kb.id}`}
-                  className={({ isActive }) => 
-                    `px-3 py-2 rounded-md cursor-pointer flex items-center justify-between hover:bg-hover-bg hover:text-text-primary transition-colors ${
-                      isActive ? 'bg-indigo-50/80 text-accent font-semibold' : 'text-text-secondary'
-                    }`
-                  }
+                <div
+                  className={`flex items-center justify-between rounded-md transition-colors ${
+                    isActiveKb ? 'bg-indigo-50/80' : 'hover:bg-hover-bg'
+                  }`}
                 >
-                  <div className="flex items-center gap-2 truncate">
+                  <NavLink
+                    to={`/kb/${kb.id}`}
+                    onClick={() => {
+                      setExpandedKbs((prev) => ({
+                        ...prev,
+                        [kb.id]: true,
+                      }));
+                    }}
+                    className={`flex items-center gap-2.5 truncate flex-1 pl-3 py-2 min-w-0 ${
+                      kbDocs.length > 0 ? 'pr-2' : 'pr-3'
+                    } ${
+                      isActiveKb ? 'text-accent font-semibold' : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
                     <Folder 
                       size={14} 
                       className="shrink-0 transition-colors"
                       style={{ color: kb.icon }}
                     />
                     <span className="truncate">{kb.name}</span>
-                  </div>
-                  {isActiveKb && kbDocs.length > 0 && (
-                    <ChevronDown size={12} className="text-text-secondary" />
+                  </NavLink>
+                  {kbDocs.length > 0 && (
+                    <div
+                      onClick={(e) => toggleKb(kb.id, e)}
+                      className="p-1 mr-2 rounded hover:bg-gray-200/50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                      title={!!expandedKbs[kb.id] ? "收起" : "展开"}
+                    >
+                      {!!expandedKbs[kb.id] ? (
+                        <ChevronDown size={12} />
+                      ) : (
+                        <ChevronRight size={12} />
+                      )}
+                    </div>
                   )}
-                </NavLink>
+                </div>
 
-                {/* Sub-tree for the active KB */}
-                {isActiveKb && (
+                {/* Sub-tree for the KB */}
+                {!!expandedKbs[kb.id] && (
                   <ul className="ml-5 pl-2.5 border-l border-gray-200/60 space-y-1 py-1">
                     {/* Groups */}
                     {kbGroups.map((group) => {

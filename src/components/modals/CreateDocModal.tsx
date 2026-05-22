@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, ChevronDown, FolderOpen } from 'lucide-react';
+import { X, ChevronDown, FolderOpen, Folder, Check } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
 
 interface CreateDocModalProps {
@@ -12,7 +12,46 @@ interface CreateDocModalProps {
 export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: CreateDocModalProps) {
   const { knowledgeBases, createDocument } = useKnowledgeBaseStore();
   const [selectedKbId, setSelectedKbId] = useState(knowledgeBases[0]?.id || '');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Reset selectedKbId to first KB or ensure it is valid when modal opens or KBs change
+  useEffect(() => {
+    if (isOpen) {
+      if (!selectedKbId || !knowledgeBases.some(kb => kb.id === selectedKbId)) {
+        setSelectedKbId(knowledgeBases[0]?.id || '');
+      }
+    }
+  }, [isOpen, knowledgeBases, selectedKbId]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const selectedKb = knowledgeBases.find((kb) => kb.id === selectedKbId);
 
   if (!isOpen) return null;
 
@@ -34,7 +73,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
       <div 
-        className="bg-white rounded-xl shadow-2xl w-[420px] border border-border-color overflow-hidden flex flex-col p-6 animate-modal-scale-in"
+        className="bg-white rounded-xl shadow-2xl w-[420px] min-h-[320px] border border-border-color flex flex-col p-6 animate-modal-scale-in relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -49,7 +88,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
         </div>
 
         {knowledgeBases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
             <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mb-3">
               <FolderOpen size={24} />
             </div>
@@ -65,24 +104,76 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">选择所属知识库</label>
-              <div className="relative">
-                <select
-                  value={selectedKbId}
-                  onChange={(e) => setSelectedKbId(e.target.value)}
-                  className="w-full pl-3.5 pr-10 py-2.5 border border-border-color rounded-lg text-sm text-text-primary outline-none focus:border-accent transition-colors appearance-none bg-white cursor-pointer"
+              <div className="relative" ref={dropdownRef}>
+                {/* Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className={`w-full flex items-center justify-between pl-3.5 pr-3.5 py-2.5 border rounded-lg text-sm text-text-primary outline-none transition-all bg-white cursor-pointer select-none ${
+                    dropdownOpen 
+                      ? 'border-accent ring-2 ring-indigo-100 shadow-sm' 
+                      : 'border-border-color hover:border-text-ghost shadow-sm'
+                  }`}
                 >
-                  {knowledgeBases.map((kb) => (
-                    <option key={kb.id} value={kb.id}>
-                      {kb.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none">
-                  <ChevronDown size={16} />
-                </div>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {selectedKb ? (
+                      <>
+                        <Folder
+                          size={15}
+                          className="shrink-0 transition-colors"
+                          style={{ color: selectedKb.icon }}
+                        />
+                        <span className="truncate font-medium">{selectedKb.name}</span>
+                      </>
+                    ) : (
+                      <span className="text-text-ghost">选择知识库...</span>
+                    )}
+                  </div>
+                  <ChevronDown
+                    size={15}
+                    className={`text-text-secondary shrink-0 transition-transform duration-200 ${
+                      dropdownOpen ? 'transform rotate-180 text-text-primary' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Dropdown Options List */}
+                {dropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-1.5 bg-white border border-border-color rounded-lg shadow-xl py-1.5 max-h-[172px] overflow-y-auto z-50 animate-dropdown-fade-in custom-scrollbar">
+                    {knowledgeBases.map((kb) => {
+                      const isSelected = kb.id === selectedKbId;
+                      return (
+                        <div
+                          key={kb.id}
+                          onClick={() => {
+                            setSelectedKbId(kb.id);
+                            setDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between px-3.5 py-2.5 text-sm transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'bg-indigo-50/50 text-accent font-semibold' 
+                              : 'text-text-primary hover:bg-hover-bg'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Folder
+                              size={15}
+                              className="shrink-0"
+                              style={{ color: kb.icon }}
+                            />
+                            <span className="truncate">{kb.name}</span>
+                          </div>
+                          {isSelected && (
+                            <Check size={14} className="text-accent shrink-0" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
