@@ -73,6 +73,38 @@ body {
   animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* 模态弹窗缩放淡入动画 */
+@keyframes modalScaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-scale-in {
+  animation: modalScaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 下拉菜单淡入动画 */
+@keyframes dropdownFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown-fade-in {
+  animation: dropdownFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* --- TipTap 节点还原样式 (对抗 Tailwind Preflight) --- */
 
 /* 列表 */
