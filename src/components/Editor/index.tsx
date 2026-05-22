@@ -12,7 +12,9 @@ import { TableHeader } from '@tiptap/extension-table'
 import { CustomCodeBlock } from './CodeBlockExtension'
 import LinkHoverPopover from './LinkHoverPopover'
 import { common, createLowlight } from 'lowlight'
+import { useParams } from 'react-router-dom'
 import { useEditorStore, type HeadingItem } from '../../store'
+import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
@@ -50,8 +52,10 @@ function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) 
 }
 
 export default function Editor() {
-  const content = useEditorStore((state) => state.content)
-  const setContent = useEditorStore((state) => state.setContent)
+  const { docId } = useParams<{ docId: string }>()
+  const { documents, updateDocument } = useKnowledgeBaseStore()
+  const doc = documents.find((d) => d.id === docId)
+
   const setSelectedText = useEditorStore((state) => state.setSelectedText)
   const setHeadings = useEditorStore((state) => state.setHeadings)
   const setEditorInstance = useEditorStore((state) => state.setEditorInstance)
@@ -89,12 +93,26 @@ export default function Editor() {
       TableHeader,
       TableCell,
     ],
-    content: content,
+    content: doc?.content || '',
     onCreate: ({ editor }) => {
       syncHeadings(editor)
     },
     onUpdate: ({ editor }) => {
-      setContent(editor.getHTML())
+      if (docId) {
+        const html = editor.getHTML()
+        let firstH1Text = ''
+        editor.state.doc.forEach((node) => {
+          if (node.type.name === 'heading' && node.attrs.level === 1 && !firstH1Text) {
+            firstH1Text = node.textContent
+          }
+        })
+        
+        const updates: { content: string; title?: string } = { content: html }
+        if (firstH1Text !== doc?.title) {
+          updates.title = firstH1Text
+        }
+        updateDocument(docId, updates)
+      }
       syncHeadings(editor)
     },
     onSelectionUpdate: ({ editor }) => {
@@ -167,10 +185,13 @@ export default function Editor() {
 
   // 同步外部 content 状态
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content, { emitUpdate: false })
+    console.log('[Editor content sync] doc?.content changed:', doc?.content, 'editor.getHTML():', editor?.getHTML());
+    if (editor && doc && doc.content !== editor.getHTML()) {
+      console.log('[Editor content sync] Executing setContent');
+      editor.commands.setContent(doc.content, { emitUpdate: false })
+      syncHeadings(editor)
     }
-  }, [content, editor])
+  }, [doc?.content, editor, syncHeadings])
 
   return (
     <div ref={editorContainerRef} className="flex-1 px-16 py-10 overflow-y-auto relative">

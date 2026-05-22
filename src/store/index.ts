@@ -8,8 +8,6 @@ export interface HeadingItem {
 }
 
 interface EditorState {
-  content: string;
-  setContent: (content: string) => void;
   selectedText: string;
   setSelectedText: (text: string) => void;
   headings: HeadingItem[];
@@ -20,8 +18,6 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
-  content: '',
-  setContent: (content) => set({ content }),
   selectedText: '',
   setSelectedText: (text) => set({ selectedText: text }),
   headings: [],

@@ -10,30 +10,50 @@ import {
   CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal,
 } from 'lucide-react';
 
+// Escape HTML characters to safely insert into HTML string
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Replace the first <h1> tag's inner text while preserving any tag attributes
+function replaceFirstH1(html: string, newTitle: string): string {
+  const escapedTitle = escapeHtml(newTitle);
+  const match = html.match(/<h1([^>]*)>([\s\S]*?)<\/h1>/);
+  if (match) {
+    return html.replace(/<h1([^>]*)>([\s\S]*?)<\/h1>/, `<h1$1>${escapedTitle}</h1>`);
+  } else {
+    return `<h1>${escapedTitle}</h1>` + html;
+  }
+}
+
 export default function DocEdit() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
   
   const { documents, updateDocument } = useKnowledgeBaseStore();
+  (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
+  (window as any).useEditorStore = useEditorStore;
   const doc = documents.find((d) => d.id === docId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
-  const editorContent = useEditorStore((state) => state.content);
-  const setContent = useEditorStore((state) => state.setContent);
 
-  // 1. When switching documents (docId changes), load the new document content into useEditorStore
+  // 1. When switching documents (docId changes), ensure the first <h1> inside the content matches the document's external title
   useEffect(() => {
+    console.log('[DocEdit] docId changed:', docId, 'doc:', doc);
     if (doc) {
-      setContent(doc.content);
+      const updatedContent = replaceFirstH1(doc.content, doc.title);
+      console.log('[DocEdit] updatedContent on load:', updatedContent);
+      if (updatedContent !== doc.content) {
+        console.log('[DocEdit] Mismatch found on load, updating doc store');
+        updateDocument(doc.id, { content: updatedContent });
+      }
     }
   }, [docId]);
-
-  // 2. When the editor content changes, auto-save it back to the knowledge base store
-  useEffect(() => {
-    if (docId && doc && editorContent && editorContent !== doc.content) {
-      updateDocument(docId, { content: editorContent });
-    }
-  }, [editorContent, docId]);
 
   // If document doesn't exist, show error and option to redirect
   if (!doc || !docId || !kbId) {
@@ -68,7 +88,15 @@ export default function DocEdit() {
             <input
               type="text"
               value={doc.title}
-              onChange={(e) => updateDocument(doc.id, { title: e.target.value })}
+              onChange={(e) => {
+                const newTitle = e.target.value;
+                const updatedContent = replaceFirstH1(doc.content, newTitle);
+                console.log('[DocEdit input onChange] newTitle:', newTitle, 'updatedContent:', updatedContent);
+                updateDocument(doc.id, { 
+                  title: newTitle, 
+                  content: updatedContent 
+                });
+              }}
               className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
               placeholder="无标题文档"
             />
