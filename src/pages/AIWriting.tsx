@@ -227,7 +227,7 @@ export default function AIWriting() {
 
         {/* Top Header */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className="flex items-center gap-3 pl-8 md:pl-0">
+          <div className={`flex items-center gap-3 transition-all duration-150 ${isCatalogCollapsed ? 'pl-10' : 'pl-8 md:pl-0'}`}>
             <h2 className="text-[15px] font-bold text-text-primary">和 Duet AI 一起写作</h2>
             <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200">
               R1 Model

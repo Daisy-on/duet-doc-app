@@ -36,6 +36,7 @@ export default function MemoEdit() {
   const navigate = useNavigate();
   
   const { documents, updateDocument, isCatalogCollapsed, setIsCatalogCollapsed } = useKnowledgeBaseStore();
+  (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
   const memo = documents.find((d) => d.id === memoId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
@@ -88,7 +89,7 @@ export default function MemoEdit() {
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
         {/* Header */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className="flex items-center gap-4">
+          <div className={`flex items-center gap-4 transition-all duration-150 ${isCatalogCollapsed ? 'pl-10' : 'pl-0'}`}>
             <input
               type="text"
               value={memo.title}
