@@ -21,9 +21,6 @@ interface DocTreeItemProps {
   handleFinishRenameDoc: () => void;
   handleCancelRenameDoc: () => void;
   
-  activeDocAddMenuId: string | null;
-  setActiveDocAddMenuId: (id: string | null) => void;
-  setDocAddMenuAnchorEl: (el: HTMLElement | null) => void;
   activeDocActionMenuId: string | null;
   setActiveDocActionMenuId: (id: string | null) => void;
   setDocActionMenuAnchorEl: (el: HTMLElement | null) => void;
@@ -42,9 +39,6 @@ function DocTreeItem({
   setRenamingDocTitle,
   handleFinishRenameDoc,
   handleCancelRenameDoc,
-  activeDocAddMenuId,
-  setActiveDocAddMenuId,
-  setDocAddMenuAnchorEl,
   activeDocActionMenuId,
   setActiveDocActionMenuId,
   setDocActionMenuAnchorEl,
@@ -67,7 +61,7 @@ function DocTreeItem({
           ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[22px]'
           : 'text-text-secondary'
       } ${
-        activeDocAddMenuId === doc.id || activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''
+        activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''
       }`}
       style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
     >
@@ -99,29 +93,12 @@ function DocTreeItem({
           className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 ml-1.5"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Plus Button Menu */}
-          <button
-            onClick={(e) => {
-              clearGroupMenus();
-              setActiveDocAddMenuId(activeDocAddMenuId === doc.id ? null : doc.id);
-              setDocAddMenuAnchorEl(activeDocAddMenuId === doc.id ? null : e.currentTarget);
-              setActiveDocActionMenuId(null);
-              setDocActionMenuAnchorEl(null);
-            }}
-            className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
-            title="新建同级内容"
-          >
-            <Plus size={13} />
-          </button>
-
           {/* Action Dot Menu */}
           <button
             onClick={(e) => {
               clearGroupMenus();
               setActiveDocActionMenuId(activeDocActionMenuId === doc.id ? null : doc.id);
               setDocActionMenuAnchorEl(activeDocActionMenuId === doc.id ? null : e.currentTarget);
-              setActiveDocAddMenuId(null);
-              setDocAddMenuAnchorEl(null);
             }}
             className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
             title="更多操作"
@@ -176,9 +153,6 @@ interface GroupTreeNodeProps {
   setRenamingDocTitle: (title: string) => void;
   handleFinishRenameDoc: () => void;
   handleCancelRenameDoc: () => void;
-  activeDocAddMenuId: string | null;
-  setActiveDocAddMenuId: (id: string | null) => void;
-  setDocAddMenuAnchorEl: (el: HTMLElement | null) => void;
   activeDocActionMenuId: string | null;
   setActiveDocActionMenuId: (id: string | null) => void;
   setDocActionMenuAnchorEl: (el: HTMLElement | null) => void;
@@ -221,9 +195,6 @@ function GroupTreeNode({
   setRenamingDocTitle,
   handleFinishRenameDoc,
   handleCancelRenameDoc,
-  activeDocAddMenuId,
-  setActiveDocAddMenuId,
-  setDocAddMenuAnchorEl,
   activeDocActionMenuId,
   setActiveDocActionMenuId,
   setDocActionMenuAnchorEl,
@@ -295,8 +266,6 @@ function GroupTreeNode({
                 setAddMenuAnchorEl(activeAddMenuId === group.id ? null : e.currentTarget);
                 setActiveActionMenuId(null);
                 setActionMenuAnchorEl(null);
-                setActiveDocAddMenuId(null);
-                setDocAddMenuAnchorEl(null);
                 setActiveDocActionMenuId(null);
                 setDocActionMenuAnchorEl(null);
               }}
@@ -313,8 +282,6 @@ function GroupTreeNode({
                 setActionMenuAnchorEl(activeActionMenuId === group.id ? null : e.currentTarget);
                 setActiveAddMenuId(null);
                 setAddMenuAnchorEl(null);
-                setActiveDocAddMenuId(null);
-                setDocAddMenuAnchorEl(null);
                 setActiveDocActionMenuId(null);
                 setDocActionMenuAnchorEl(null);
               }}
@@ -368,9 +335,6 @@ function GroupTreeNode({
               setRenamingDocTitle={setRenamingDocTitle}
               handleFinishRenameDoc={handleFinishRenameDoc}
               handleCancelRenameDoc={handleCancelRenameDoc}
-              activeDocAddMenuId={activeDocAddMenuId}
-              setActiveDocAddMenuId={setActiveDocAddMenuId}
-              setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
               activeDocActionMenuId={activeDocActionMenuId}
               setActiveDocActionMenuId={setActiveDocActionMenuId}
               setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
@@ -414,9 +378,6 @@ function GroupTreeNode({
               setRenamingDocTitle={setRenamingDocTitle}
               handleFinishRenameDoc={handleFinishRenameDoc}
               handleCancelRenameDoc={handleCancelRenameDoc}
-              activeDocAddMenuId={activeDocAddMenuId}
-              setActiveDocAddMenuId={setActiveDocAddMenuId}
-              setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
               activeDocActionMenuId={activeDocActionMenuId}
               setActiveDocActionMenuId={setActiveDocActionMenuId}
               setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
@@ -490,8 +451,6 @@ export default function CatalogPanel() {
   // Document action states & anchors
   const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
   const [renamingDocTitle, setRenamingDocTitle] = useState('');
-  const [activeDocAddMenuId, setActiveDocAddMenuId] = useState<string | null>(null);
-  const [docAddMenuAnchorEl, setDocAddMenuAnchorEl] = useState<HTMLElement | null>(null);
   const [activeDocActionMenuId, setActiveDocActionMenuId] = useState<string | null>(null);
   const [docActionMenuAnchorEl, setDocActionMenuAnchorEl] = useState<HTMLElement | null>(null);
   const [isDeleteDocModalOpen, setIsDeleteDocModalOpen] = useState(false);
@@ -507,8 +466,6 @@ export default function CatalogPanel() {
   };
 
   const clearDocMenus = () => {
-    setActiveDocAddMenuId(null);
-    setDocAddMenuAnchorEl(null);
     setActiveDocActionMenuId(null);
     setDocActionMenuAnchorEl(null);
   };
@@ -728,9 +685,6 @@ export default function CatalogPanel() {
                   setRenamingDocTitle={setRenamingDocTitle}
                   handleFinishRenameDoc={handleFinishRenameDoc}
                   handleCancelRenameDoc={handleCancelRenameDoc}
-                  activeDocAddMenuId={activeDocAddMenuId}
-                  setActiveDocAddMenuId={setActiveDocAddMenuId}
-                  setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
                   activeDocActionMenuId={activeDocActionMenuId}
                   setActiveDocActionMenuId={setActiveDocActionMenuId}
                   setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
@@ -779,9 +733,6 @@ export default function CatalogPanel() {
                           setRenamingDocTitle={setRenamingDocTitle}
                           handleFinishRenameDoc={handleFinishRenameDoc}
                           handleCancelRenameDoc={handleCancelRenameDoc}
-                          activeDocAddMenuId={activeDocAddMenuId}
-                          setActiveDocAddMenuId={setActiveDocAddMenuId}
-                          setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
                           activeDocActionMenuId={activeDocActionMenuId}
                           setActiveDocActionMenuId={setActiveDocActionMenuId}
                           setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
@@ -858,40 +809,7 @@ export default function CatalogPanel() {
         })()
       )}
 
-      {/* 3. Doc Add Menu */}
-      {activeDocAddMenuId && (
-        (() => {
-          const doc = documents.find((d) => d.id === activeDocAddMenuId);
-          if (!doc) return null;
-
-          let parentDepth = -1;
-          if (doc.groupId) {
-            const parentGroup = groups.find((g) => g.id === doc.groupId);
-            if (parentGroup) {
-              parentDepth = parentGroup.depth;
-            }
-          }
-
-          return (
-            <GroupAddMenu
-              isOpen={true}
-              onClose={clearDocMenus}
-              onNewDoc={() => {
-                const newDocId = createDocument(kbId, doc.groupId, '新建文档');
-                navigate(`/kb/${kbId}/doc/${newDocId}`);
-              }}
-              onNewSubGroup={() => {
-                setCreatingParentId(doc.groupId);
-                setNewGroupName(doc.groupId ? '新建子分组' : '新建分组');
-              }}
-              currentDepth={parentDepth}
-              anchorEl={docAddMenuAnchorEl}
-            />
-          );
-        })()
-      )}
-
-      {/* 4. Doc Action Menu */}
+      {/* 3. Doc Action Menu */}
       {activeDocActionMenuId && (
         (() => {
           const doc = documents.find((d) => d.id === activeDocActionMenuId);
