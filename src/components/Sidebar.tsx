@@ -21,7 +21,7 @@ function SidebarGroupNode({
   collapsedGroups,
   toggleGroup,
 }: SidebarGroupNodeProps) {
-  const { getChildGroups } = useKnowledgeBaseStore();
+  const { getChildGroups, setIsCatalogCollapsed } = useKnowledgeBaseStore();
   const subGroups = getChildGroups(group.id, kbId);
   const groupDocs = kbDocs.filter((d) => d.groupId === group.id);
   const isExpanded = !collapsedGroups[group.id];
@@ -69,6 +69,7 @@ function SidebarGroupNode({
             <li key={doc.id}>
               <NavLink
                 to={`/kb/${kbId}/doc/${doc.id}`}
+                onClick={() => setIsCatalogCollapsed(false)}
                 className={({ isActive }) =>
                   `py-1 pr-2 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
                     isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'
@@ -89,7 +90,7 @@ function SidebarGroupNode({
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
-  const { knowledgeBases, documents, getChildGroups } = useKnowledgeBaseStore();
+  const { knowledgeBases, documents, getChildGroups, setIsCatalogCollapsed } = useKnowledgeBaseStore();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [expandedKbs, setExpandedKbs] = useState<Record<string, boolean>>({});
 
@@ -190,6 +191,7 @@ export default function Sidebar() {
                         ...prev,
                         [kb.id]: true,
                       }));
+                      setIsCatalogCollapsed(false);
                     }}
                     className={`flex items-center gap-2.5 truncate flex-1 pl-3 py-2 min-w-0 ${
                       kbDocs.length > 0 ? 'pr-2' : 'pr-3'
@@ -240,6 +242,7 @@ export default function Sidebar() {
                       <li key={doc.id}>
                         <NavLink
                           to={`/kb/${kb.id}/doc/${doc.id}`}
+                          onClick={() => setIsCatalogCollapsed(false)}
                           className={({ isActive }) =>
                             `px-2 py-1 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
                               isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'

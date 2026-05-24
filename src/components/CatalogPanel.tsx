@@ -6,7 +6,133 @@ import type { Group, Document } from '../store/knowledgeBaseStore';
 import AddContentMenu from './AddContentMenu';
 import GroupAddMenu from './menus/GroupAddMenu';
 import GroupActionMenu from './menus/GroupActionMenu';
+import DocActionMenu from './menus/DocActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
+
+interface DocTreeItemProps {
+  doc: Document;
+  kbId: string;
+  docId: string | undefined;
+  paddingLeft: number;
+  
+  renamingDocId: string | null;
+  renamingDocTitle: string;
+  setRenamingDocTitle: (title: string) => void;
+  handleFinishRenameDoc: () => void;
+  handleCancelRenameDoc: () => void;
+  
+  activeDocAddMenuId: string | null;
+  setActiveDocAddMenuId: (id: string | null) => void;
+  setDocAddMenuAnchorEl: (el: HTMLElement | null) => void;
+  activeDocActionMenuId: string | null;
+  setActiveDocActionMenuId: (id: string | null) => void;
+  setDocActionMenuAnchorEl: (el: HTMLElement | null) => void;
+  
+  // Clear any group menu states
+  clearGroupMenus: () => void;
+}
+
+function DocTreeItem({
+  doc,
+  kbId,
+  docId,
+  paddingLeft,
+  renamingDocId,
+  renamingDocTitle,
+  setRenamingDocTitle,
+  handleFinishRenameDoc,
+  handleCancelRenameDoc,
+  activeDocAddMenuId,
+  setActiveDocAddMenuId,
+  setDocAddMenuAnchorEl,
+  activeDocActionMenuId,
+  setActiveDocActionMenuId,
+  setDocActionMenuAnchorEl,
+  clearGroupMenus,
+}: DocTreeItemProps) {
+  const navigate = useNavigate();
+  const isDocActive = docId === doc.id;
+  const isRenamingDoc = renamingDocId === doc.id;
+
+  const handleDocClick = () => {
+    if (isRenamingDoc) return;
+    navigate(`/kb/${kbId}/doc/${doc.id}`);
+  };
+
+  return (
+    <div
+      onClick={handleDocClick}
+      className={`text-[13px] py-1.5 px-2 pr-2 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+        isDocActive
+          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[22px]'
+          : 'text-text-secondary'
+      } ${
+        activeDocAddMenuId === doc.id || activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''
+      }`}
+      style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <FileText size={14} className={isDocActive ? 'text-accent' : 'text-text-secondary'} />
+        {isRenamingDoc ? (
+          <input
+            type="text"
+            value={renamingDocTitle}
+            onChange={(e) => setRenamingDocTitle(e.target.value)}
+            onBlur={handleFinishRenameDoc}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleFinishRenameDoc();
+              else if (e.key === 'Escape') handleCancelRenameDoc();
+            }}
+            className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onFocus={(e) => e.target.select()}
+          />
+        ) : (
+          <span className="truncate">{doc.title}</span>
+        )}
+      </div>
+
+      {/* Row Action Buttons (hover triggers) */}
+      {!isRenamingDoc && (
+        <div
+          className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 ml-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Plus Button Menu */}
+          <button
+            onClick={(e) => {
+              clearGroupMenus();
+              setActiveDocAddMenuId(activeDocAddMenuId === doc.id ? null : doc.id);
+              setDocAddMenuAnchorEl(activeDocAddMenuId === doc.id ? null : e.currentTarget);
+              setActiveDocActionMenuId(null);
+              setDocActionMenuAnchorEl(null);
+            }}
+            className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
+            title="新建同级内容"
+          >
+            <Plus size={13} />
+          </button>
+
+          {/* Action Dot Menu */}
+          <button
+            onClick={(e) => {
+              clearGroupMenus();
+              setActiveDocActionMenuId(activeDocActionMenuId === doc.id ? null : doc.id);
+              setDocActionMenuAnchorEl(activeDocActionMenuId === doc.id ? null : e.currentTarget);
+              setActiveDocAddMenuId(null);
+              setDocAddMenuAnchorEl(null);
+            }}
+            className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
+            title="更多操作"
+          >
+            <MoreHorizontal size={13} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface GroupTreeNodeProps {
   group: Group;
@@ -29,16 +155,35 @@ interface GroupTreeNodeProps {
   setRenamingName: (name: string) => void;
   handleFinishRename: () => void;
   handleCancelRename: () => void;
+  
+  // Set Menu Active and Anchors
+  activeAddMenuId: string | null;
+  setActiveAddMenuId: (id: string | null) => void;
+  setAddMenuAnchorEl: (el: HTMLElement | null) => void;
+  activeActionMenuId: string | null;
+  setActiveActionMenuId: (id: string | null) => void;
+  setActionMenuAnchorEl: (el: HTMLElement | null) => void;
+  
   // Delete Modal state
   setDeleteTargetGroup: (group: Group) => void;
   setDeleteDescendantsCount: (count: number) => void;
   setDeleteDocsCount: (count: number) => void;
   setIsDeleteModalOpen: (open: boolean) => void;
-  // Active menus
-  activeAddMenuId: string | null;
-  setActiveAddMenuId: (id: string | null) => void;
-  activeActionMenuId: string | null;
-  setActiveActionMenuId: (id: string | null) => void;
+  
+  // Document actions props
+  renamingDocId: string | null;
+  renamingDocTitle: string;
+  setRenamingDocTitle: (title: string) => void;
+  handleFinishRenameDoc: () => void;
+  handleCancelRenameDoc: () => void;
+  activeDocAddMenuId: string | null;
+  setActiveDocAddMenuId: (id: string | null) => void;
+  setDocAddMenuAnchorEl: (el: HTMLElement | null) => void;
+  activeDocActionMenuId: string | null;
+  setActiveDocActionMenuId: (id: string | null) => void;
+  setDocActionMenuAnchorEl: (el: HTMLElement | null) => void;
+  
+  clearGroupMenus: () => void;
 }
 
 function GroupTreeNode({
@@ -60,30 +205,42 @@ function GroupTreeNode({
   setRenamingName,
   handleFinishRename,
   handleCancelRename,
+  activeAddMenuId,
+  setActiveAddMenuId,
+  setAddMenuAnchorEl,
+  activeActionMenuId,
+  setActiveActionMenuId,
+  setActionMenuAnchorEl,
   setDeleteTargetGroup,
   setDeleteDescendantsCount,
   setDeleteDocsCount,
   setIsDeleteModalOpen,
-  activeAddMenuId,
-  setActiveAddMenuId,
-  activeActionMenuId,
-  setActiveActionMenuId,
+  
+  renamingDocId,
+  renamingDocTitle,
+  setRenamingDocTitle,
+  handleFinishRenameDoc,
+  handleCancelRenameDoc,
+  activeDocAddMenuId,
+  setActiveDocAddMenuId,
+  setDocAddMenuAnchorEl,
+  activeDocActionMenuId,
+  setActiveDocActionMenuId,
+  setDocActionMenuAnchorEl,
+  clearGroupMenus,
 }: GroupTreeNodeProps) {
-  const navigate = useNavigate();
-  const { getChildGroups, createDocument, getDescendantGroupIds } = useKnowledgeBaseStore();
+  const { getChildGroups } = useKnowledgeBaseStore();
 
   const subGroups = getChildGroups(group.id, kbId);
   const groupDocs = documents.filter((doc) => doc.groupId === group.id);
   const isExpanded = !collapsedGroups[group.id];
   const isRenaming = renamingGroupId === group.id;
 
-  // Max out standard indentation padding at depth 3 to avoid text wrapping in narrow sidebars
-  const indentLevel = Math.min(depth, 3);
-  const groupPaddingLeft = indentLevel * 12 + 6;
-  const docPaddingLeft = indentLevel * 12 + 24;
+  // 8px indentation per level without visual capping
+  const groupPaddingLeft = depth * 8 + 6;
+  const docPaddingLeft = depth * 8 + 24;
 
   const handleGroupClick = () => {
-    // Only toggle if not clicking on rename input
     if (isRenaming) return;
     toggleGroup(group.id);
   };
@@ -110,15 +267,15 @@ function GroupTreeNode({
               type="text"
               value={renamingName}
               onChange={(e) => setRenamingName(e.target.value)}
+              className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.target.select()}
               onBlur={handleFinishRename}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleFinishRename();
                 else if (e.key === 'Escape') handleCancelRename();
               }}
-              className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-              onFocus={(e) => e.target.select()}
             />
           ) : (
             <span className="truncate">{group.name}</span>
@@ -132,67 +289,40 @@ function GroupTreeNode({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Plus Button Menu */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setActiveAddMenuId(activeAddMenuId === group.id ? null : group.id);
-                  setActiveActionMenuId(null);
-                }}
-                className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
-                title="新建内容"
-              >
-                <Plus size={13} />
-              </button>
-              {activeAddMenuId === group.id && (
-                <GroupAddMenu
-                  isOpen={true}
-                  onClose={() => setActiveAddMenuId(null)}
-                  onNewDoc={() => {
-                    const newDocId = createDocument(kbId, group.id, '新建文档');
-                    navigate(`/kb/${kbId}/doc/${newDocId}`);
-                  }}
-                  onNewSubGroup={() => {
-                    setCreatingParentId(group.id);
-                    setNewGroupName('新建子分组');
-                  }}
-                  currentDepth={group.depth}
-                />
-              )}
-            </div>
+            <button
+              onClick={(e) => {
+                setActiveAddMenuId(activeAddMenuId === group.id ? null : group.id);
+                setAddMenuAnchorEl(activeAddMenuId === group.id ? null : e.currentTarget);
+                setActiveActionMenuId(null);
+                setActionMenuAnchorEl(null);
+                setActiveDocAddMenuId(null);
+                setDocAddMenuAnchorEl(null);
+                setActiveDocActionMenuId(null);
+                setDocActionMenuAnchorEl(null);
+              }}
+              className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
+              title="新建内容"
+            >
+              <Plus size={13} />
+            </button>
 
             {/* Action Dot Menu */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setActiveActionMenuId(activeActionMenuId === group.id ? null : group.id);
-                  setActiveAddMenuId(null);
-                }}
-                className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
-                title="更多操作"
-              >
-                <MoreHorizontal size={13} />
-              </button>
-              {activeActionMenuId === group.id && (
-                <GroupActionMenu
-                  isOpen={true}
-                  onClose={() => setActiveActionMenuId(null)}
-                  onRename={() => {
-                    setRenamingGroupId(group.id);
-                    setRenamingName(group.name);
-                  }}
-                  onDelete={() => {
-                    const descendants = getDescendantGroupIds(group.id);
-                    const allGroupIds = [group.id, ...descendants];
-                    const docCount = documents.filter((d) => allGroupIds.includes(d.groupId || '')).length;
-
-                    setDeleteTargetGroup(group);
-                    setDeleteDescendantsCount(descendants.length);
-                    setDeleteDocsCount(docCount);
-                    setIsDeleteModalOpen(true);
-                  }}
-                />
-              )}
-            </div>
+            <button
+              onClick={(e) => {
+                setActiveActionMenuId(activeActionMenuId === group.id ? null : group.id);
+                setActionMenuAnchorEl(activeActionMenuId === group.id ? null : e.currentTarget);
+                setActiveAddMenuId(null);
+                setAddMenuAnchorEl(null);
+                setActiveDocAddMenuId(null);
+                setDocAddMenuAnchorEl(null);
+                setActiveDocActionMenuId(null);
+                setDocActionMenuAnchorEl(null);
+              }}
+              className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
+              title="更多操作"
+            >
+              <MoreHorizontal size={13} />
+            </button>
           </div>
         )}
       </div>
@@ -222,14 +352,29 @@ function GroupTreeNode({
               setRenamingName={setRenamingName}
               handleFinishRename={handleFinishRename}
               handleCancelRename={handleCancelRename}
+              activeAddMenuId={activeAddMenuId}
+              setActiveAddMenuId={setActiveAddMenuId}
+              setAddMenuAnchorEl={setAddMenuAnchorEl}
+              activeActionMenuId={activeActionMenuId}
+              setActiveActionMenuId={setActiveActionMenuId}
+              setActionMenuAnchorEl={setActionMenuAnchorEl}
               setDeleteTargetGroup={setDeleteTargetGroup}
               setDeleteDescendantsCount={setDeleteDescendantsCount}
               setDeleteDocsCount={setDeleteDocsCount}
               setIsDeleteModalOpen={setIsDeleteModalOpen}
-              activeAddMenuId={activeAddMenuId}
-              setActiveAddMenuId={setActiveAddMenuId}
-              activeActionMenuId={activeActionMenuId}
-              setActiveActionMenuId={setActiveActionMenuId}
+              
+              renamingDocId={renamingDocId}
+              renamingDocTitle={renamingDocTitle}
+              setRenamingDocTitle={setRenamingDocTitle}
+              handleFinishRenameDoc={handleFinishRenameDoc}
+              handleCancelRenameDoc={handleCancelRenameDoc}
+              activeDocAddMenuId={activeDocAddMenuId}
+              setActiveDocAddMenuId={setActiveDocAddMenuId}
+              setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
+              activeDocActionMenuId={activeDocActionMenuId}
+              setActiveDocActionMenuId={setActiveDocActionMenuId}
+              setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
+              clearGroupMenus={clearGroupMenus}
             />
           ))}
 
@@ -237,7 +382,7 @@ function GroupTreeNode({
           {creatingParentId === group.id && (
             <div
               className="p-1 mt-1 flex items-center gap-1.5 border border-accent/40 bg-indigo-50/20 rounded-md"
-              style={{ paddingLeft: `${(indentLevel + 1) * 12 + 6}px` }}
+              style={{ paddingLeft: `${(depth + 1) * 8 + 6}px` }}
             >
               <ChevronDown size={14} className="text-accent shrink-0" />
               <input
@@ -257,24 +402,27 @@ function GroupTreeNode({
           )}
 
           {/* Group Documents */}
-          {groupDocs.map((doc) => {
-            const isDocActive = docId === doc.id;
-            return (
-              <div
-                key={doc.id}
-                onClick={() => navigate(`/kb/${kbId}/doc/${doc.id}`)}
-                className={`text-[13px] py-1.5 px-2 pr-2 rounded-md cursor-pointer flex items-center gap-2 transition-all ${
-                  isDocActive
-                    ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[22px]'
-                    : 'text-text-secondary hover:bg-hover-bg'
-                }`}
-                style={{ paddingLeft: isDocActive ? `${docPaddingLeft - 2}px` : `${docPaddingLeft}px` }}
-              >
-                <FileText size={14} className={isDocActive ? 'text-accent' : 'text-text-secondary'} />
-                <span className="truncate">{doc.title}</span>
-              </div>
-            );
-          })}
+          {groupDocs.map((doc) => (
+            <DocTreeItem
+              key={doc.id}
+              doc={doc}
+              kbId={kbId}
+              docId={docId}
+              paddingLeft={docPaddingLeft}
+              renamingDocId={renamingDocId}
+              renamingDocTitle={renamingDocTitle}
+              setRenamingDocTitle={setRenamingDocTitle}
+              handleFinishRenameDoc={handleFinishRenameDoc}
+              handleCancelRenameDoc={handleCancelRenameDoc}
+              activeDocAddMenuId={activeDocAddMenuId}
+              setActiveDocAddMenuId={setActiveDocAddMenuId}
+              setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
+              activeDocActionMenuId={activeDocActionMenuId}
+              setActiveDocActionMenuId={setActiveDocActionMenuId}
+              setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
+              clearGroupMenus={clearGroupMenus}
+            />
+          ))}
 
           {subGroups.length === 0 && groupDocs.length === 0 && (
             <div
@@ -301,8 +449,15 @@ export default function CatalogPanel() {
     createGroup,
     updateGroup,
     deleteGroup,
+    updateDocument,
+    deleteDocument,
     getChildGroups,
     getDescendantGroupIds,
+    catalogWidth,
+    isCatalogCollapsed,
+    setCatalogWidth,
+    setIsCatalogCollapsed,
+    groups,
   } = useKnowledgeBaseStore();
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
@@ -313,7 +468,6 @@ export default function CatalogPanel() {
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Group creation states
-  // undefined = not creating, null = creating at root, string = creating sub-group under that parentGroupId
   const [creatingParentId, setCreatingParentId] = useState<string | null | undefined>(undefined);
   const [newGroupName, setNewGroupName] = useState('');
 
@@ -321,17 +475,43 @@ export default function CatalogPanel() {
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState('');
 
-  // Active floating menus
+  // Group active floating menus & anchors
   const [activeAddMenuId, setActiveAddMenuId] = useState<string | null>(null);
+  const [addMenuAnchorEl, setAddMenuAnchorEl] = useState<HTMLElement | null>(null);
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
+  const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState<HTMLElement | null>(null);
 
-  // Delete modal states
+  // Group Delete modal states
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteTargetGroup, setDeleteTargetGroup] = useState<Group | null>(null);
   const [deleteDescendantsCount, setDeleteDescendantsCount] = useState(0);
   const [deleteDocsCount, setDeleteDocsCount] = useState(0);
 
+  // Document action states & anchors
+  const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
+  const [renamingDocTitle, setRenamingDocTitle] = useState('');
+  const [activeDocAddMenuId, setActiveDocAddMenuId] = useState<string | null>(null);
+  const [docAddMenuAnchorEl, setDocAddMenuAnchorEl] = useState<HTMLElement | null>(null);
+  const [activeDocActionMenuId, setActiveDocActionMenuId] = useState<string | null>(null);
+  const [docActionMenuAnchorEl, setDocActionMenuAnchorEl] = useState<HTMLElement | null>(null);
+  const [isDeleteDocModalOpen, setIsDeleteDocModalOpen] = useState(false);
+  const [deleteTargetDoc, setDeleteTargetDoc] = useState<Document | null>(null);
+
   const menuTriggerRef = useRef<HTMLDivElement>(null);
+
+  const clearGroupMenus = () => {
+    setActiveAddMenuId(null);
+    setAddMenuAnchorEl(null);
+    setActiveActionMenuId(null);
+    setActionMenuAnchorEl(null);
+  };
+
+  const clearDocMenus = () => {
+    setActiveDocAddMenuId(null);
+    setDocAddMenuAnchorEl(null);
+    setActiveDocActionMenuId(null);
+    setDocActionMenuAnchorEl(null);
+  };
 
   const handleFinishCreateGroup = () => {
     if (creatingParentId === undefined || !kbId) return;
@@ -380,8 +560,33 @@ export default function CatalogPanel() {
 
     deleteGroup(deleteTargetGroup.id);
     setDeleteTargetGroup(null);
+    setIsDeleteModalOpen(false);
 
     if (isActiveDocDeleted) {
+      navigate(`/kb/${kbId}`);
+    }
+  };
+
+  // Document action handlers
+  const handleFinishRenameDoc = () => {
+    if (!renamingDocId) return;
+    if (renamingDocTitle.trim()) {
+      updateDocument(renamingDocId, { title: renamingDocTitle.trim() });
+    }
+    setRenamingDocId(null);
+  };
+
+  const handleCancelRenameDoc = () => {
+    setRenamingDocId(null);
+  };
+
+  const handleConfirmDeleteDoc = () => {
+    if (!deleteTargetDoc || !kbId) return;
+    deleteDocument(deleteTargetDoc.id);
+    const wasActiveDoc = docId === deleteTargetDoc.id;
+    setDeleteTargetDoc(null);
+    setIsDeleteDocModalOpen(false);
+    if (wasActiveDoc) {
       navigate(`/kb/${kbId}`);
     }
   };
@@ -391,6 +596,44 @@ export default function CatalogPanel() {
       ...prev,
       [groupId]: !prev[groupId],
     }));
+  };
+
+  // Drag resize handler
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = catalogWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = startWidth + deltaX;
+      const minWidth = 220;
+      const maxWidth = Math.floor(window.innerWidth / 3);
+
+      if (newWidth < minWidth) {
+        const overflow = minWidth - newWidth;
+        if (overflow > minWidth / 2) {
+          setIsCatalogCollapsed(true);
+        } else {
+          setIsCatalogCollapsed(false);
+          setCatalogWidth(minWidth);
+        }
+      } else if (newWidth > maxWidth) {
+        setCatalogWidth(maxWidth);
+        setIsCatalogCollapsed(false);
+      } else {
+        setCatalogWidth(newWidth);
+        setIsCatalogCollapsed(false);
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   if (!kb || !kbId) {
@@ -406,127 +649,272 @@ export default function CatalogPanel() {
 
   return (
     <>
-      <aside className="w-[220px] min-w-[220px] bg-bg-panel border-r border-border-color flex flex-col h-full select-none">
-        {/* Header */}
-        <div className="p-5 pb-3 flex justify-between items-center shrink-0">
+      <aside
+        style={{ width: isCatalogCollapsed ? 0 : `${catalogWidth}px` }}
+        className="relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out overflow-hidden"
+      >
+        {/* Render content only when not collapsed */}
+        {!isCatalogCollapsed && (
+          <div className="flex flex-col h-full w-full min-w-[220px]">
+            {/* Header */}
+            <div className="p-5 pb-3 flex justify-between items-center shrink-0">
+              <div
+                onClick={() => navigate(backPath)}
+                className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5 cursor-pointer hover:text-accent transition-colors truncate max-w-[150px]"
+                title={docId ? `返回 ${kb.name}` : '返回主页'}
+              >
+                <ChevronLeft size={16} className="shrink-0" />
+                <span className="truncate">{kb.name}</span>
+              </div>
+              <div className="relative" ref={menuTriggerRef}>
+                <button
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
+                >
+                  <Plus size={16} />
+                </button>
+
+                <AddContentMenu
+                  isOpen={isMenuOpen}
+                  onClose={() => setIsMenuOpen(false)}
+                  onNewDoc={handleCreateDocument}
+                  onNewGroup={handleStartCreateGroup}
+                />
+              </div>
+            </div>
+
+            {/* Search Current KB */}
+            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0 cursor-text hover:border-accent transition-colors">
+              <Search size={14} /> 搜索当前知识库...
+            </div>
+
+            {/* Catalog Tree Scroll Area */}
+            <div className="flex-1 overflow-y-auto px-2 pb-4">
+              {/* Render Groups and their Docs recursively */}
+              {rootGroups.map((group) => (
+                <GroupTreeNode
+                  key={group.id}
+                  group={group}
+                  depth={0}
+                  kbId={kbId}
+                  docId={docId}
+                  documents={documents}
+                  collapsedGroups={collapsedGroups}
+                  toggleGroup={toggleGroup}
+                  creatingParentId={creatingParentId}
+                  setCreatingParentId={setCreatingParentId}
+                  newGroupName={newGroupName}
+                  setNewGroupName={setNewGroupName}
+                  handleFinishCreateGroup={handleFinishCreateGroup}
+                  renamingGroupId={renamingGroupId}
+                  setRenamingGroupId={setRenamingGroupId}
+                  renamingName={renamingName}
+                  setRenamingName={setRenamingName}
+                  handleFinishRename={handleFinishRename}
+                  handleCancelRename={handleCancelRename}
+                  activeAddMenuId={activeAddMenuId}
+                  setActiveAddMenuId={setActiveAddMenuId}
+                  setAddMenuAnchorEl={setAddMenuAnchorEl}
+                  activeActionMenuId={activeActionMenuId}
+                  setActiveActionMenuId={setActiveActionMenuId}
+                  setActionMenuAnchorEl={setActionMenuAnchorEl}
+                  setDeleteTargetGroup={setDeleteTargetGroup}
+                  setDeleteDescendantsCount={setDeleteDescendantsCount}
+                  setDeleteDocsCount={setDeleteDocsCount}
+                  setIsDeleteModalOpen={setIsDeleteModalOpen}
+                  
+                  renamingDocId={renamingDocId}
+                  renamingDocTitle={renamingDocTitle}
+                  setRenamingDocTitle={setRenamingDocTitle}
+                  handleFinishRenameDoc={handleFinishRenameDoc}
+                  handleCancelRenameDoc={handleCancelRenameDoc}
+                  activeDocAddMenuId={activeDocAddMenuId}
+                  setActiveDocAddMenuId={setActiveDocAddMenuId}
+                  setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
+                  activeDocActionMenuId={activeDocActionMenuId}
+                  setActiveDocActionMenuId={setActiveDocActionMenuId}
+                  setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
+                  clearGroupMenus={clearGroupMenus}
+                />
+              ))}
+
+              {/* Inline edit container for creating a new root group */}
+              {creatingParentId === null && (
+                <div className="p-2 mt-2 flex items-center gap-1.5 border border-accent/40 bg-indigo-50/20 rounded-md">
+                  <ChevronDown size={14} className="text-accent shrink-0" />
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    onBlur={handleFinishCreateGroup}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleFinishCreateGroup();
+                      else if (e.key === 'Escape') setCreatingParentId(undefined);
+                    }}
+                    className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+                    autoFocus
+                    onFocus={(e) => e.target.select()}
+                  />
+                </div>
+              )}
+
+              {/* Render Root Level Documents */}
+              {documents.filter((doc) => doc.groupId === null).length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <div className="text-[11px] font-bold text-text-secondary uppercase tracking-wider px-2 mb-1.5">
+                    未分组文档
+                  </div>
+                  <div className="space-y-0.5">
+                    {documents
+                      .filter((doc) => doc.groupId === null)
+                      .map((doc) => (
+                        <DocTreeItem
+                          key={doc.id}
+                          doc={doc}
+                          kbId={kbId}
+                          docId={docId}
+                          paddingLeft={24}
+                          renamingDocId={renamingDocId}
+                          renamingDocTitle={renamingDocTitle}
+                          setRenamingDocTitle={setRenamingDocTitle}
+                          handleFinishRenameDoc={handleFinishRenameDoc}
+                          handleCancelRenameDoc={handleCancelRenameDoc}
+                          activeDocAddMenuId={activeDocAddMenuId}
+                          setActiveDocAddMenuId={setActiveDocAddMenuId}
+                          setDocAddMenuAnchorEl={setDocAddMenuAnchorEl}
+                          activeDocActionMenuId={activeDocActionMenuId}
+                          setActiveDocActionMenuId={setActiveDocActionMenuId}
+                          setDocActionMenuAnchorEl={setDocActionMenuAnchorEl}
+                          clearGroupMenus={clearGroupMenus}
+                        />
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Drag handle resize line */}
+        {!isCatalogCollapsed && (
           <div
-            onClick={() => navigate(backPath)}
-            className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5 cursor-pointer hover:text-accent transition-colors truncate max-w-[150px]"
-            title={docId ? `返回 ${kb.name}` : '返回主页'}
-          >
-            <ChevronLeft size={16} className="shrink-0" />
-            <span className="truncate">{kb.name}</span>
-          </div>
-          <div className="relative" ref={menuTriggerRef}>
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
-            >
-              <Plus size={16} />
-            </button>
-
-            <AddContentMenu
-              isOpen={isMenuOpen}
-              onClose={() => setIsMenuOpen(false)}
-              onNewDoc={handleCreateDocument}
-              onNewGroup={handleStartCreateGroup}
-            />
-          </div>
-        </div>
-
-        {/* Search Current KB */}
-        <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0 cursor-text hover:border-accent transition-colors">
-          <Search size={14} /> 搜索当前知识库...
-        </div>
-
-        {/* Catalog Tree Scroll Area */}
-        <div className="flex-1 overflow-y-auto px-2 pb-4">
-          {/* Render Groups and their Docs recursively */}
-          {rootGroups.map((group) => (
-            <GroupTreeNode
-              key={group.id}
-              group={group}
-              depth={0}
-              kbId={kbId}
-              docId={docId}
-              documents={documents}
-              collapsedGroups={collapsedGroups}
-              toggleGroup={toggleGroup}
-              creatingParentId={creatingParentId}
-              setCreatingParentId={setCreatingParentId}
-              newGroupName={newGroupName}
-              setNewGroupName={setNewGroupName}
-              handleFinishCreateGroup={handleFinishCreateGroup}
-              renamingGroupId={renamingGroupId}
-              setRenamingGroupId={setRenamingGroupId}
-              renamingName={renamingName}
-              setRenamingName={setRenamingName}
-              handleFinishRename={handleFinishRename}
-              handleCancelRename={handleCancelRename}
-              setDeleteTargetGroup={setDeleteTargetGroup}
-              setDeleteDescendantsCount={setDeleteDescendantsCount}
-              setDeleteDocsCount={setDeleteDocsCount}
-              setIsDeleteModalOpen={setIsDeleteModalOpen}
-              activeAddMenuId={activeAddMenuId}
-              setActiveAddMenuId={setActiveAddMenuId}
-              activeActionMenuId={activeActionMenuId}
-              setActiveActionMenuId={setActiveActionMenuId}
-            />
-          ))}
-
-          {/* Inline edit container for creating a new root group */}
-          {creatingParentId === null && (
-            <div className="p-2 mt-2 flex items-center gap-1.5 border border-accent/40 bg-indigo-50/20 rounded-md">
-              <ChevronDown size={14} className="text-accent shrink-0" />
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onBlur={handleFinishCreateGroup}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleFinishCreateGroup();
-                  else if (e.key === 'Escape') setCreatingParentId(undefined);
-                }}
-                className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
-                autoFocus
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
-          )}
-
-          {/* Render Root Level Documents */}
-          {documents.filter((doc) => doc.groupId === null).length > 0 && (
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <div className="text-[11px] font-bold text-text-secondary uppercase tracking-wider px-2 mb-1.5">
-                未分组文档
-              </div>
-              <div className="space-y-0.5">
-                {documents
-                  .filter((doc) => doc.groupId === null)
-                  .map((doc) => {
-                    const isDocActive = docId === doc.id;
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => navigate(`/kb/${kbId}/doc/${doc.id}`)}
-                        className={`text-[13px] py-1.5 px-2 pr-2 pl-6 rounded-md cursor-pointer flex items-center gap-2 transition-all ${
-                          isDocActive
-                            ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[22px]'
-                            : 'text-text-secondary hover:bg-hover-bg'
-                        }`}
-                      >
-                        <FileText size={14} className={isDocActive ? 'text-accent' : 'text-text-secondary'} />
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
+            onMouseDown={handleMouseDown}
+            className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
+          />
+        )}
       </aside>
 
-      {/* Cascading Delete Confirmation Modal */}
+      {/* Floating Menus (Landed outside aside with overflow-hidden to prevent container clipping) */}
+      {/* 1. Group Add Menu */}
+      {activeAddMenuId && (
+        (() => {
+          const group = groups.find((g) => g.id === activeAddMenuId);
+          if (!group) return null;
+          return (
+            <GroupAddMenu
+              isOpen={true}
+              onClose={clearGroupMenus}
+              onNewDoc={() => {
+                const newDocId = createDocument(kbId, group.id, '新建文档');
+                navigate(`/kb/${kbId}/doc/${newDocId}`);
+              }}
+              onNewSubGroup={() => {
+                setCreatingParentId(group.id);
+                setNewGroupName('新建子分组');
+              }}
+              currentDepth={group.depth}
+              anchorEl={addMenuAnchorEl}
+            />
+          );
+        })()
+      )}
+
+      {/* 2. Group Action Menu */}
+      {activeActionMenuId && (
+        (() => {
+          const group = groups.find((g) => g.id === activeActionMenuId);
+          if (!group) return null;
+          return (
+            <GroupActionMenu
+              isOpen={true}
+              onClose={clearGroupMenus}
+              onRename={() => {
+                setRenamingGroupId(group.id);
+                setRenamingName(group.name);
+              }}
+              onDelete={() => {
+                const descendants = getDescendantGroupIds(group.id);
+                const allGroupIds = [group.id, ...descendants];
+                const docCount = documents.filter((d) => allGroupIds.includes(d.groupId || '')).length;
+
+                setDeleteTargetGroup(group);
+                setDeleteDescendantsCount(descendants.length);
+                setDeleteDocsCount(docCount);
+                setIsDeleteModalOpen(true);
+              }}
+              anchorEl={actionMenuAnchorEl}
+            />
+          );
+        })()
+      )}
+
+      {/* 3. Doc Add Menu */}
+      {activeDocAddMenuId && (
+        (() => {
+          const doc = documents.find((d) => d.id === activeDocAddMenuId);
+          if (!doc) return null;
+
+          let parentDepth = -1;
+          if (doc.groupId) {
+            const parentGroup = groups.find((g) => g.id === doc.groupId);
+            if (parentGroup) {
+              parentDepth = parentGroup.depth;
+            }
+          }
+
+          return (
+            <GroupAddMenu
+              isOpen={true}
+              onClose={clearDocMenus}
+              onNewDoc={() => {
+                const newDocId = createDocument(kbId, doc.groupId, '新建文档');
+                navigate(`/kb/${kbId}/doc/${newDocId}`);
+              }}
+              onNewSubGroup={() => {
+                setCreatingParentId(doc.groupId);
+                setNewGroupName(doc.groupId ? '新建子分组' : '新建分组');
+              }}
+              currentDepth={parentDepth}
+              anchorEl={docAddMenuAnchorEl}
+            />
+          );
+        })()
+      )}
+
+      {/* 4. Doc Action Menu */}
+      {activeDocActionMenuId && (
+        (() => {
+          const doc = documents.find((d) => d.id === activeDocActionMenuId);
+          if (!doc) return null;
+          return (
+            <DocActionMenu
+              isOpen={true}
+              onClose={clearDocMenus}
+              onRename={() => {
+                setRenamingDocId(doc.id);
+                setRenamingDocTitle(doc.title);
+              }}
+              onDelete={() => {
+                setDeleteTargetDoc(doc);
+                setIsDeleteDocModalOpen(true);
+              }}
+              anchorEl={docActionMenuAnchorEl}
+            />
+          );
+        })()
+      )}
+
+      {/* Cascading Group Delete Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -548,6 +936,28 @@ export default function CatalogPanel() {
                 </>
               )}
               <strong className="text-text-primary mx-1">{deleteDocsCount} 篇文档</strong>
+              。删除后不可恢复，是否确认删除？
+            </span>
+          ) : (
+            ''
+          )
+        }
+      />
+
+      {/* Document Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteDocModalOpen}
+        onClose={() => {
+          setIsDeleteDocModalOpen(false);
+          setDeleteTargetDoc(null);
+        }}
+        onConfirm={handleConfirmDeleteDoc}
+        title="确认删除文档"
+        description={
+          deleteTargetDoc ? (
+            <span>
+              此操作将永久删除文档
+              <strong className="text-text-primary mx-1">“{deleteTargetDoc.title}”</strong>
               。删除后不可恢复，是否确认删除？
             </span>
           ) : (

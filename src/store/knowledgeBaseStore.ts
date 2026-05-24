@@ -61,6 +61,12 @@ interface KnowledgeBaseStore {
   getGroupDepth: (groupId: string) => number;
   getGroupAncestors: (groupId: string) => Group[];  // Breadcrumb helper
   getDescendantGroupIds: (groupId: string) => string[];  // Cascade delete helper
+
+  // Catalog Panel resizable & collapsible states
+  catalogWidth: number;
+  isCatalogCollapsed: boolean;
+  setCatalogWidth: (width: number) => void;
+  setIsCatalogCollapsed: (collapsed: boolean) => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -276,6 +282,11 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   knowledgeBases: initialKBs,
   groups: initialGroups,
   documents: initialDocs,
+
+  catalogWidth: 220,
+  isCatalogCollapsed: false,
+  setCatalogWidth: (width) => set({ catalogWidth: width }),
+  setIsCatalogCollapsed: (collapsed) => set({ isCatalogCollapsed: collapsed }),
 
   // Knowledge Base CRUD
   createKnowledgeBase: (name, description, icon = '#3b82f6') => {

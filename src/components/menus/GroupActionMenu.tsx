@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { Pencil, Trash2, ArrowRightLeft } from 'lucide-react';
 
 interface GroupActionMenuProps {
@@ -6,6 +6,7 @@ interface GroupActionMenuProps {
   onClose: () => void;
   onRename: () => void;
   onDelete: () => void;
+  anchorEl: HTMLElement | null;
 }
 
 export default function GroupActionMenu({
@@ -13,7 +14,11 @@ export default function GroupActionMenu({
   onClose,
   onRename,
   onDelete,
+  anchorEl,
 }: GroupActionMenuProps) {
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -28,6 +33,29 @@ export default function GroupActionMenu({
     };
   }, [isOpen, onClose]);
 
+  useLayoutEffect(() => {
+    if (isOpen && anchorEl) {
+      const rect = anchorEl.getBoundingClientRect();
+      const menuHeight = menuRef.current?.offsetHeight || 120;
+      const menuWidth = menuRef.current?.offsetWidth || 176; // w-44 is 11rem = 176px
+      
+      let top = rect.bottom + 4; // 4px margin
+      let left = rect.left;
+      
+      // If bottom of menu goes offscreen
+      if (rect.bottom + menuHeight > window.innerHeight) {
+        top = rect.top - menuHeight - 4;
+      }
+      
+      // If right of menu goes offscreen
+      if (rect.left + menuWidth > window.innerWidth) {
+        left = rect.right - menuWidth;
+      }
+      
+      setCoords({ top, left });
+    }
+  }, [isOpen, anchorEl]);
+
   if (!isOpen) return null;
 
   return (
@@ -37,7 +65,13 @@ export default function GroupActionMenu({
 
       {/* Menu dropdown */}
       <div
-        className="absolute left-0 mt-1 z-50 w-44 bg-white border border-border-color rounded-lg shadow-lg py-1.5 animate-dropdown-fade-in"
+        ref={menuRef}
+        style={{
+          position: 'fixed',
+          top: `${coords.top}px`,
+          left: `${coords.left}px`,
+        }}
+        className="z-50 w-44 bg-white border border-border-color rounded-lg shadow-lg py-1.5 animate-dropdown-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         <button
