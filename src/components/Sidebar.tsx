@@ -2,10 +2,94 @@ import { Home, Sparkles, StickyNote, Star, Folder, Search, ChevronDown, ChevronR
 import { NavLink, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import type { Group, Document } from '../store/knowledgeBaseStore';
+
+interface SidebarGroupNodeProps {
+  group: Group;
+  depth: number;
+  kbId: string;
+  kbDocs: Document[];
+  collapsedGroups: Record<string, boolean>;
+  toggleGroup: (groupId: string, e: React.MouseEvent) => void;
+}
+
+function SidebarGroupNode({
+  group,
+  depth,
+  kbId,
+  kbDocs,
+  collapsedGroups,
+  toggleGroup,
+}: SidebarGroupNodeProps) {
+  const { getChildGroups } = useKnowledgeBaseStore();
+  const subGroups = getChildGroups(group.id, kbId);
+  const groupDocs = kbDocs.filter((d) => d.groupId === group.id);
+  const isExpanded = !collapsedGroups[group.id];
+  const hasContent = subGroups.length > 0 || groupDocs.length > 0;
+
+  // Max indentation padding at depth 2 (level 3) to keep it readable in narrow sidebar
+  const indentPaddingLeft = Math.min(depth, 2) * 10;
+
+  return (
+    <li className="space-y-0.5 animate-dropdown-fade-in">
+      {/* Group Row */}
+      <div
+        onClick={(e) => toggleGroup(group.id, e)}
+        className="px-2 py-1 rounded hover:bg-hover-bg hover:text-text-primary transition-colors flex items-center justify-between cursor-pointer text-xs font-semibold text-text-primary select-none"
+        style={{ paddingLeft: `${indentPaddingLeft + 8}px` }}
+      >
+        <span className="truncate text-text-secondary">{group.name}</span>
+        {hasContent && (
+          isExpanded ? (
+            <ChevronDown size={11} className="text-text-secondary shrink-0" />
+          ) : (
+            <ChevronRight size={11} className="text-text-secondary shrink-0" />
+          )
+        )}
+      </div>
+
+      {/* Group Children */}
+      {isExpanded && hasContent && (
+        <ul className="space-y-0.5">
+          {/* Sub-groups */}
+          {subGroups.map((subGroup) => (
+            <SidebarGroupNode
+              key={subGroup.id}
+              group={subGroup}
+              depth={depth + 1}
+              kbId={kbId}
+              kbDocs={kbDocs}
+              collapsedGroups={collapsedGroups}
+              toggleGroup={toggleGroup}
+            />
+          ))}
+
+          {/* Docs */}
+          {groupDocs.map((doc) => (
+            <li key={doc.id}>
+              <NavLink
+                to={`/kb/${kbId}/doc/${doc.id}`}
+                className={({ isActive }) =>
+                  `py-1 pr-2 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
+                    isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'
+                  }`
+                }
+                style={{ paddingLeft: `${Math.min(depth + 1, 3) * 10 + 10}px` }}
+              >
+                <FileText size={11} className="shrink-0 text-indigo-400" />
+                <span className="truncate">{doc.title}</span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
-  const { knowledgeBases, groups, documents } = useKnowledgeBaseStore();
+  const { knowledgeBases, documents, getChildGroups } = useKnowledgeBaseStore();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [expandedKbs, setExpandedKbs] = useState<Record<string, boolean>>({});
 
@@ -88,7 +172,7 @@ export default function Sidebar() {
         <ul className="list-none text-[13px] text-text-secondary space-y-1">
           {knowledgeBases.map((kb) => {
             const isActiveKb = activeKbId === kb.id;
-            const kbGroups = groups.filter((g) => g.kbId === kb.id).sort((a, b) => a.order - b.order);
+            const kbRootGroups = getChildGroups(null, kb.id);
             const kbDocs = documents.filter((d) => d.kbId === kb.id);
             const rootDocs = kbDocs.filter((d) => d.groupId === null);
 
@@ -113,8 +197,8 @@ export default function Sidebar() {
                       isActiveKb ? 'text-accent font-semibold' : 'text-text-secondary hover:text-text-primary'
                     }`}
                   >
-                    <Folder 
-                      size={14} 
+                    <Folder
+                      size={14}
                       className="shrink-0 transition-colors"
                       style={{ color: kb.icon }}
                     />
@@ -138,51 +222,25 @@ export default function Sidebar() {
                 {/* Sub-tree for the KB */}
                 {!!expandedKbs[kb.id] && (
                   <ul className="ml-5 pl-2.5 border-l border-gray-200/60 space-y-1 py-1">
-                    {/* Groups */}
-                    {kbGroups.map((group) => {
-                      const groupDocs = kbDocs.filter((d) => d.groupId === group.id);
-                      const isExpanded = !collapsedGroups[group.id];
-
-                      return (
-                        <li key={group.id} className="space-y-0.5">
-                          <div 
-                            onClick={(e) => toggleGroup(group.id, e)}
-                            className="px-2 py-1 rounded hover:bg-hover-bg hover:text-text-primary transition-colors flex items-center justify-between cursor-pointer text-xs font-semibold text-text-primary select-none"
-                          >
-                            <span className="truncate text-text-secondary">{group.name}</span>
-                            {groupDocs.length > 0 && (
-                              isExpanded ? <ChevronDown size={11} className="text-text-secondary shrink-0" /> : <ChevronRight size={11} className="text-text-secondary shrink-0" />
-                            )}
-                          </div>
-                          {isExpanded && groupDocs.length > 0 && (
-                            <ul className="space-y-0.5 ml-1">
-                              {groupDocs.map((doc) => (
-                                <li key={doc.id}>
-                                  <NavLink
-                                    to={`/kb/${kb.id}/doc/${doc.id}`}
-                                    className={({ isActive }) => 
-                                      `px-2.5 py-1 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
-                                        isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'
-                                      }`
-                                    }
-                                  >
-                                    <FileText size={11} className="shrink-0 text-indigo-400" />
-                                    <span className="truncate">{doc.title}</span>
-                                  </NavLink>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      );
-                    })}
+                    {/* Root Groups of this KB recursively */}
+                    {kbRootGroups.map((group) => (
+                      <SidebarGroupNode
+                        key={group.id}
+                        group={group}
+                        depth={0}
+                        kbId={kb.id}
+                        kbDocs={kbDocs}
+                        collapsedGroups={collapsedGroups}
+                        toggleGroup={toggleGroup}
+                      />
+                    ))}
 
                     {/* Root documents */}
                     {rootDocs.map((doc) => (
                       <li key={doc.id}>
                         <NavLink
                           to={`/kb/${kb.id}/doc/${doc.id}`}
-                          className={({ isActive }) => 
+                          className={({ isActive }) =>
                             `px-2 py-1 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
                               isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'
                             }`

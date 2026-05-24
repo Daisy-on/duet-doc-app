@@ -1,5 +1,6 @@
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, FolderPlus, Folder, Calendar, BookOpen, User } from 'lucide-react';
+import { FileText, FolderPlus, Folder, Calendar, BookOpen, User, ChevronRight, Plus } from 'lucide-react';
 import CatalogPanel from '../components/CatalogPanel';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 
@@ -30,10 +31,35 @@ function formatRelativeTime(timestamp: number): string {
 export default function KnowledgeBaseHome() {
   const { kbId } = useParams<{ kbId: string }>();
   const navigate = useNavigate();
-  const { getKnowledgeBase, getDocumentsByKb, getGroupsByKb, createDocument } = useKnowledgeBaseStore();
+  
+  const groups = useKnowledgeBaseStore((state) => state.groups);
+  const documents = useKnowledgeBaseStore((state) => state.documents);
+  const { 
+    getKnowledgeBase, 
+    createDocument,
+    getChildGroups,
+    getGroupAncestors
+  } = useKnowledgeBaseStore();
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
   
+  // Track currently selected sub-group
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
+
+  // Reset folder selection when switching KBs
+  useEffect(() => {
+    setCurrentGroupId(null);
+  }, [kbId]);
+
+  // Reset selected folder if the current group was deleted (e.g. via CatalogPanel)
+  useEffect(() => {
+    if (currentGroupId) {
+      if (!groups.some((g) => g.id === currentGroupId)) {
+        setCurrentGroupId(null);
+      }
+    }
+  }, [currentGroupId, groups]);
+
   if (!kb || !kbId) {
     return (
       <div className="flex-1 flex items-center justify-center bg-bg-main">
@@ -50,12 +76,18 @@ export default function KnowledgeBaseHome() {
     );
   }
 
-  const docs = getDocumentsByKb(kbId);
-  const groups = getGroupsByKb(kbId);
+  const allDocs = documents.filter((d) => d.kbId === kbId);
+  const allGroups = groups.filter((g) => g.kbId === kbId).sort((a, b) => a.order - b.order);
+
+  // Filter groups and docs for current layer
+  const currentSubGroups = getChildGroups(currentGroupId, kbId);
+  const currentDocs = allDocs.filter((doc) => doc.groupId === currentGroupId);
+  const currentGroup = currentGroupId ? allGroups.find((g) => g.id === currentGroupId) : null;
+  const ancestors = currentGroupId ? getGroupAncestors(currentGroupId) : [];
 
   const handleCreateDocument = () => {
-    // Create new document in this KB (at root level by default)
-    const newDocId = createDocument(kbId, null, '新建文档');
+    // Create new document in this KB inside current group layer
+    const newDocId = createDocument(kbId, currentGroupId, '新建文档');
     navigate(`/kb/${kbId}/doc/${newDocId}`);
   };
 
@@ -74,8 +106,8 @@ export default function KnowledgeBaseHome() {
               style={{ backgroundColor: kb.icon }}
             />
             <div className="text-[15px] font-semibold text-text-primary">{kb.name}</div>
-            <div className="text-[11px] text-text-secondary bg-gray-50 border border-border-color px-2 py-0.5 rounded-full">
-              共 {docs.length} 篇文档
+            <div className="text-[11px] text-text-secondary bg-gray-50 border border-border-color px-2 py-0.5 rounded-full font-medium">
+              共 {allDocs.length} 篇文档
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -89,41 +121,114 @@ export default function KnowledgeBaseHome() {
           </div>
         </header>
 
-        {/* KB Details Banner */}
-        <div className="px-10 py-8 border-b border-border-color bg-white">
+        {/* Breadcrumb Navigation Bar */}
+        <div className="px-10 py-3 bg-gray-50/70 border-b border-border-color flex items-center gap-1.5 text-[12px] font-semibold text-text-secondary select-none shrink-0">
+          <span 
+            onClick={() => setCurrentGroupId(null)}
+            className="hover:text-accent cursor-pointer transition-colors text-text-primary font-bold"
+          >
+            {kb.name}
+          </span>
+          {ancestors.map((ancestor, index) => {
+            const isLast = index === ancestors.length - 1;
+            return (
+              <React.Fragment key={ancestor.id}>
+                <ChevronRight size={12} className="text-gray-400 shrink-0" />
+                {isLast ? (
+                  <span className="text-text-primary font-bold truncate max-w-[150px]">
+                    {ancestor.name}
+                  </span>
+                ) : (
+                  <span
+                    onClick={() => setCurrentGroupId(ancestor.id)}
+                    className="hover:text-accent cursor-pointer transition-colors truncate max-w-[150px]"
+                  >
+                    {ancestor.name}
+                  </span>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* Details Banner */}
+        <div className="px-10 py-8 border-b border-border-color bg-white shrink-0">
           <div className="max-w-4xl mx-auto flex items-start gap-6">
             <div 
-              className="w-16 h-16 rounded-xl flex items-center justify-center text-white shadow-md shrink-0"
+              className="w-16 h-16 rounded-xl flex items-center justify-center text-white shadow-md shrink-0 transition-transform duration-300 hover:scale-105"
               style={{ backgroundColor: kb.icon }}
             >
               <Folder size={32} />
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-[26px] font-bold text-text-primary mb-2 flex items-center gap-3">
-                {kb.name}
+                {currentGroup ? currentGroup.name : kb.name}
               </h1>
               <p className="text-[14px] text-text-secondary leading-relaxed mb-4">
-                {kb.description || '暂无简介。你可以点击编辑知识库来添加描述。'}
+                {currentGroup 
+                  ? `当前在 “${currentGroup.name}” 分组下，可查看其子级分组及归属文档。` 
+                  : (kb.description || '暂无简介。你可以点击编辑知识库来添加描述。')}
               </p>
               <div className="flex flex-wrap gap-5 text-xs text-text-secondary font-medium">
                 <span className="flex items-center gap-1.5">
-                  <BookOpen size={14} /> {docs.length} 篇文档
+                  <BookOpen size={14} /> {currentGroup ? currentDocs.length : allDocs.length} 篇文档
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <FolderPlus size={14} /> {groups.length} 个分组
+                  <FolderPlus size={14} /> {currentGroup ? currentSubGroups.length : getChildGroups(null, kbId).length} 个子分组
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Calendar size={14} /> 创建于 {new Date(kb.createdAt).toLocaleDateString()}
+                  <Calendar size={14} /> {currentGroup ? '创建于 ' + new Date(currentGroup.createdAt).toLocaleDateString() : '创建于 ' + new Date(kb.createdAt).toLocaleDateString()}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Documents Section */}
+        {/* Catalog Main Content List Area */}
         <div className="p-10 flex-1 bg-bg-main">
           <div className="max-w-4xl mx-auto">
-            {docs.length === 0 ? (
+            
+            {/* Sub-groups Grid */}
+            {currentSubGroups.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3 pl-1">
+                  子分组 ({currentSubGroups.length})
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {currentSubGroups.map((group) => {
+                    const directDocsCount = allDocs.filter((d) => d.groupId === group.id).length;
+                    const directSubGroupsCount = allGroups.filter((g) => g.parentGroupId === group.id).length;
+                    
+                    return (
+                      <div
+                        key={group.id}
+                        onClick={() => setCurrentGroupId(group.id)}
+                        className="bg-white border border-border-color rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-accent hover:-translate-y-0.5 transition-all duration-200 group flex items-start gap-3.5"
+                      >
+                        <div 
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform"
+                          style={{ backgroundColor: `${kb.icon}20`, color: kb.icon }}
+                        >
+                          <Folder size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-bold text-text-primary group-hover:text-accent transition-colors truncate mb-1" title={group.name}>
+                            {group.name}
+                          </div>
+                          <div className="text-[11px] text-text-secondary font-medium">
+                            {directSubGroupsCount > 0 ? `${directSubGroupsCount} 个分组 · ` : ''}
+                            {directDocsCount} 篇文档
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Documents Section */}
+            {currentSubGroups.length === 0 && currentDocs.length === 0 ? (
               /* Empty State */
               <div className="bg-white border border-border-color rounded-2xl p-16 text-center shadow-sm flex flex-col items-center">
                 <div 
@@ -132,9 +237,9 @@ export default function KnowledgeBaseHome() {
                 >
                   <FolderOpen size={28} />
                 </div>
-                <h3 className="text-base font-bold text-text-primary mb-2">知识库空空如也</h3>
+                <h3 className="text-base font-bold text-text-primary mb-2">当前目录空空如也</h3>
                 <p className="text-xs text-text-secondary mb-6 max-w-sm leading-relaxed">
-                  该知识库下暂无任何文档。立即创建第一篇文档，开始记录你的想法、架构和规划吧！
+                  此目录下暂无任何子分组或文档。立即创建第一篇文档，开始记录吧！
                 </p>
                 <button
                   onClick={handleCreateDocument}
@@ -144,11 +249,19 @@ export default function KnowledgeBaseHome() {
                   <span>新建文档</span>
                 </button>
               </div>
-            ) : (
+            ) : currentDocs.length > 0 ? (
               /* Table list of documents */
               <div className="bg-white rounded-xl border border-border-color shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-border-color bg-gray-50/50">
+                <div className="p-5 border-b border-border-color bg-gray-50/50 flex justify-between items-center">
                   <h3 className="text-sm font-semibold text-text-primary">文档列表</h3>
+                  {currentGroupId && (
+                    <button 
+                      onClick={handleCreateDocument}
+                      className="text-xs font-semibold text-accent hover:text-indigo-700 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus size={14} /> 在此目录下新建文档
+                    </button>
+                  )}
                 </div>
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -159,8 +272,8 @@ export default function KnowledgeBaseHome() {
                     </tr>
                   </thead>
                   <tbody>
-                    {docs.map((doc) => {
-                      const group = groups.find((g) => g.id === doc.groupId);
+                    {currentDocs.map((doc) => {
+                      const group = allGroups.find((g) => g.id === doc.groupId);
                       return (
                         <tr 
                           key={doc.id}
@@ -195,6 +308,15 @@ export default function KnowledgeBaseHome() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            ) : (
+              /* No direct docs, but there are sub-groups */
+              <div className="bg-white rounded-xl border border-border-color border-dashed p-8 text-center text-text-secondary text-xs">
+                当前目录下暂无直属文档。你可以点击
+                <span onClick={handleCreateDocument} className="text-accent font-semibold cursor-pointer hover:underline mx-1">
+                  新建文档
+                </span>
+                在此分组中创建新文章。
               </div>
             )}
           </div>

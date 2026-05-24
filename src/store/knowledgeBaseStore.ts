@@ -12,6 +12,8 @@ export interface KnowledgeBase {
 export interface Group {
   id: string;
   kbId: string;
+  parentGroupId: string | null;  // null = 知识库根级分组
+  depth: number;                 // 0 = 根级，1 = 二级，最大 5
   name: string;
   order: number;
   createdAt: number;
@@ -38,7 +40,7 @@ interface KnowledgeBaseStore {
   deleteKnowledgeBase: (id: string) => void;
 
   // Group CRUD
-  createGroup: (kbId: string, name?: string) => string;
+  createGroup: (kbId: string, parentGroupId: string | null, name?: string) => string;
   updateGroup: (id: string, data: Partial<Group>) => void;
   deleteGroup: (id: string) => void;
 
@@ -53,6 +55,12 @@ interface KnowledgeBaseStore {
   getDocumentsByKb: (kbId: string) => Document[];
   getDocumentsByGroup: (groupId: string) => Document[];
   getRootDocuments: (kbId: string) => Document[];
+  
+  // New nested group helpers
+  getChildGroups: (parentGroupId: string | null, kbId: string) => Group[];
+  getGroupDepth: (groupId: string) => number;
+  getGroupAncestors: (groupId: string) => Group[];  // Breadcrumb helper
+  getDescendantGroupIds: (groupId: string) => string[];  // Cascade delete helper
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -86,7 +94,7 @@ const initialKBs: KnowledgeBase[] = [
   {
     id: 'kb-inspiration',
     name: '个人灵感收集',
-    description: '好玩的点子、交互参考、设计素材和日常碎片记录。',
+    description: '好玩的点子、交互参考、设计素材 and 日常碎片记录。',
     icon: '#a855f7', // Purple
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 20,
     updatedAt: Date.now() - 1000 * 60 * 60 * 22,
@@ -97,13 +105,35 @@ const initialGroups: Group[] = [
   {
     id: 'group-basic',
     kbId: 'kb-frontend',
+    parentGroupId: null,
+    depth: 0,
     name: '01. 前端基础',
     order: 1,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
   },
   {
+    id: 'group-html',
+    kbId: 'kb-frontend',
+    parentGroupId: 'group-basic',
+    depth: 1,
+    name: 'HTML',
+    order: 1,
+    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3.9,
+  },
+  {
+    id: 'group-css',
+    kbId: 'kb-frontend',
+    parentGroupId: 'group-basic',
+    depth: 1,
+    name: 'CSS',
+    order: 2,
+    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3.8,
+  },
+  {
     id: 'group-eng',
     kbId: 'kb-frontend',
+    parentGroupId: null,
+    depth: 0,
     name: '02. 工程化',
     order: 2,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
@@ -111,6 +141,8 @@ const initialGroups: Group[] = [
   {
     id: 'group-perf',
     kbId: 'kb-frontend',
+    parentGroupId: null,
+    depth: 0,
     name: '03. 性能优化',
     order: 3,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
@@ -121,7 +153,7 @@ const initialDocs: Document[] = [
   {
     id: 'doc-html-semantic',
     kbId: 'kb-frontend',
-    groupId: 'group-basic',
+    groupId: 'group-html',
     title: 'HTML 语义化总结',
     content: `
       <h1>HTML 语义化总结</h1>
@@ -139,7 +171,7 @@ const initialDocs: Document[] = [
   {
     id: 'doc-css-layout',
     kbId: 'kb-frontend',
-    groupId: 'group-basic',
+    groupId: 'group-css',
     title: 'CSS 布局指南',
     content: `
       <h1>CSS 布局指南</h1>
@@ -174,7 +206,7 @@ let games = reactive([
 &lt;/script&gt;</code></pre>
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 10, // 今天 10:42 左右
+    updatedAt: Date.now() - 1000 * 60 * 60 * 10,
   },
   {
     id: 'doc-webpack-vite',
@@ -183,7 +215,7 @@ let games = reactive([
     title: 'Webpack 与 Vite 对比',
     content: `
       <h1>Webpack 与 Vite 对比</h1>
-      <p>Webpack 是一个传统的静态模块打包工具，需要先递归构建依赖图然后打包生成 bundle；而 Vite 利用原生 ESM 实现了按需编译，极大地加快了启动和更新速度。</p>
+      <p>Webpack 是一个传统的静态模块打包工具，需要先递归构建依赖图然后打包生成 bundle；而 Vite 利用原生 ESM 实现了按需编译，极大地加快了启动 and 更新速度。</p>
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
     updatedAt: Date.now() - 1000 * 60 * 60 * 11,
@@ -200,7 +232,7 @@ let games = reactive([
       <p>通过 AI 对学生的实验报告、作业进行自动批改，指出错误并给出修改建议，降低教师批改负担。</p>
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 9, // 今天 09:18 左右
+    updatedAt: Date.now() - 1000 * 60 * 60 * 9,
   },
   {
     id: 'doc-student-flow',
@@ -212,7 +244,7 @@ let games = reactive([
       <p>详细规定了学生在实验过程中的实时步骤存档、数据同步策略、以及断网重连下的 LocalStorage 暂存机制。</p>
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 22, // 昨天 18:56 左右
+    updatedAt: Date.now() - 1000 * 60 * 60 * 22,
   },
   {
     id: 'doc-course-table',
@@ -224,7 +256,7 @@ let games = reactive([
       <p>定义了 <code>course_kb</code>, <code>course_doc</code>, <code>doc_chunk</code>, <code>vector_index</code> 等数据表的关系以及主外键约束。</p>
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 25, // 昨天 15:32 左右
+    updatedAt: Date.now() - 1000 * 60 * 60 * 25,
   },
   {
     id: 'doc-bar-inspiration',
@@ -236,7 +268,7 @@ let games = reactive([
       <p>一些关于共振酒吧 (Resonance Bar) 的视觉灵感。包含蒸汽波、赛博朋克霓虹色调以及网格排版系统参考。</p>
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 8, // 今天 10:42
+    updatedAt: Date.now() - 1000 * 60 * 60 * 8,
   },
 ];
 
@@ -265,7 +297,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   updateKnowledgeBase: (id, data) => {
     set((state) => ({
       knowledgeBases: state.knowledgeBases.map((kb) =>
-        kb.id === id ? { ...kb, ...data, updatedAt: Date.now() } : kb
+          kb.id === id ? { ...kb, ...data, updatedAt: Date.now() } : kb
       ),
     }));
   },
@@ -279,16 +311,32 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   // Group CRUD
-  createGroup: (kbId, name = '新建分组') => {
+  createGroup: (kbId, parentGroupId, name = '新建分组') => {
     const id = `group-${generateId()}`;
-    const kbGroups = get().getGroupsByKb(kbId);
+    const groups = get().groups;
+    
+    let depth = 0;
+    if (parentGroupId) {
+      const parent = groups.find((g) => g.id === parentGroupId);
+      if (parent) {
+        depth = parent.depth + 1;
+      }
+    }
+    
+    const siblingCount = groups.filter(
+      (g) => g.kbId === kbId && g.parentGroupId === parentGroupId
+    ).length;
+
     const newGroup: Group = {
       id,
       kbId,
+      parentGroupId,
+      depth,
       name,
-      order: kbGroups.length + 1,
+      order: siblingCount + 1,
       createdAt: Date.now(),
     };
+    
     set((state) => ({
       groups: [...state.groups, newGroup],
     }));
@@ -302,12 +350,13 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   deleteGroup: (id) => {
+    const descendantIds = get().getDescendantGroupIds(id);
+    const deleteGroupIds = [id, ...descendantIds];
+    
     set((state) => ({
-      groups: state.groups.filter((g) => g.id !== id),
-      // Move docs in this group to root level of their respective KBs
-      documents: state.documents.map((doc) =>
-        doc.groupId === id ? { ...doc, groupId: null, updatedAt: Date.now() } : doc
-      ),
+      groups: state.groups.filter((g) => !deleteGroupIds.includes(g.id)),
+      // Cascade delete: Remove documents belonging to any of these groups
+      documents: state.documents.filter((doc) => !deleteGroupIds.includes(doc.groupId || '')),
     }));
   },
 
@@ -332,7 +381,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   updateDocument: (id, data) => {
     set((state) => ({
       documents: state.documents.map((doc) =>
-        doc.id === id ? { ...doc, ...data, updatedAt: Date.now() } : doc
+          doc.id === id ? { ...doc, ...data, updatedAt: Date.now() } : doc
       ),
     }));
   },
@@ -350,8 +399,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   getGroupsByKb: (kbId) => {
     return get()
-      .groups.filter((g) => g.kbId === kbId)
-      .sort((a, b) => a.order - b.order);
+        .groups.filter((g) => g.kbId === kbId)
+        .sort((a, b) => a.order - b.order);
   },
 
   getDocumentsByKb: (kbId) => {
@@ -364,5 +413,45 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   getRootDocuments: (kbId) => {
     return get().documents.filter((d) => d.kbId === kbId && d.groupId === null);
+  },
+  
+  getChildGroups: (parentGroupId, kbId) => {
+    return get()
+      .groups.filter((g) => g.kbId === kbId && g.parentGroupId === parentGroupId)
+      .sort((a, b) => a.order - b.order);
+  },
+
+  getGroupDepth: (groupId) => {
+    const group = get().groups.find((g) => g.id === groupId);
+    return group ? group.depth : 0;
+  },
+
+  getGroupAncestors: (groupId) => {
+    const ancestors: Group[] = [];
+    let currentId: string | null = groupId;
+    const groups = get().groups;
+    while (currentId) {
+      const currentGroup = groups.find((g) => g.id === currentId);
+      if (currentGroup) {
+        ancestors.unshift(currentGroup);
+        currentId = currentGroup.parentGroupId;
+      } else {
+        break;
+      }
+    }
+    return ancestors;
+  },
+
+  getDescendantGroupIds: (groupId) => {
+    const descendants: string[] = [];
+    const traverse = (id: string) => {
+      const children = get().groups.filter((g) => g.parentGroupId === id);
+      children.forEach((child) => {
+        descendants.push(child.id);
+        traverse(child.id);
+      });
+    };
+    traverse(groupId);
+    return descendants;
   },
 }));
