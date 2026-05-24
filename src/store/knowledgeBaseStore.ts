@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+export const MEMO_KB_ID = 'kb-memo-system';
+
 export interface KnowledgeBase {
   id: string;
   name: string;
@@ -67,6 +69,11 @@ interface KnowledgeBaseStore {
   isCatalogCollapsed: boolean;
   setCatalogWidth: (width: number) => void;
   setIsCatalogCollapsed: (collapsed: boolean) => void;
+
+  // Memo operations
+  getMemos: () => Document[];
+  createMemo: (title?: string) => string;
+  moveDocument: (id: string, targetKbId: string, targetGroupId: string | null) => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -104,6 +111,14 @@ const initialKBs: KnowledgeBase[] = [
     icon: '#a855f7', // Purple
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 20,
     updatedAt: Date.now() - 1000 * 60 * 60 * 22,
+  },
+  {
+    id: MEMO_KB_ID,
+    name: '小记',
+    description: '轻量化小记知识库',
+    icon: '#ec4899', // Pink
+    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
   },
 ];
 
@@ -275,6 +290,35 @@ let games = reactive([
     `,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
     updatedAt: Date.now() - 1000 * 60 * 60 * 8,
+  },
+  {
+    id: 'memo-1',
+    kbId: MEMO_KB_ID,
+    groupId: null,
+    title: '今日待办与灵感',
+    content: `
+      <h1>今日待办与灵感</h1>
+      <p>这里记录了今天的一些灵感：</p>
+      <ul>
+        <li>调研 TipTap 扩展支持</li>
+        <li>梳理 AI 写作的界面交互流</li>
+        <li>下班买点水果</li>
+      </ul>
+    `,
+    createdAt: Date.now() - 1000 * 60 * 60 * 4,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 4,
+  },
+  {
+    id: 'memo-2',
+    kbId: MEMO_KB_ID,
+    groupId: null,
+    title: 'React 19 Concurrent Features 笔记',
+    content: `
+      <h1>React 19 Concurrent Features 笔记</h1>
+      <p>主要是对 <code>useActionState</code> 和 <code>useOptimistic</code> 的使用场景进行对比。前者用于处理异步 Action 的 State 转换，后者用于处理乐观更新。</p>
+    `,
+    createdAt: Date.now() - 1000 * 60 * 60 * 20,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 18,
   },
 ];
 
@@ -464,5 +508,22 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     };
     traverse(groupId);
     return descendants;
+  },
+
+  // Memo operations
+  getMemos: () => {
+    return get().documents.filter((d) => d.kbId === MEMO_KB_ID);
+  },
+
+  createMemo: (title = '未命名小记') => {
+    return get().createDocument(MEMO_KB_ID, null, title);
+  },
+
+  moveDocument: (id, targetKbId, targetGroupId) => {
+    set((state) => ({
+      documents: state.documents.map((doc) =>
+        doc.id === id ? { ...doc, kbId: targetKbId, groupId: targetGroupId, updatedAt: Date.now() } : doc
+      ),
+    }));
   },
 }));

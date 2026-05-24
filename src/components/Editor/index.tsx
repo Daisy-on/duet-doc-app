@@ -52,9 +52,10 @@ function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) 
 }
 
 export default function Editor() {
-  const { docId } = useParams<{ docId: string }>()
+  const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>()
+  const currentDocId = docId || memoId
   const { documents, updateDocument } = useKnowledgeBaseStore()
-  const doc = documents.find((d) => d.id === docId)
+  const doc = documents.find((d) => d.id === currentDocId)
 
   const setSelectedText = useEditorStore((state) => state.setSelectedText)
   const setHeadings = useEditorStore((state) => state.setHeadings)
@@ -98,7 +99,7 @@ export default function Editor() {
       syncHeadings(editor)
     },
     onUpdate: ({ editor }) => {
-      if (docId) {
+      if (currentDocId) {
         const html = editor.getHTML()
         let firstH1Text = ''
         editor.state.doc.forEach((node) => {
@@ -111,7 +112,7 @@ export default function Editor() {
         if (firstH1Text !== doc?.title) {
           updates.title = firstH1Text
         }
-        updateDocument(docId, updates)
+        updateDocument(currentDocId, updates)
       }
       syncHeadings(editor)
     },

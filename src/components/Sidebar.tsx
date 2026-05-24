@@ -1,7 +1,7 @@
 import { Home, Sparkles, StickyNote, Star, Folder, Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { NavLink, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
 import type { Group, Document } from '../store/knowledgeBaseStore';
 
 interface SidebarGroupNodeProps {
@@ -94,6 +94,8 @@ export default function Sidebar() {
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [expandedKbs, setExpandedKbs] = useState<Record<string, boolean>>({});
 
+  const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
+
   // Auto-expand the active KB when navigation happens
   useEffect(() => {
     if (activeKbId) {
@@ -147,7 +149,7 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/kb/kb-frontend/doc/doc-vite-analysis" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink to="/ai-writing" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
             {({ isActive }) => (
               <>
                 <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> AI 写作
@@ -156,7 +158,7 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/memo" tabIndex={-1} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors">
+          <NavLink to="/memo" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
             <StickyNote size={16} /> 小记
           </NavLink>
         </li>
@@ -171,7 +173,7 @@ export default function Sidebar() {
       <div className="text-[12px] text-text-secondary mb-3 pl-3 font-semibold tracking-wide shrink-0">知识库列表</div>
       <div className="flex-1 overflow-y-auto -mx-2 px-2">
         <ul className="list-none text-[13px] text-text-secondary space-y-1">
-          {knowledgeBases.map((kb) => {
+          {visibleKBs.map((kb) => {
             const isActiveKb = activeKbId === kb.id;
             const kbRootGroups = getChildGroups(null, kb.id);
             const kbDocs = documents.filter((d) => d.kbId === kb.id);
