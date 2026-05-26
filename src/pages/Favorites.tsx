@@ -10,9 +10,11 @@ import {
   FileText,
   ArrowUpRight,
   BookOpen,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useFavoritesStore, FOLDER_ALL_ID } from '../store/favoritesStore';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
+import FavoriteItemMenu from '../components/modals/FavoriteItemMenu';
 
 // ── FolderCard (left panel item) ─────────────────────────────────────────────
 
@@ -120,8 +122,15 @@ function EmptyState() {
 export default function Favorites() {
   const navigate = useNavigate();
 
-  const { folders, items, createFolder, renameFolder, deleteFolder, getItemsByFolder } =
-    useFavoritesStore();
+  const {
+    folders,
+    items,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    getItemsByFolder,
+    removeFavorite,
+  } = useFavoritesStore();
   const { documents, knowledgeBases, groups } = useKnowledgeBaseStore();
 
   const [selectedFolderId, setSelectedFolderId] = useState<string>(FOLDER_ALL_ID);
@@ -129,6 +138,9 @@ export default function Favorites() {
   const [editingName, setEditingName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -346,10 +358,11 @@ export default function Favorites() {
           ) : (
             <div className="max-w-4xl mx-auto px-6 py-5">
               {/* Table header */}
-              <div className="grid grid-cols-[1fr_180px_130px] gap-4 px-4 py-2 text-[11px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-color mb-1">
+              <div className="grid grid-cols-[1fr_180px_130px_36px] gap-4 px-4 py-2 text-[11px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-color mb-1">
                 <span>名称</span>
                 <span>归属知识库</span>
                 <span>收藏时间</span>
+                <span></span>
               </div>
 
               {/* Table rows */}
@@ -361,7 +374,7 @@ export default function Favorites() {
                   return (
                     <div
                       key={item.id}
-                      className="grid grid-cols-[1fr_180px_130px] gap-4 px-4 py-3 rounded-xl text-xs text-text-ghost italic"
+                      className="grid grid-cols-[1fr_180px_130px_36px] gap-4 px-4 py-3 rounded-xl text-xs text-text-ghost italic items-center"
                     >
                       <span className="flex items-center gap-2">
                         <FileText size={14} className="text-gray-300 shrink-0" />
@@ -369,6 +382,18 @@ export default function Favorites() {
                       </span>
                       <span>—</span>
                       <span>{formatTime(item.favoritedAt)}</span>
+                      <div className="flex justify-end">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFavorite(item.docId);
+                          }}
+                          title="移除收藏"
+                          className="p-1 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   );
                 }
@@ -376,10 +401,10 @@ export default function Favorites() {
                 const { doc, kb, group } = info;
 
                 return (
-                  <button
+                  <div
                     key={item.id}
                     onClick={() => handleDocClick(item.docId)}
-                    className="w-full grid grid-cols-[1fr_180px_130px] gap-4 px-4 py-3 rounded-xl hover:bg-hover-bg transition-colors group text-left cursor-pointer"
+                    className="w-full grid grid-cols-[1fr_180px_130px_36px] gap-4 px-4 py-3 rounded-xl hover:bg-hover-bg transition-colors group text-left cursor-pointer items-center"
                   >
                     {/* Title */}
                     <span className="flex items-center gap-2.5 min-w-0">
@@ -397,22 +422,49 @@ export default function Favorites() {
                     </span>
 
                     {/* KB / Group breadcrumb */}
-                    <span className="text-xs text-text-secondary truncate self-center">
+                    <span className="text-xs text-text-secondary truncate">
                       {kb?.name ?? '—'}
                       {group ? ` / ${group.name}` : ''}
                     </span>
 
                     {/* Favorited time */}
-                    <span className="text-xs text-text-secondary self-center">
+                    <span className="text-xs text-text-secondary">
                       {formatTime(item.favoritedAt)}
                     </span>
-                  </button>
+
+                    {/* Action dropdown trigger */}
+                    <div className="flex justify-end">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveDocId(item.docId);
+                          setMenuAnchorEl(e.currentTarget);
+                        }}
+                        className={`p-1 rounded-lg hover:bg-gray-200 text-text-secondary hover:text-text-primary transition-colors cursor-pointer ${
+                          activeDocId === item.docId ? 'opacity-100 bg-gray-200' : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
       </main>
+
+      {/* Popover Menu */}
+      <FavoriteItemMenu
+        docId={activeDocId || ''}
+        isOpen={activeDocId !== null}
+        onClose={() => {
+          setActiveDocId(null);
+          setMenuAnchorEl(null);
+        }}
+        anchorEl={menuAnchorEl}
+      />
     </div>
   );
 }
