@@ -4,7 +4,7 @@ import CatalogPanel from '../components/CatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
 import Editor from '../components/Editor';
 import Toolbar from '../components/Toolbar';
-import { useEditorStore } from '../store';
+import { useEditorStore, useLayoutStore } from '../store';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { 
   CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal, PanelLeft,
@@ -22,14 +22,48 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-// Replace the first <h1> tag's inner text while preserving any tag attributes
-function replaceFirstH1(html: string, newTitle: string): string {
-  const escapedTitle = escapeHtml(newTitle);
-  const match = html.match(/<h1([^>]*)>([\s\S]*?)<\/h1>/);
-  if (match) {
-    return html.replace(/<h1([^>]*)>([\s\S]*?)<\/h1>/, `<h1$1>${escapedTitle}</h1>`);
+// Replace the first <h1> tag's inner text or the first level 1 heading in JSON
+function replaceFirstH1(content: string, newTitle: string): string {
+  const isJson = content.trim().startsWith('{');
+  if (isJson) {
+    try {
+      const parsed = JSON.parse(content);
+      let found = false;
+      const traverse = (node: any) => {
+        if (found) return;
+        if (node.type === 'heading' && node.attrs?.level === 1) {
+          node.content = [{ type: 'text', text: newTitle }];
+          found = true;
+          return;
+        }
+        if (node.content && Array.isArray(node.content)) {
+          for (const child of node.content) {
+            traverse(child);
+          }
+        }
+      };
+      traverse(parsed);
+      if (!found) {
+        const h1Node = {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: newTitle }]
+        };
+        parsed.content = [h1Node, ...(parsed.content || [])];
+      }
+      return JSON.stringify(parsed);
+    } catch (err) {
+      console.error(err);
+      return content;
+    }
   } else {
-    return `<h1>${escapedTitle}</h1>` + html;
+    const escapedTitle = escapeHtml(newTitle);
+    const match = content.match(/<h1([^>]*)>([\s\S]*?)<\/h1>/);
+    if (match) {
+      return content.replace(/<h1([^>]*)>([\s\S]*?)<\/h1>/, `<h1$1>${escapedTitle}</h1>`);
+    } else {
+      return `<h1>${escapedTitle}</h1>` + content;
+    }
   }
 }
 
@@ -37,7 +71,8 @@ export default function DocEdit() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
   
-  const { documents, updateDocument, isCatalogCollapsed, setIsCatalogCollapsed } = useKnowledgeBaseStore();
+  const { documents, updateDocument } = useKnowledgeBaseStore();
+  const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
   (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
   (window as any).useEditorStore = useEditorStore;
   const doc = documents.find((d) => d.id === docId);

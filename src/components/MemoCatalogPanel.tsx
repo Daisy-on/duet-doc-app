@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Search, FileText, MoreHorizontal } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 import type { Document } from '../store/knowledgeBaseStore';
 import MemoActionMenu from './menus/MemoActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
@@ -13,9 +14,15 @@ export default function MemoCatalogPanel() {
   
   const { 
     getMemos, createMemo, updateDocument, 
-    deleteDocument, moveDocument, catalogWidth, isCatalogCollapsed, 
-    setCatalogWidth, setIsCatalogCollapsed 
+    deleteDocument, moveDocument
   } = useKnowledgeBaseStore();
+
+  const {
+    catalogWidth,
+    isCatalogCollapsed,
+    setCatalogWidth,
+    setIsCatalogCollapsed,
+  } = useLayoutStore();
 
   const memos = getMemos();
 

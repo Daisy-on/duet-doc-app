@@ -15,7 +15,7 @@ import { common, createLowlight } from 'lowlight'
 import { useParams } from 'react-router-dom'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 
@@ -51,6 +51,16 @@ function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) 
   })
 }
 
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
+  let timer: number | null = null
+  return (...args: Parameters<T>) => {
+    if (timer) window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      fn(...args)
+    }, delay)
+  }
+}
+
 export default function Editor() {
   const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>()
   const currentDocId = docId || memoId
@@ -64,6 +74,13 @@ export default function Editor() {
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
   const timerRef = useRef<number | null>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
+
+  // Debounced updateDocument
+  const debouncedUpdateDoc = useMemo(() => {
+    return debounce((id: string, updates: { content: string; title?: string }) => {
+      updateDocument(id, updates)
+    }, 800)
+  }, [updateDocument])
 
   // 解析并同步标题到 Zustand，然后给 DOM 打标记
   const syncHeadings = useCallback((editor: TiptapEditor) => {
@@ -94,13 +111,13 @@ export default function Editor() {
       TableHeader,
       TableCell,
     ],
-    content: doc?.content || '',
+    content: doc ? (doc.content.trim().startsWith('{') ? JSON.parse(doc.content) : doc.content) : '',
     onCreate: ({ editor }) => {
       syncHeadings(editor)
     },
     onUpdate: ({ editor }) => {
       if (currentDocId) {
-        const html = editor.getHTML()
+        const jsonStr = JSON.stringify(editor.getJSON())
         let firstH1Text = ''
         editor.state.doc.forEach((node) => {
           if (node.type.name === 'heading' && node.attrs.level === 1 && !firstH1Text) {
@@ -108,11 +125,11 @@ export default function Editor() {
           }
         })
         
-        const updates: { content: string; title?: string } = { content: html }
-        if (firstH1Text !== doc?.title) {
+        const updates: { content: string; title?: string } = { content: jsonStr }
+        if (firstH1Text && firstH1Text !== doc?.title) {
           updates.title = firstH1Text
         }
-        updateDocument(currentDocId, updates)
+        debouncedUpdateDoc(currentDocId, updates)
       }
       syncHeadings(editor)
     },
@@ -186,11 +203,13 @@ export default function Editor() {
 
   // 同步外部 content 状态
   useEffect(() => {
-    console.log('[Editor content sync] doc?.content changed:', doc?.content, 'editor.getHTML():', editor?.getHTML());
-    if (editor && doc && doc.content !== editor.getHTML()) {
-      console.log('[Editor content sync] Executing setContent');
-      editor.commands.setContent(doc.content, { emitUpdate: false })
-      syncHeadings(editor)
+    if (editor && doc) {
+      const isJson = doc.content.trim().startsWith('{')
+      const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML()
+      if (doc.content !== currentContent) {
+        editor.commands.setContent(isJson ? JSON.parse(doc.content) : doc.content, { emitUpdate: false })
+        syncHeadings(editor)
+      }
     }
   }, [doc?.content, editor, syncHeadings])
 

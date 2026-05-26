@@ -1,13 +1,13 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2, MessageSquare, Sparkles } from 'lucide-react';
 import { useAIWritingStore } from '../store/aiWritingStore';
-import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 
 export default function AIChatListPanel() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId?: string }>();
   const { sessions, createSession, deleteSession, activeSessionId, setActiveSessionId } = useAIWritingStore();
-  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useKnowledgeBaseStore();
+  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useLayoutStore();
 
   const handleCreateSession = () => {
     const newId = createSession();

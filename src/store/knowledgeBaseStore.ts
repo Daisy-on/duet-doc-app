@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { nanoid } from 'nanoid';
+import { db } from '../db';
+import { useFavoritesStore } from './favoritesStore';
 
 export const MEMO_KB_ID = 'kb-memo-system';
 
@@ -19,6 +22,7 @@ export interface Group {
   name: string;
   order: number;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface Document {
@@ -35,6 +39,8 @@ interface KnowledgeBaseStore {
   knowledgeBases: KnowledgeBase[];
   groups: Group[];
   documents: Document[];
+
+  initStore: () => Promise<void>;
 
   // Knowledge Base CRUD
   createKnowledgeBase: (name: string, description: string, icon?: string) => string;
@@ -64,11 +70,7 @@ interface KnowledgeBaseStore {
   getGroupAncestors: (groupId: string) => Group[];  // Breadcrumb helper
   getDescendantGroupIds: (groupId: string) => string[];  // Cascade delete helper
 
-  // Catalog Panel resizable & collapsible states
-  catalogWidth: number;
-  isCatalogCollapsed: boolean;
-  setCatalogWidth: (width: number) => void;
-  setIsCatalogCollapsed: (collapsed: boolean) => void;
+
 
   // Memo operations
   getMemos: () => Document[];
@@ -77,7 +79,7 @@ interface KnowledgeBaseStore {
   moveGroup: (id: string, targetKbId: string, targetParentGroupId: string | null) => { success: boolean; error?: string };
 }
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+const generateId = () => nanoid(12);
 
 // Preset Mock Data
 const initialKBs: KnowledgeBase[] = [
@@ -132,6 +134,7 @@ const initialGroups: Group[] = [
     name: '01. 前端基础',
     order: 1,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
   },
   {
     id: 'group-html',
@@ -141,6 +144,7 @@ const initialGroups: Group[] = [
     name: 'HTML',
     order: 1,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3.9,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3.9,
   },
   {
     id: 'group-css',
@@ -150,6 +154,7 @@ const initialGroups: Group[] = [
     name: 'CSS',
     order: 2,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3.8,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3.8,
   },
   {
     id: 'group-eng',
@@ -159,6 +164,7 @@ const initialGroups: Group[] = [
     name: '02. 工程化',
     order: 2,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
   },
   {
     id: 'group-perf',
@@ -168,6 +174,7 @@ const initialGroups: Group[] = [
     name: '03. 性能优化',
     order: 3,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
   },
 ];
 
@@ -324,14 +331,34 @@ let games = reactive([
 ];
 
 export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
-  knowledgeBases: initialKBs,
-  groups: initialGroups,
-  documents: initialDocs,
+  knowledgeBases: [],
+  groups: [],
+  documents: [],
 
-  catalogWidth: 220,
-  isCatalogCollapsed: false,
-  setCatalogWidth: (width) => set({ catalogWidth: width }),
-  setIsCatalogCollapsed: (collapsed) => set({ isCatalogCollapsed: collapsed }),
+  initStore: async () => {
+    try {
+      const kbCount = await db.knowledgeBases.count();
+      if (kbCount === 0) {
+        await db.knowledgeBases.bulkAdd(initialKBs);
+        await db.groups.bulkAdd(initialGroups);
+        await db.documents.bulkAdd(initialDocs);
+      }
+      
+      const kbs = await db.knowledgeBases.toArray();
+      const grps = await db.groups.toArray();
+      const docs = await db.documents.toArray();
+      
+      set({
+        knowledgeBases: kbs,
+        groups: grps.sort((a, b) => a.order - b.order),
+        documents: docs,
+      });
+    } catch (error) {
+      console.error('Failed to initialize KnowledgeBaseStore from Dexie:', error);
+    }
+  },
+
+
 
   // Knowledge Base CRUD
   createKnowledgeBase: (name, description, icon = '#3b82f6') => {
@@ -344,6 +371,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
+    db.knowledgeBases.add(newKB).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       knowledgeBases: [...state.knowledgeBases, newKB],
     }));
@@ -351,14 +379,24 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   updateKnowledgeBase: (id, data) => {
+    const updatedAt = Date.now();
+    db.knowledgeBases.update(id, { ...data, updatedAt }).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       knowledgeBases: state.knowledgeBases.map((kb) =>
-          kb.id === id ? { ...kb, ...data, updatedAt: Date.now() } : kb
+          kb.id === id ? { ...kb, ...data, updatedAt } : kb
       ),
     }));
   },
 
   deleteKnowledgeBase: (id) => {
+    const docIds = get().documents.filter((d) => d.kbId === id).map((d) => d.id);
+    docIds.forEach((docId) => {
+      useFavoritesStore.getState().removeFavorite(docId);
+    });
+
+    db.knowledgeBases.delete(id).catch(err => console.error('Dexie error:', err));
+    db.groups.where('kbId').equals(id).delete().catch(err => console.error('Dexie error:', err));
+    db.documents.where('kbId').equals(id).delete().catch(err => console.error('Dexie error:', err));
     set((state) => ({
       knowledgeBases: state.knowledgeBases.filter((kb) => kb.id !== id),
       groups: state.groups.filter((g) => g.kbId !== id),
@@ -391,8 +429,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       name,
       order: siblingCount + 1,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
-    
+    db.groups.add(newGroup).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       groups: [...state.groups, newGroup],
     }));
@@ -400,8 +439,10 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   updateGroup: (id, data) => {
+    const updatedAt = Date.now();
+    db.groups.update(id, { ...data, updatedAt }).catch(err => console.error('Dexie error:', err));
     set((state) => ({
-      groups: state.groups.map((g) => (g.id === id ? { ...g, ...data } : g)),
+      groups: state.groups.map((g) => (g.id === id ? { ...g, ...data, updatedAt } : g)),
     }));
   },
 
@@ -409,6 +450,13 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     const descendantIds = get().getDescendantGroupIds(id);
     const deleteGroupIds = [id, ...descendantIds];
     
+    const docIds = get().documents.filter((d) => d.groupId && deleteGroupIds.includes(d.groupId)).map((d) => d.id);
+    docIds.forEach((docId) => {
+      useFavoritesStore.getState().removeFavorite(docId);
+    });
+
+    db.groups.bulkDelete(deleteGroupIds).catch(err => console.error('Dexie error:', err));
+    db.documents.where('groupId').anyOf(deleteGroupIds).delete().catch(err => console.error('Dexie error:', err));
     set((state) => ({
       groups: state.groups.filter((g) => !deleteGroupIds.includes(g.id)),
       // Cascade delete: Remove documents belonging to any of these groups
@@ -428,6 +476,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
+    db.documents.add(newDoc).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       documents: [...state.documents, newDoc],
     }));
@@ -435,14 +484,18 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   updateDocument: (id, data) => {
+    const updatedAt = Date.now();
+    db.documents.update(id, { ...data, updatedAt }).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       documents: state.documents.map((doc) =>
-          doc.id === id ? { ...doc, ...data, updatedAt: Date.now() } : doc
+          doc.id === id ? { ...doc, ...data, updatedAt } : doc
       ),
     }));
   },
 
   deleteDocument: (id) => {
+    useFavoritesStore.getState().removeFavorite(id);
+    db.documents.delete(id).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       documents: state.documents.filter((doc) => doc.id !== id),
     }));
@@ -521,9 +574,11 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   moveDocument: (id, targetKbId, targetGroupId) => {
+    const updatedAt = Date.now();
+    db.documents.update(id, { kbId: targetKbId, groupId: targetGroupId, updatedAt }).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       documents: state.documents.map((doc) =>
-        doc.id === id ? { ...doc, kbId: targetKbId, groupId: targetGroupId, updatedAt: Date.now() } : doc
+        doc.id === id ? { ...doc, kbId: targetKbId, groupId: targetGroupId, updatedAt } : doc
       ),
     }));
   },
@@ -556,6 +611,16 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     // 3. Move group, descendants and all their documents
     const allGroupIds = [groupId, ...descendantIds];
     
+    // Save updates in Dexie
+    db.groups.update(groupId, { kbId: targetKbId, parentGroupId: targetParentGroupId, depth: newDepthOfG, updatedAt: Date.now() }).catch(err => console.error(err));
+    descendantIds.forEach((descId) => {
+      const descG = get().groups.find(g => g.id === descId);
+      if (descG) {
+        db.groups.update(descId, { kbId: targetKbId, depth: newDepthOfG + (descG.depth - oldDepthOfG), updatedAt: Date.now() }).catch(err => console.error(err));
+      }
+    });
+    db.documents.where('groupId').anyOf(allGroupIds).modify({ kbId: targetKbId, updatedAt: Date.now() }).catch(err => console.error(err));
+
     set((state) => {
       // Update groups
       const updatedGroups = state.groups.map((g) => {
@@ -565,12 +630,14 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
             kbId: targetKbId,
             parentGroupId: targetParentGroupId,
             depth: newDepthOfG,
+            updatedAt: Date.now(),
           };
         } else if (descendantIds.includes(g.id)) {
           return {
             ...g,
             kbId: targetKbId,
             depth: newDepthOfG + (g.depth - oldDepthOfG),
+            updatedAt: Date.now(),
           };
         }
         return g;

@@ -26,3 +26,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setEditorInstance: (editor) => set({ editorInstance: editor }),
 }));
 
+export * from './layoutStore';
+
+

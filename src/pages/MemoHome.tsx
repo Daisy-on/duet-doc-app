@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { StickyNote, Plus, PanelLeft } from 'lucide-react';
 import MemoCatalogPanel from '../components/MemoCatalogPanel';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 
 export default function MemoHome() {
   const navigate = useNavigate();
-  const { createMemo, isCatalogCollapsed, setIsCatalogCollapsed } = useKnowledgeBaseStore();
+  const { createMemo } = useKnowledgeBaseStore();
+  const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
 
   const handleCreateMemo = () => {
     const newId = createMemo('未命名小记');

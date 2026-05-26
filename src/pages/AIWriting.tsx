@@ -8,7 +8,7 @@ import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBDocSelectorModal from '../components/modals/KBDocSelectorModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import type { ReferencedDoc } from '../store/aiWritingStore';
-import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 
 // Simple Markdown parser for beautiful text display
 function parseMarkdown(text: string): React.ReactNode[] {
@@ -107,7 +107,7 @@ export default function AIWriting() {
     setIsThinkingEnabled, setIsWebSearchEnabled, setActiveSessionId
   } = useAIWritingStore();
 
-  const { isCatalogCollapsed, setIsCatalogCollapsed } = useKnowledgeBaseStore();
+  const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
 
   // Selected session context
   const currentSessionId = sessionId || activeSessionId;

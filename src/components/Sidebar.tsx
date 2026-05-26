@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Home, Sparkles, StickyNote, Star, Folder, Search, Plus, MoreHorizontal } from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import KbActionMenu from './menus/KbActionMenu';
@@ -11,10 +12,10 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const {
     knowledgeBases,
-    setIsCatalogCollapsed,
     updateKnowledgeBase,
     deleteKnowledgeBase,
   } = useKnowledgeBaseStore();
+  const { setIsCatalogCollapsed } = useLayoutStore();
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FileText, FolderPlus, Folder, Calendar, BookOpen, User, ChevronRight, Plus, PanelLeft } from 'lucide-react';
 import CatalogPanel from '../components/CatalogPanel';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 
 // Helper to format date relative to today/yesterday or absolute
 function formatRelativeTime(timestamp: number): string {
@@ -38,10 +39,13 @@ export default function KnowledgeBaseHome() {
     getKnowledgeBase, 
     createDocument,
     getChildGroups,
-    getGroupAncestors,
-    isCatalogCollapsed,
-    setIsCatalogCollapsed
+    getGroupAncestors
   } = useKnowledgeBaseStore();
+
+  const {
+    isCatalogCollapsed,
+    setIsCatalogCollapsed,
+  } = useLayoutStore();
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
   

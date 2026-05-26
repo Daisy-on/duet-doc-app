@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Search, ChevronDown, ChevronRight, FileText, MoreHorizontal } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useLayoutStore } from '../store';
 import type { Group, Document } from '../store/knowledgeBaseStore';
 import AddContentMenu from './AddContentMenu';
 import GroupAddMenu from './menus/GroupAddMenu';
@@ -419,12 +420,15 @@ export default function CatalogPanel() {
     moveDocument,
     moveGroup,
     getGroupAncestors,
+    groups,
+  } = useKnowledgeBaseStore();
+
+  const {
     catalogWidth,
     isCatalogCollapsed,
     setCatalogWidth,
     setIsCatalogCollapsed,
-    groups,
-  } = useKnowledgeBaseStore();
+  } = useLayoutStore();
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
   const rootGroups = kbId ? getChildGroups(null, kbId) : [];

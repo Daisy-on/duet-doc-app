@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { nanoid } from 'nanoid';
+import { db } from '../db';
 
 export interface ReferencedDoc {
   id: string;
@@ -22,6 +24,7 @@ export interface ChatSession {
   id: string;
   title: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 interface AIWritingStore {
@@ -30,6 +33,8 @@ interface AIWritingStore {
   activeSessionId: string | null;
   isThinkingEnabled: boolean;
   isWebSearchEnabled: boolean;
+
+  initStore: () => Promise<void>;
 
   // Actions
   createSession: (title?: string) => string;
@@ -40,7 +45,7 @@ interface AIWritingStore {
   sendMessage: (sessionId: string, content: string, referencedDocs?: ReferencedDoc[]) => void;
 }
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+const generateId = () => nanoid(12);
 
 // Mock data sessions
 const initialSessions: ChatSession[] = [
@@ -48,11 +53,13 @@ const initialSessions: ChatSession[] = [
     id: 'session-nextjs',
     title: '关于 Next.js 15 性能优化',
     createdAt: Date.now() - 1000 * 60 * 60 * 2,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
   },
   {
     id: 'session-container-queries',
     title: 'CSS Container Queries 落地指南',
     createdAt: Date.now() - 1000 * 60 * 60 * 24,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24,
   }
 ];
 
@@ -127,11 +134,31 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
-  sessions: initialSessions,
-  messages: initialMessages,
-  activeSessionId: initialSessions[0]?.id || null,
+  sessions: [],
+  messages: [],
+  activeSessionId: null,
   isThinkingEnabled: true,
   isWebSearchEnabled: false,
+
+  initStore: async () => {
+    try {
+      const sessionCount = await db.chatSessions.count();
+      if (sessionCount === 0) {
+        await db.chatSessions.bulkAdd(initialSessions);
+        await db.chatMessages.bulkAdd(initialMessages);
+      }
+      const sessions = await db.chatSessions.toArray();
+      const messages = await db.chatMessages.toArray();
+      sessions.sort((a, b) => b.createdAt - a.createdAt);
+      set({ 
+        sessions, 
+        messages, 
+        activeSessionId: sessions[0]?.id || null 
+      });
+    } catch (error) {
+      console.error('Failed to initialize AIWritingStore from Dexie:', error);
+    }
+  },
 
   createSession: (title = '新对话') => {
     const id = `session-${generateId()}`;
@@ -139,7 +166,9 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
       id,
       title,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
+    db.chatSessions.add(newSession).catch(err => console.error('Dexie error:', err));
     set((state) => ({
       sessions: [newSession, ...state.sessions],
       activeSessionId: id,
@@ -148,6 +177,8 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   },
 
   deleteSession: (id) => {
+    db.chatSessions.delete(id).catch(err => console.error('Dexie error:', err));
+    db.chatMessages.where('sessionId').equals(id).delete().catch(err => console.error('Dexie error:', err));
     set((state) => {
       const filteredSessions = state.sessions.filter((s) => s.id !== id);
       let newActiveId = state.activeSessionId;
@@ -185,6 +216,8 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
       createdAt: Date.now(),
     };
 
+    db.chatMessages.add(userMessage).catch(err => console.error('Dexie error:', err));
+
     set((state) => ({
       messages: [...state.messages, userMessage],
     }));
@@ -193,8 +226,10 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
     const session = get().sessions.find((s) => s.id === sessionId);
     if (session && session.title === '新对话') {
       const newTitle = content.length > 15 ? content.substring(0, 15) + '...' : content;
+      const updatedAt = Date.now();
+      db.chatSessions.update(sessionId, { title: newTitle, updatedAt }).catch(err => console.error('Dexie error:', err));
       set((state) => ({
-        sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, title: newTitle } : s)
+        sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, title: newTitle, updatedAt } : s)
       }));
     }
 
@@ -222,6 +257,8 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
           { title: '百度百科', url: 'https://baike.baidu.com' }
         ] : undefined
       };
+
+      db.chatMessages.add(assistantMessage).catch(err => console.error('Dexie error:', err));
 
       set((state) => ({
         messages: [...state.messages, assistantMessage],
