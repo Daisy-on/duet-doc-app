@@ -1,128 +1,12 @@
-import { Home, Sparkles, StickyNote, Star, Folder, Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Home, Sparkles, StickyNote, Star, Folder, Search } from 'lucide-react';
 import { NavLink, useParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
-import type { Group, Document } from '../store/knowledgeBaseStore';
-
-interface SidebarGroupNodeProps {
-  group: Group;
-  depth: number;
-  kbId: string;
-  kbDocs: Document[];
-  collapsedGroups: Record<string, boolean>;
-  toggleGroup: (groupId: string, e: React.MouseEvent) => void;
-}
-
-function SidebarGroupNode({
-  group,
-  depth,
-  kbId,
-  kbDocs,
-  collapsedGroups,
-  toggleGroup,
-}: SidebarGroupNodeProps) {
-  const { getChildGroups, setIsCatalogCollapsed } = useKnowledgeBaseStore();
-  const subGroups = getChildGroups(group.id, kbId);
-  const groupDocs = kbDocs.filter((d) => d.groupId === group.id);
-  const isExpanded = !collapsedGroups[group.id];
-  const hasContent = subGroups.length > 0 || groupDocs.length > 0;
-
-  // Max indentation padding at depth 2 (level 3) to keep it readable in narrow sidebar
-  const indentPaddingLeft = Math.min(depth, 2) * 10;
-
-  return (
-    <li className="space-y-0.5 animate-dropdown-fade-in">
-      {/* Group Row */}
-      <div
-        onClick={(e) => toggleGroup(group.id, e)}
-        className="px-2 py-1 rounded hover:bg-hover-bg hover:text-text-primary transition-colors flex items-center justify-between cursor-pointer text-xs font-semibold text-text-primary select-none"
-        style={{ paddingLeft: `${indentPaddingLeft + 8}px` }}
-      >
-        <span className="truncate text-text-secondary">{group.name}</span>
-        {hasContent && (
-          isExpanded ? (
-            <ChevronDown size={11} className="text-text-secondary shrink-0" />
-          ) : (
-            <ChevronRight size={11} className="text-text-secondary shrink-0" />
-          )
-        )}
-      </div>
-
-      {/* Group Children */}
-      {isExpanded && hasContent && (
-        <ul className="space-y-0.5">
-          {/* Sub-groups */}
-          {subGroups.map((subGroup) => (
-            <SidebarGroupNode
-              key={subGroup.id}
-              group={subGroup}
-              depth={depth + 1}
-              kbId={kbId}
-              kbDocs={kbDocs}
-              collapsedGroups={collapsedGroups}
-              toggleGroup={toggleGroup}
-            />
-          ))}
-
-          {/* Docs */}
-          {groupDocs.map((doc) => (
-            <li key={doc.id}>
-              <NavLink
-                to={`/kb/${kbId}/doc/${doc.id}`}
-                onClick={() => setIsCatalogCollapsed(false)}
-                className={({ isActive }) =>
-                  `py-1 pr-2 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
-                    isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'
-                  }`
-                }
-                style={{ paddingLeft: `${Math.min(depth + 1, 3) * 10 + 10}px` }}
-              >
-                <FileText size={11} className="shrink-0 text-indigo-400" />
-                <span className="truncate">{doc.title}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
-  const { knowledgeBases, documents, getChildGroups, setIsCatalogCollapsed } = useKnowledgeBaseStore();
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const [expandedKbs, setExpandedKbs] = useState<Record<string, boolean>>({});
+  const { knowledgeBases, setIsCatalogCollapsed } = useKnowledgeBaseStore();
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
-
-  // Auto-expand the active KB when navigation happens
-  useEffect(() => {
-    if (activeKbId) {
-      setExpandedKbs((prev) => ({
-        ...prev,
-        [activeKbId]: true,
-      }));
-    }
-  }, [activeKbId]);
-
-  const toggleKb = (kbId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setExpandedKbs((prev) => ({
-      ...prev,
-      [kbId]: !prev[kbId],
-    }));
-  };
-
-  const toggleGroup = (groupId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setCollapsedGroups((prev) => ({
-      ...prev,
-      [groupId]: !prev[groupId],
-    }));
-  };
 
   return (
     <aside className="w-[220px] min-w-[220px] bg-bg-sidebar border-r border-border-color flex flex-col p-5 h-full">
@@ -175,9 +59,6 @@ export default function Sidebar() {
         <ul className="list-none text-[13px] text-text-secondary space-y-1">
           {visibleKBs.map((kb) => {
             const isActiveKb = activeKbId === kb.id;
-            const kbRootGroups = getChildGroups(null, kb.id);
-            const kbDocs = documents.filter((d) => d.kbId === kb.id);
-            const rootDocs = kbDocs.filter((d) => d.groupId === null);
 
             return (
               <li key={kb.id} className="space-y-0.5">
@@ -189,15 +70,9 @@ export default function Sidebar() {
                   <NavLink
                     to={`/kb/${kb.id}`}
                     onClick={() => {
-                      setExpandedKbs((prev) => ({
-                        ...prev,
-                        [kb.id]: true,
-                      }));
                       setIsCatalogCollapsed(false);
                     }}
-                    className={`flex items-center gap-2.5 truncate flex-1 pl-3 py-2 min-w-0 ${
-                      kbDocs.length > 0 ? 'pr-2' : 'pr-3'
-                    } ${
+                    className={`flex items-center gap-2.5 truncate flex-1 px-3 py-2 min-w-0 ${
                       isActiveKb ? 'text-accent font-semibold' : 'text-text-secondary hover:text-text-primary'
                     }`}
                   >
@@ -208,56 +83,7 @@ export default function Sidebar() {
                     />
                     <span className="truncate">{kb.name}</span>
                   </NavLink>
-                  {kbDocs.length > 0 && (
-                    <div
-                      onClick={(e) => toggleKb(kb.id, e)}
-                      className="p-1 mr-2 rounded hover:bg-gray-200/50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer flex items-center justify-center shrink-0"
-                      title={!!expandedKbs[kb.id] ? "收起" : "展开"}
-                    >
-                      {!!expandedKbs[kb.id] ? (
-                        <ChevronDown size={12} />
-                      ) : (
-                        <ChevronRight size={12} />
-                      )}
-                    </div>
-                  )}
                 </div>
-
-                {/* Sub-tree for the KB */}
-                {!!expandedKbs[kb.id] && (
-                  <ul className="ml-5 pl-2.5 border-l border-gray-200/60 space-y-1 py-1">
-                    {/* Root Groups of this KB recursively */}
-                    {kbRootGroups.map((group) => (
-                      <SidebarGroupNode
-                        key={group.id}
-                        group={group}
-                        depth={0}
-                        kbId={kb.id}
-                        kbDocs={kbDocs}
-                        collapsedGroups={collapsedGroups}
-                        toggleGroup={toggleGroup}
-                      />
-                    ))}
-
-                    {/* Root documents */}
-                    {rootDocs.map((doc) => (
-                      <li key={doc.id}>
-                        <NavLink
-                          to={`/kb/${kb.id}/doc/${doc.id}`}
-                          onClick={() => setIsCatalogCollapsed(false)}
-                          className={({ isActive }) =>
-                            `px-2 py-1 rounded text-[12px] hover:bg-hover-bg hover:text-text-primary transition-all flex items-center gap-1.5 ${
-                              isActive ? 'text-accent font-semibold bg-indigo-50/55 shadow-sm' : 'text-text-secondary'
-                            }`
-                          }
-                        >
-                          <FileText size={11} className="shrink-0 text-indigo-400" />
-                          <span className="truncate">{doc.title}</span>
-                        </NavLink>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </li>
             );
           })}
