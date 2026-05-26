@@ -6,6 +6,7 @@ import DocEdit from './pages/DocEdit';
 import AIWriting from './pages/AIWriting';
 import MemoHome from './pages/MemoHome';
 import MemoEdit from './pages/MemoEdit';
+import Favorites from './pages/Favorites';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="ai-writing/:sessionId" element={<AIWriting />} />
           <Route path="memo" element={<MemoHome />} />
           <Route path="memo/:memoId" element={<MemoEdit />} />
+          <Route path="favorites" element={<Favorites />} />
         </Route>
       </Routes>
     </BrowserRouter>

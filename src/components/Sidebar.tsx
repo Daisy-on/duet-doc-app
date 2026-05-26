@@ -47,8 +47,12 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/favorites" tabIndex={-1} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors">
-            <Star size={16} /> 收藏
+          <NavLink to="/favorites" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+            {({ isActive }) => (
+              <>
+                <Star size={16} className={isActive ? 'text-yellow-400 fill-yellow-400' : ''} /> 收藏
+              </>
+            )}
           </NavLink>
         </li>
       </ul>

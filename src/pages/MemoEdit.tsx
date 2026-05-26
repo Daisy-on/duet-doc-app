@@ -7,7 +7,7 @@ import Toolbar from '../components/Toolbar';
 import { useEditorStore } from '../store';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { 
-  CloudUpload, Star, Share2, History, MoreHorizontal, StickyNote, PanelLeft
+  CloudUpload, Share2, History, MoreHorizontal, StickyNote, PanelLeft
 } from 'lucide-react';
 
 // Escape HTML characters to safely insert into HTML string
@@ -112,7 +112,6 @@ export default function MemoEdit() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-text-secondary">
-            <span title="收藏" className="cursor-pointer hover:text-text-primary transition-colors flex"><Star size={16} /></span>
             <span title="分享" className="cursor-pointer hover:text-text-primary transition-colors flex"><Share2 size={16} /></span>
             <span title="历史记录" className="cursor-pointer hover:text-text-primary transition-colors flex"><History size={16} /></span>
             <span className="cursor-pointer hover:text-text-primary transition-colors flex"><MoreHorizontal size={16} /></span>

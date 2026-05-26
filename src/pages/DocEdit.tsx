@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CatalogPanel from '../components/CatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
@@ -9,6 +9,8 @@ import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { 
   CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal, PanelLeft,
 } from 'lucide-react';
+import FavoritePopover from '../components/modals/FavoritePopover';
+import { useFavoritesStore } from '../store/favoritesStore';
 
 // Escape HTML characters to safely insert into HTML string
 function escapeHtml(text: string): string {
@@ -41,6 +43,9 @@ export default function DocEdit() {
   const doc = documents.find((d) => d.id === docId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
+  const { isFavorited } = useFavoritesStore();
+  const [isFavOpen, setIsFavOpen] = useState(false);
+  const favBtnRef = useRef<HTMLButtonElement>(null);
 
   // 1. When switching documents (docId changes), ensure the first <h1> inside the content matches the document's external title
   useEffect(() => {
@@ -120,7 +125,19 @@ export default function DocEdit() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-text-secondary">
-            <span title="收藏" className="cursor-pointer hover:text-text-primary transition-colors flex"><Star size={16} /></span>
+            <button
+              ref={favBtnRef}
+              title="收藏"
+              onClick={() => setIsFavOpen((prev) => !prev)}
+              className={`cursor-pointer transition-colors flex hover:text-text-primary ${
+                isFavorited(docId ?? '') ? 'text-yellow-400' : ''
+              }`}
+            >
+              <Star
+                size={16}
+                className={isFavorited(docId ?? '') ? 'fill-yellow-400 text-yellow-400' : ''}
+              />
+            </button>
             <span title="分享" className="cursor-pointer hover:text-text-primary transition-colors flex"><Share2 size={16} /></span>
             <span title="历史记录" className="cursor-pointer hover:text-text-primary transition-colors flex"><History size={16} /></span>
             <span className="cursor-pointer hover:text-text-primary transition-colors flex"><MoreHorizontal size={16} /></span>
@@ -136,6 +153,16 @@ export default function DocEdit() {
 
       {/* 4. 最右侧大纲面板 */}
       <OutlinePanel />
+
+      {/* 收藏弹窗 */}
+      {docId && (
+        <FavoritePopover
+          docId={docId}
+          isOpen={isFavOpen}
+          onClose={() => setIsFavOpen(false)}
+          anchorEl={favBtnRef.current}
+        />
+      )}
     </div>
   );
 }
