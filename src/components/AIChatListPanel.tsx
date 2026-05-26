@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash2, MessageSquare, Sparkles } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Sparkles, ChevronLeft } from 'lucide-react';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 
@@ -65,32 +65,39 @@ export default function AIChatListPanel() {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // If collapsed, render nothing or just a thin handle
-  if (isCatalogCollapsed) {
-    return null;
-  }
-
   return (
     <>
       <aside
-        style={{ width: `${catalogWidth}px` }}
-        className="relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out overflow-hidden"
+        style={{ width: isCatalogCollapsed ? 0 : `${catalogWidth}px` }}
+        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out ${
+          isCatalogCollapsed ? 'overflow-visible' : 'overflow-hidden'
+        }`}
       >
-        <div className="flex flex-col h-full w-full min-w-[220px]">
-          {/* Header */}
-          <div className="p-5 pb-3 flex justify-between items-center shrink-0">
-            <div className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5">
-              <Sparkles size={16} className="text-accent" />
-              <span>AI 写作对话</span>
+        {!isCatalogCollapsed && (
+          <div className="flex flex-col h-full w-full min-w-[220px]">
+            {/* Header */}
+            <div className="p-5 pb-3 flex justify-between items-center shrink-0">
+              <div className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5">
+                <Sparkles size={16} className="text-accent" />
+                <span>AI 写作对话</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsCatalogCollapsed(true)}
+                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
+                  title="收起会话树"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={handleCreateSession}
+                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
+                  title="开启新对话"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleCreateSession}
-              className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
-              title="开启新对话"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
 
           {/* Title / Label */}
           <div className="text-[11px] font-bold text-text-secondary uppercase tracking-wider px-5 mt-4 mb-2 shrink-0">
@@ -137,11 +144,12 @@ export default function AIChatListPanel() {
             )}
           </div>
         </div>
+      )}
 
         {/* Drag handle resize line */}
         <div
           onMouseDown={handleMouseDown}
-          className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
+          className="absolute top-0 -right-[2px] w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
         />
       </aside>
     </>

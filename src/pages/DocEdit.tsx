@@ -7,7 +7,7 @@ import Toolbar from '../components/Toolbar';
 import { useEditorStore } from '../store';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { 
-  CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal,
+  CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal, Folder,
 } from 'lucide-react';
 
 // Escape HTML characters to safely insert into HTML string
@@ -35,7 +35,7 @@ export default function DocEdit() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
   
-  const { documents, updateDocument } = useKnowledgeBaseStore();
+  const { documents, updateDocument, isCatalogCollapsed, setIsCatalogCollapsed } = useKnowledgeBaseStore();
   (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
   (window as any).useEditorStore = useEditorStore;
   const doc = documents.find((d) => d.id === docId);
@@ -77,6 +77,17 @@ export default function DocEdit() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
+      {/* Toggle Collapse Button for Sidebar */}
+      {isCatalogCollapsed && (
+        <button
+          onClick={() => setIsCatalogCollapsed(false)}
+          className="absolute left-4 top-[18px] z-20 bg-white border border-border-color shadow-sm hover:text-accent p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-text-secondary"
+          title="展开目录树"
+        >
+          <Folder size={14} />
+        </button>
+      )}
+
       {/* 2. 中间目录面板 */}
       <CatalogPanel />
 
@@ -84,7 +95,7 @@ export default function DocEdit() {
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
         {/* 顶部栏 */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className="flex items-center gap-4">
+          <div className={`flex items-center gap-4 transition-all duration-150 ${isCatalogCollapsed ? 'pl-10' : 'pl-0'}`}>
             <input
               type="text"
               value={doc.title}

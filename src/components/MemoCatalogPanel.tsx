@@ -113,8 +113,6 @@ export default function MemoCatalogPanel() {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  if (isCatalogCollapsed) return null;
-
   const filteredMemos = searchQuery.trim()
     ? memos.filter((m) => m.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : memos;
@@ -122,28 +120,40 @@ export default function MemoCatalogPanel() {
   return (
     <>
       <aside
-        style={{ width: `${catalogWidth}px` }}
-        className="relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out overflow-hidden"
+        style={{ width: isCatalogCollapsed ? 0 : `${catalogWidth}px` }}
+        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out ${
+          isCatalogCollapsed ? 'overflow-visible' : 'overflow-hidden'
+        }`}
       >
-        <div className="flex flex-col h-full w-full min-w-[220px]">
-          {/* Header */}
-          <div className="p-5 pb-3 flex justify-between items-center shrink-0">
-            <div
-              onClick={() => navigate('/')}
-              className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5 cursor-pointer hover:text-accent transition-colors truncate max-w-[150px]"
-              title="返回主页"
-            >
-              <ChevronLeft size={16} className="shrink-0" />
-              <span>小记列表</span>
+        {!isCatalogCollapsed && (
+          <div className="flex flex-col h-full w-full min-w-[220px]">
+            {/* Header */}
+            <div className="p-5 pb-3 flex justify-between items-center shrink-0">
+              <div
+                onClick={() => navigate('/')}
+                className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5 cursor-pointer hover:text-accent transition-colors truncate max-w-[150px]"
+                title="返回主页"
+              >
+                <ChevronLeft size={16} className="shrink-0" />
+                <span>小记列表</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsCatalogCollapsed(true)}
+                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
+                  title="收起小记树"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={handleCreateMemo}
+                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
+                  title="新建小记"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleCreateMemo}
-              className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
-              title="新建小记"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
 
           {/* Search Box */}
           <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color focus-within:border-accent rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0">
@@ -226,11 +236,12 @@ export default function MemoCatalogPanel() {
             )}
           </div>
         </div>
+      )}
 
         {/* Drag handle resize line */}
         <div
           onMouseDown={handleMouseDown}
-          className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
+          className="absolute top-0 -right-[2px] w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
         />
       </aside>
 

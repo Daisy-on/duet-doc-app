@@ -608,7 +608,9 @@ export default function CatalogPanel() {
     <>
       <aside
         style={{ width: isCatalogCollapsed ? 0 : `${catalogWidth}px` }}
-        className="relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out overflow-hidden"
+        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out ${
+          isCatalogCollapsed ? 'overflow-visible' : 'overflow-hidden'
+        }`}
       >
         {/* Render content only when not collapsed */}
         {!isCatalogCollapsed && (
@@ -623,7 +625,14 @@ export default function CatalogPanel() {
                 <ChevronLeft size={16} className="shrink-0" />
                 <span className="truncate">{kb.name}</span>
               </div>
-              <div className="relative" ref={menuTriggerRef}>
+              <div className="relative flex items-center gap-1.5" ref={menuTriggerRef}>
+                <button
+                  onClick={() => setIsCatalogCollapsed(true)}
+                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
+                  title="收起目录树"
+                >
+                  <ChevronLeft size={16} />
+                </button>
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                   className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
@@ -747,12 +756,10 @@ export default function CatalogPanel() {
         )}
 
         {/* Drag handle resize line */}
-        {!isCatalogCollapsed && (
-          <div
-            onMouseDown={handleMouseDown}
-            className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
-          />
-        )}
+        <div
+          onMouseDown={handleMouseDown}
+          className="absolute top-0 -right-[2px] w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
+        />
       </aside>
 
       {/* Floating Menus (Landed outside aside with overflow-hidden to prevent container clipping) */}

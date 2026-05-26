@@ -38,7 +38,9 @@ export default function KnowledgeBaseHome() {
     getKnowledgeBase, 
     createDocument,
     getChildGroups,
-    getGroupAncestors
+    getGroupAncestors,
+    isCatalogCollapsed,
+    setIsCatalogCollapsed
   } = useKnowledgeBaseStore();
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
@@ -93,6 +95,17 @@ export default function KnowledgeBaseHome() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
+      {/* Toggle Collapse Button for Sidebar */}
+      {isCatalogCollapsed && (
+        <button
+          onClick={() => setIsCatalogCollapsed(false)}
+          className="absolute left-4 top-[18px] z-20 bg-white border border-border-color shadow-sm hover:text-accent p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-text-secondary"
+          title="展开目录树"
+        >
+          <Folder size={14} />
+        </button>
+      )}
+
       {/* Left sidebar catalog panel specific to this KB */}
       <CatalogPanel />
 
@@ -100,7 +113,7 @@ export default function KnowledgeBaseHome() {
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main overflow-y-auto">
         {/* Top Header Bar */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-8 shrink-0 bg-white">
-          <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-3 transition-all duration-150 ${isCatalogCollapsed ? 'pl-8' : 'pl-0'}`}>
             <div 
               className="w-4 h-4 rounded-md shadow-sm"
               style={{ backgroundColor: kb.icon }}
