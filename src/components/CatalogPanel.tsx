@@ -8,6 +8,7 @@ import GroupAddMenu from './menus/GroupAddMenu';
 import GroupActionMenu from './menus/GroupActionMenu';
 import DocActionMenu from './menus/DocActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
+import MoveToKBModal from './modals/MoveToKBModal';
 
 interface DocTreeItemProps {
   doc: Document;
@@ -414,6 +415,7 @@ export default function CatalogPanel() {
     deleteDocument,
     getChildGroups,
     getDescendantGroupIds,
+    moveDocument,
     catalogWidth,
     isCatalogCollapsed,
     setCatalogWidth,
@@ -427,6 +429,19 @@ export default function CatalogPanel() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // Document move states
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [selectedDocForMove, setSelectedDocForMove] = useState<Document | null>(null);
+
+  const handleConfirmMove = (targetKbId: string, targetGroupId: string | null) => {
+    if (selectedDocForMove) {
+      moveDocument(selectedDocForMove.id, targetKbId, targetGroupId);
+      setIsMoveModalOpen(false);
+      navigate(`/kb/${targetKbId}/doc/${selectedDocForMove.id}`);
+      setSelectedDocForMove(null);
+    }
+  };
 
   // Group creation states
   const [creatingParentId, setCreatingParentId] = useState<string | null | undefined>(undefined);
@@ -826,6 +841,10 @@ export default function CatalogPanel() {
                 setDeleteTargetDoc(doc);
                 setIsDeleteDocModalOpen(true);
               }}
+              onMove={() => {
+                setSelectedDocForMove(doc);
+                setIsMoveModalOpen(true);
+              }}
               anchorEl={docActionMenuAnchorEl}
             />
           );
@@ -883,6 +902,20 @@ export default function CatalogPanel() {
           )
         }
       />
+
+      {/* Document Move Modal */}
+      {selectedDocForMove && (
+        <MoveToKBModal
+          isOpen={isMoveModalOpen}
+          onClose={() => {
+            setIsMoveModalOpen(false);
+            setSelectedDocForMove(null);
+          }}
+          documentId={selectedDocForMove.id}
+          documentTitle={selectedDocForMove.title}
+          onConfirm={handleConfirmMove}
+        />
+      )}
     </>
   );
 }
