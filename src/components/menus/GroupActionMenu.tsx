@@ -6,6 +6,7 @@ interface GroupActionMenuProps {
   onClose: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onMove: () => void;
   anchorEl: HTMLElement | null;
 }
 
@@ -14,6 +15,7 @@ export default function GroupActionMenu({
   onClose,
   onRename,
   onDelete,
+  onMove,
   anchorEl,
 }: GroupActionMenuProps) {
   const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -98,18 +100,16 @@ export default function GroupActionMenu({
 
         <div className="h-[1px] bg-border-color my-1" />
 
-        <div
-          className="w-full px-3.5 py-2 text-[13px] font-medium text-text-secondary opacity-50 flex items-center justify-between gap-2.5 cursor-not-allowed select-none"
-          title="移动层级功能即将上线"
+        <button
+          onClick={() => {
+            onMove();
+            onClose();
+          }}
+          className="w-full px-3.5 py-2 text-[13px] font-medium text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
         >
-          <div className="flex items-center gap-2.5">
-            <ArrowRightLeft size={14} />
-            <span>移动层级</span>
-          </div>
-          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-semibold border border-gray-200">
-            即将上线
-          </span>
-        </div>
+          <ArrowRightLeft size={14} className="text-gray-500" />
+          <span>移动层级</span>
+        </button>
       </div>
     </>
   );

@@ -9,6 +9,7 @@ import GroupActionMenu from './menus/GroupActionMenu';
 import DocActionMenu from './menus/DocActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import MoveToKBModal from './modals/MoveToKBModal';
+import MoveGroupModal from './modals/MoveGroupModal';
 
 interface DocTreeItemProps {
   doc: Document;
@@ -416,6 +417,8 @@ export default function CatalogPanel() {
     getChildGroups,
     getDescendantGroupIds,
     moveDocument,
+    moveGroup,
+    getGroupAncestors,
     catalogWidth,
     isCatalogCollapsed,
     setCatalogWidth,
@@ -440,6 +443,34 @@ export default function CatalogPanel() {
       setIsMoveModalOpen(false);
       navigate(`/kb/${targetKbId}/doc/${selectedDocForMove.id}`);
       setSelectedDocForMove(null);
+    }
+  };
+
+  // Group move states
+  const [isMoveGroupModalOpen, setIsMoveGroupModalOpen] = useState(false);
+  const [selectedGroupForMove, setSelectedGroupForMove] = useState<Group | null>(null);
+
+  const handleConfirmMoveGroup = (targetKbId: string, targetGroupId: string | null) => {
+    if (selectedGroupForMove) {
+      const res = moveGroup(selectedGroupForMove.id, targetKbId, targetGroupId);
+      if (res.success) {
+        setIsMoveGroupModalOpen(false);
+        if (targetGroupId) {
+          const ancestors = getGroupAncestors(targetGroupId);
+          setCollapsedGroups((prev) => {
+            const next = { ...prev };
+            next[targetGroupId] = false;
+            ancestors.forEach((a) => {
+              next[a.id] = false;
+            });
+            return next;
+          });
+        }
+        navigate(`/kb/${targetKbId}`);
+        setSelectedGroupForMove(null);
+      } else {
+        alert(res.error || '移动分组失败');
+      }
     }
   };
 
@@ -818,6 +849,10 @@ export default function CatalogPanel() {
                 setDeleteDocsCount(docCount);
                 setIsDeleteModalOpen(true);
               }}
+              onMove={() => {
+                setSelectedGroupForMove(group);
+                setIsMoveGroupModalOpen(true);
+              }}
               anchorEl={actionMenuAnchorEl}
             />
           );
@@ -914,6 +949,20 @@ export default function CatalogPanel() {
           documentId={selectedDocForMove.id}
           documentTitle={selectedDocForMove.title}
           onConfirm={handleConfirmMove}
+        />
+      )}
+
+      {/* Group Move Modal */}
+      {selectedGroupForMove && (
+        <MoveGroupModal
+          isOpen={isMoveGroupModalOpen}
+          onClose={() => {
+            setIsMoveGroupModalOpen(false);
+            setSelectedGroupForMove(null);
+          }}
+          groupId={selectedGroupForMove.id}
+          groupName={selectedGroupForMove.name}
+          onConfirm={handleConfirmMoveGroup}
         />
       )}
     </>

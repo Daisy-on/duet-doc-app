@@ -74,6 +74,7 @@ interface KnowledgeBaseStore {
   getMemos: () => Document[];
   createMemo: (title?: string) => string;
   moveDocument: (id: string, targetKbId: string, targetGroupId: string | null) => void;
+  moveGroup: (id: string, targetKbId: string, targetParentGroupId: string | null) => { success: boolean; error?: string };
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -525,5 +526,74 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         doc.id === id ? { ...doc, kbId: targetKbId, groupId: targetGroupId, updatedAt: Date.now() } : doc
       ),
     }));
+  },
+
+  moveGroup: (groupId, targetKbId, targetParentGroupId) => {
+    const G = get().groups.find((g) => g.id === groupId);
+    if (!G) return { success: false, error: '未找到源分组' };
+
+    // 1. Circularity check
+    const descendantIds = get().getDescendantGroupIds(groupId);
+    if (targetParentGroupId === groupId || (targetParentGroupId && descendantIds.includes(targetParentGroupId))) {
+      return { success: false, error: '不能将分组移动到自身或其子分组下' };
+    }
+
+    // 2. Depth check
+    const descendants = descendantIds.map((id) => get().groups.find((g) => g.id === id)!).filter(Boolean);
+    const oldDepthOfG = G.depth;
+    let newDepthOfG = 0;
+    if (targetParentGroupId) {
+      const targetParent = get().groups.find((g) => g.id === targetParentGroupId);
+      if (!targetParent) return { success: false, error: '未找到目标父分组' };
+      newDepthOfG = targetParent.depth + 1;
+    }
+
+    const maxSubtreeDepthDiff = descendants.reduce((max, d) => Math.max(max, d.depth - oldDepthOfG), 0);
+    if (newDepthOfG + maxSubtreeDepthDiff > 5) {
+      return { success: false, error: '移动后层级深度超过了系统最大 6 层限制' };
+    }
+
+    // 3. Move group, descendants and all their documents
+    const allGroupIds = [groupId, ...descendantIds];
+    
+    set((state) => {
+      // Update groups
+      const updatedGroups = state.groups.map((g) => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            kbId: targetKbId,
+            parentGroupId: targetParentGroupId,
+            depth: newDepthOfG,
+          };
+        } else if (descendantIds.includes(g.id)) {
+          return {
+            ...g,
+            kbId: targetKbId,
+            depth: newDepthOfG + (g.depth - oldDepthOfG),
+          };
+        }
+        return g;
+      });
+
+      // Update documents
+      const updatedDocs = state.documents.map((doc) => {
+        if (doc.groupId && allGroupIds.includes(doc.groupId)) {
+          return {
+            ...doc,
+            kbId: targetKbId,
+            updatedAt: Date.now(),
+          };
+        }
+        return doc;
+      });
+
+      return {
+        groups: updatedGroups,
+        documents: updatedDocs,
+      };
+    });
+
+    return { success: true };
   },
 }));
