@@ -214,24 +214,22 @@ export default function AIWriting() {
 
       {/* 2. Main Chat Panel */}
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
-        {/* Toggle Collapse Button for Sidebar */}
-        {isCatalogCollapsed && (
-          <button
-            onClick={() => setIsCatalogCollapsed(false)}
-            className="absolute left-4 top-[18px] z-20 bg-white border border-border-color shadow-sm hover:text-accent p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-text-secondary"
-            title="展开会话树"
-          >
-            <Sparkles size={14} />
-          </button>
-        )}
-
         {/* Top Header */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className={`flex items-center gap-3 transition-all duration-150 ${isCatalogCollapsed ? 'pl-10' : 'pl-8 md:pl-0'}`}>
-            <h2 className="text-[15px] font-bold text-text-primary">和 Duet AI 一起写作</h2>
-            <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200">
-              R1 Model
-            </span>
+          <div className="flex items-center gap-3.5 min-w-0">
+            <button
+              onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              title={isCatalogCollapsed ? "展开" : "折叠"}
+            >
+              <Sparkles size={14} className="text-indigo-500" />
+            </button>
+            <div className="flex items-center gap-3 ml-1 min-w-0">
+              <h2 className="text-[15px] font-bold text-text-primary truncate">和 Duet AI 一起写作</h2>
+              <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
+                R1 Model
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-text-secondary bg-gray-50 border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />

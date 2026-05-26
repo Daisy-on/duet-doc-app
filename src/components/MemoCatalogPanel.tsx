@@ -139,13 +139,6 @@ export default function MemoCatalogPanel() {
               </div>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setIsCatalogCollapsed(true)}
-                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
-                  title="收起小记树"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
                   onClick={handleCreateMemo}
                   className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
                   title="新建小记"

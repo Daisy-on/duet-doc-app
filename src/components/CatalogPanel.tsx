@@ -627,13 +627,6 @@ export default function CatalogPanel() {
               </div>
               <div className="relative flex items-center gap-1.5" ref={menuTriggerRef}>
                 <button
-                  onClick={() => setIsCatalogCollapsed(true)}
-                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
-                  title="收起目录树"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                   className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
                 >

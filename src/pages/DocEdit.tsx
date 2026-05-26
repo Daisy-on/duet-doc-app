@@ -7,7 +7,7 @@ import Toolbar from '../components/Toolbar';
 import { useEditorStore } from '../store';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { 
-  CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal, Folder,
+  CloudUpload, ShieldHalf, Star, Share2, History, MoreHorizontal, PanelLeft,
 } from 'lucide-react';
 
 // Escape HTML characters to safely insert into HTML string
@@ -77,17 +77,6 @@ export default function DocEdit() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Toggle Collapse Button for Sidebar */}
-      {isCatalogCollapsed && (
-        <button
-          onClick={() => setIsCatalogCollapsed(false)}
-          className="absolute left-4 top-[18px] z-20 bg-white border border-border-color shadow-sm hover:text-accent p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-text-secondary"
-          title="展开目录树"
-        >
-          <Folder size={14} />
-        </button>
-      )}
-
       {/* 2. 中间目录面板 */}
       <CatalogPanel />
 
@@ -95,30 +84,39 @@ export default function DocEdit() {
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
         {/* 顶部栏 */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className={`flex items-center gap-4 transition-all duration-150 ${isCatalogCollapsed ? 'pl-10' : 'pl-0'}`}>
-            <input
-              type="text"
-              value={doc.title}
-              onChange={(e) => {
-                const newTitle = e.target.value;
-                const updatedContent = replaceFirstH1(doc.content, newTitle);
-                console.log('[DocEdit input onChange] newTitle:', newTitle, 'updatedContent:', updatedContent);
-                updateDocument(doc.id, { 
-                  title: newTitle, 
-                  content: updatedContent 
-                });
-              }}
-              className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
-              placeholder="无标题文档"
-            />
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-text-secondary flex items-center gap-1">
-                <CloudUpload size={14} /> 已自动保存 {saveTime}
-              </span>
-              {/* 隐私模式 Tag */}
-              <span className="bg-emerald-50 text-success-color px-2.5 py-1 rounded-full font-medium flex items-center gap-1 border border-emerald-200" title="当前模型请求已切断云端网络，仅在本地设备运行">
-                <ShieldHalf size={12} /> 隐私模式
-              </span>
+          <div className="flex items-center gap-3.5 min-w-0">
+            <button
+              onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              title={isCatalogCollapsed ? "展开" : "折叠"}
+            >
+              <PanelLeft size={16} />
+            </button>
+            <div className="flex items-center gap-3 ml-1 min-w-0">
+              <input
+                type="text"
+                value={doc.title}
+                onChange={(e) => {
+                  const newTitle = e.target.value;
+                  const updatedContent = replaceFirstH1(doc.content, newTitle);
+                  console.log('[DocEdit input onChange] newTitle:', newTitle, 'updatedContent:', updatedContent);
+                  updateDocument(doc.id, { 
+                    title: newTitle, 
+                    content: updatedContent 
+                  });
+                }}
+                className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
+                placeholder="无标题文档"
+              />
+              <div className="flex items-center gap-3 text-xs shrink-0">
+                <span className="text-text-secondary flex items-center gap-1">
+                  <CloudUpload size={14} /> 已自动保存 {saveTime}
+                </span>
+                {/* 隐私模式 Tag */}
+                <span className="bg-emerald-50 text-success-color px-2.5 py-1 rounded-full font-medium flex items-center gap-1 border border-emerald-200" title="当前模型请求已切断云端网络，仅在本地设备运行">
+                  <ShieldHalf size={12} /> 隐私模式
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-4 text-text-secondary">

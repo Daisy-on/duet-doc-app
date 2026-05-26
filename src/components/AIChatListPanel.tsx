@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash2, MessageSquare, Sparkles, ChevronLeft } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Sparkles } from 'lucide-react';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 
@@ -82,13 +82,6 @@ export default function AIChatListPanel() {
                 <span>AI 写作对话</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setIsCatalogCollapsed(true)}
-                  className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"
-                  title="收起会话树"
-                >
-                  <ChevronLeft size={16} />
-                </button>
                 <button
                   onClick={handleCreateSession}
                   className="text-text-secondary cursor-pointer hover:text-text-primary transition-colors p-1 hover:bg-hover-bg rounded-md flex"

@@ -7,7 +7,7 @@ import Toolbar from '../components/Toolbar';
 import { useEditorStore } from '../store';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { 
-  CloudUpload, Star, Share2, History, MoreHorizontal, StickyNote
+  CloudUpload, Star, Share2, History, MoreHorizontal, StickyNote, PanelLeft
 } from 'lucide-react';
 
 // Escape HTML characters to safely insert into HTML string
@@ -71,17 +71,6 @@ export default function MemoEdit() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Toggle Collapse Button for Sidebar */}
-      {isCatalogCollapsed && (
-        <button
-          onClick={() => setIsCatalogCollapsed(false)}
-          className="absolute left-4 top-[18px] z-20 bg-white border border-border-color shadow-sm hover:text-accent p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-text-secondary"
-          title="展开小记树"
-        >
-          <StickyNote size={14} />
-        </button>
-      )}
-
       {/* Left panel for list of Memos */}
       <MemoCatalogPanel />
 
@@ -89,28 +78,37 @@ export default function MemoEdit() {
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
         {/* Header */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className={`flex items-center gap-4 transition-all duration-150 ${isCatalogCollapsed ? 'pl-10' : 'pl-0'}`}>
-            <input
-              type="text"
-              value={memo.title}
-              onChange={(e) => {
-                const newTitle = e.target.value;
-                const updatedContent = replaceFirstH1(memo.content, newTitle);
-                updateDocument(memo.id, { 
-                  title: newTitle, 
-                  content: updatedContent 
-                });
-              }}
-              className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
-              placeholder="无标题小记"
-            />
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-text-secondary flex items-center gap-1">
-                <CloudUpload size={14} /> 已保存 {saveTime}
-              </span>
-              <span className="bg-pink-50 text-pink-600 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 border border-pink-200">
-                <StickyNote size={12} /> 独立小记
-              </span>
+          <div className="flex items-center gap-3.5 min-w-0">
+            <button
+              onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              title={isCatalogCollapsed ? "展开" : "折叠"}
+            >
+              <PanelLeft size={16} />
+            </button>
+            <div className="flex items-center gap-3 ml-1 min-w-0">
+              <input
+                type="text"
+                value={memo.title}
+                onChange={(e) => {
+                  const newTitle = e.target.value;
+                  const updatedContent = replaceFirstH1(memo.content, newTitle);
+                  updateDocument(memo.id, { 
+                    title: newTitle, 
+                    content: updatedContent 
+                  });
+                }}
+                className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
+                placeholder="无标题小记"
+              />
+              <div className="flex items-center gap-3 text-xs shrink-0">
+                <span className="text-text-secondary flex items-center gap-1">
+                  <CloudUpload size={14} /> 已保存 {saveTime}
+                </span>
+                <span className="bg-pink-50 text-pink-600 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 border border-pink-200">
+                  <StickyNote size={12} /> 独立小记
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-4 text-text-secondary">

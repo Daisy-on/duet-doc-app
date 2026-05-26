@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, FolderPlus, Folder, Calendar, BookOpen, User, ChevronRight, Plus } from 'lucide-react';
+import { FileText, FolderPlus, Folder, Calendar, BookOpen, User, ChevronRight, Plus, PanelLeft } from 'lucide-react';
 import CatalogPanel from '../components/CatalogPanel';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 
@@ -95,17 +95,6 @@ export default function KnowledgeBaseHome() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Toggle Collapse Button for Sidebar */}
-      {isCatalogCollapsed && (
-        <button
-          onClick={() => setIsCatalogCollapsed(false)}
-          className="absolute left-4 top-[18px] z-20 bg-white border border-border-color shadow-sm hover:text-accent p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-text-secondary"
-          title="展开目录树"
-        >
-          <Folder size={14} />
-        </button>
-      )}
-
       {/* Left sidebar catalog panel specific to this KB */}
       <CatalogPanel />
 
@@ -113,14 +102,23 @@ export default function KnowledgeBaseHome() {
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main overflow-y-auto">
         {/* Top Header Bar */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-8 shrink-0 bg-white">
-          <div className={`flex items-center gap-3 transition-all duration-150 ${isCatalogCollapsed ? 'pl-8' : 'pl-0'}`}>
-            <div 
-              className="w-4 h-4 rounded-md shadow-sm"
-              style={{ backgroundColor: kb.icon }}
-            />
-            <div className="text-[15px] font-semibold text-text-primary">{kb.name}</div>
-            <div className="text-[11px] text-text-secondary bg-gray-50 border border-border-color px-2 py-0.5 rounded-full font-medium">
-              共 {allDocs.length} 篇文档
+          <div className="flex items-center gap-3.5 min-w-0">
+            <button
+              onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              title={isCatalogCollapsed ? "展开" : "折叠"}
+            >
+              <PanelLeft size={16} />
+            </button>
+            <div className="flex items-center gap-3 ml-1 min-w-0">
+              <div 
+                className="w-4 h-4 rounded-md shadow-sm shrink-0"
+                style={{ backgroundColor: kb.icon }}
+              />
+              <div className="text-[15px] font-semibold text-text-primary truncate">{kb.name}</div>
+              <div className="text-[11px] text-text-secondary bg-gray-50 border border-border-color px-2 py-0.5 rounded-full font-medium shrink-0">
+                共 {allDocs.length} 篇文档
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
