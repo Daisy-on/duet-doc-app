@@ -20,10 +20,18 @@ export default function DocHistory() {
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState(false);
 
+  // Split Panel Resize States
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [splitPercent, setSplitPercent] = useState(50);
+  const isDragging = useRef(false);
+
   // Scroll Sync Refs
   const leftScrollRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const scrollLock = useRef<string | null>(null);
+
+  const leftVer = versions.find((v) => v.id === selectedId);
+  const rightVer = versions.find((v) => v.id === compareId);
 
   // Load versions
   useEffect(() => {
@@ -68,20 +76,49 @@ export default function DocHistory() {
 
   // Run diffing when comparison targets change
   useEffect(() => {
-    if (selectedId === '' || compareId === '') return;
-
-    const leftVer = versions.find((v) => v.id === selectedId);
-    const rightVer = versions.find((v) => v.id === compareId);
-
     if (leftVer && rightVer) {
       const leftLines = jsonToLines(leftVer.content);
       const rightLines = jsonToLines(rightVer.content);
       const results = diffLines(leftLines, rightLines);
       setDiffResults(results);
     }
-  }, [selectedId, compareId, versions]);
+  }, [leftVer, rightVer]);
 
-  // Synchronized scrolling
+  // Dragging handlers for Resizer
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const percent = (offsetX / rect.width) * 100;
+    // Boundary check, ensure neither column disappears (15% to 85%)
+    if (percent >= 15 && percent <= 85) {
+      setSplitPercent(percent);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Synchronized scrolling (Vertical only, no horizontal scroll sync)
   const handleScroll = (source: 'left' | 'right') => {
     const leftEl = leftScrollRef.current;
     const rightEl = rightScrollRef.current;
@@ -92,10 +129,8 @@ export default function DocHistory() {
       scrollLock.current = source;
       if (source === 'left') {
         rightEl.scrollTop = leftEl.scrollTop;
-        rightEl.scrollLeft = leftEl.scrollLeft;
       } else {
         leftEl.scrollTop = rightEl.scrollTop;
-        leftEl.scrollLeft = rightEl.scrollLeft;
       }
       
       requestAnimationFrame(() => {
@@ -167,8 +202,8 @@ export default function DocHistory() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-gray-800 select-none">
       
-      {/* 1. Left Sidebar - Checklist of history snapshots */}
-      <aside className="w-[300px] border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
+      {/* 1. Left Sidebar - Checklist of history snapshots (Narrowed to 240px) */}
+      <aside className="w-[240px] border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
         <div className="p-4 border-b border-gray-200 flex items-center gap-3 bg-white">
           <button
             onClick={() => navigate(`/kb/${kbId}/doc/${docId}`)}
@@ -283,77 +318,116 @@ export default function DocHistory() {
         </header>
 
         {/* Diff Canvas Area */}
-        <div className="flex-1 flex overflow-hidden relative bg-white">
+        <div ref={containerRef} className="flex-1 flex overflow-hidden relative bg-white">
           {isIdentical ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10 text-sm text-gray-500">
-              <div className="text-center p-6 border border-gray-200 rounded-xl bg-gray-50/50 shadow-sm">
-                <div className="text-gray-400 mb-2 font-mono text-xs uppercase tracking-wider">=== NO DIFFERENCE ===</div>
-                内容一致
+            <div className="flex-1 flex items-center justify-center bg-gray-50/30">
+              <div className="text-center p-8 border border-gray-200 rounded-xl bg-white shadow-sm max-w-sm w-full mx-4">
+                <div className="text-gray-400 mb-3 font-mono text-xs uppercase tracking-wider">=== NO DIFFERENCE ===</div>
+                <div className="text-gray-900 font-semibold text-base mb-1">内容一致</div>
+                <div className="text-gray-500 text-xs">选中的版本与对比的版本在内容上完全相同</div>
               </div>
             </div>
-          ) : null}
-
-          {/* Left Column - Selected Version (Base) */}
-          <div
-            ref={leftScrollRef}
-            onScroll={() => handleScroll('left')}
-            className="flex-1 border-r border-gray-200 overflow-auto custom-scrollbar bg-gray-50/50 flex flex-col font-mono text-[13px] leading-relaxed py-4 select-text"
-          >
-            {diffResults.map((line, idx) => {
-              const type = line.left.type;
-              let bgClass = 'hover:bg-gray-100/60';
-              let lineNumClass = 'text-gray-400';
-              if (type === 'deleted') {
-                bgClass = 'bg-red-50 text-red-950 border-l-4 border-red-500 hover:bg-red-100/70';
-                lineNumClass = 'text-red-500 font-bold';
-              } else if (type === 'empty') {
-                bgClass = 'bg-gray-100/40 text-transparent select-none';
-                lineNumClass = 'text-gray-200';
-              } else {
-                bgClass += ' border-l-4 border-transparent';
-              }
-
-              return (
-                <div key={`left-${idx}`} className={`flex items-start shrink-0 min-w-max ${bgClass}`}>
-                  <div className={`w-12 shrink-0 text-right pr-3 select-none text-[11px] font-sans ${lineNumClass}`}>
-                    {type === 'empty' ? ' ' : line.left.lineNumber}
+          ) : (
+            <>
+              {/* Left Column - Selected Version (Base) */}
+              <div
+                ref={leftScrollRef}
+                onScroll={() => handleScroll('left')}
+                className="border-r border-gray-200 overflow-auto custom-scrollbar bg-gray-50/50 flex flex-col font-mono text-[13px] leading-relaxed select-text"
+                style={{ width: `${splitPercent}%`, flexGrow: 0, flexShrink: 0 }}
+              >
+                {/* Version Sticky Header (Source) */}
+                <div className="sticky top-0 z-10 bg-gray-100/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex items-center justify-between text-xs text-gray-600 font-sans select-none shrink-0">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <Clock size={12} className="text-indigo-600" />
+                    <span>源版本: {leftVer ? formatTime(leftVer.createdAt) : '无'}</span>
                   </div>
-                  <pre className="m-0 pl-1 whitespace-pre pr-8">{type === 'empty' ? ' ' : line.left.text || ' '}</pre>
+                  {leftVer && getTag(leftVer.saveType)}
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Right Column - Compare Version (Target) */}
-          <div
-            ref={rightScrollRef}
-            onScroll={() => handleScroll('right')}
-            className="flex-1 overflow-auto custom-scrollbar bg-white flex flex-col font-mono text-[13px] leading-relaxed py-4 select-text"
-          >
-            {diffResults.map((line, idx) => {
-              const type = line.right.type;
-              let bgClass = 'hover:bg-gray-55';
-              let lineNumClass = 'text-gray-400';
-              if (type === 'added') {
-                bgClass = 'bg-emerald-50 text-emerald-950 border-l-4 border-emerald-500 hover:bg-emerald-100/70';
-                lineNumClass = 'text-emerald-600 font-bold';
-              } else if (type === 'empty') {
-                bgClass = 'bg-gray-100/40 text-transparent select-none';
-                lineNumClass = 'text-gray-200';
-              } else {
-                bgClass += ' border-l-4 border-transparent';
-              }
+                {/* Lines Content */}
+                <div className="py-4 flex-1">
+                  {diffResults.map((line, idx) => {
+                    const type = line.left.type;
+                    let bgClass = 'hover:bg-gray-100/60';
+                    let lineNumClass = 'text-gray-400';
+                    if (type === 'deleted') {
+                      bgClass = 'bg-red-50 text-red-950 border-l-4 border-red-500 hover:bg-red-100/70';
+                      lineNumClass = 'text-red-500 font-bold';
+                    } else if (type === 'empty') {
+                      bgClass = 'bg-gray-100/40 text-transparent select-none';
+                      lineNumClass = 'text-gray-200';
+                    } else {
+                      bgClass += ' border-l-4 border-transparent';
+                    }
 
-              return (
-                <div key={`right-${idx}`} className={`flex items-start shrink-0 min-w-max ${bgClass}`}>
-                  <div className={`w-12 shrink-0 text-right pr-3 select-none text-[11px] font-sans ${lineNumClass}`}>
-                    {type === 'empty' ? ' ' : line.right.lineNumber}
+                    return (
+                      <div key={`left-${idx}`} className={`flex items-start shrink-0 min-w-max ${bgClass}`}>
+                        <div className={`w-12 shrink-0 text-right pr-3 select-none text-[11px] font-sans ${lineNumClass}`}>
+                          {type === 'empty' ? ' ' : line.left.lineNumber}
+                        </div>
+                        <pre className="m-0 pl-1 whitespace-pre pr-8">{type === 'empty' ? ' ' : line.left.text || ' '}</pre>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Draggable Resizer Divider (拉风箱样式边界调整) */}
+              <div
+                onMouseDown={handleMouseDown}
+                className="w-1 bg-gray-200 hover:bg-indigo-500 cursor-col-resize select-none shrink-0 transition-colors z-20 flex items-center justify-center group relative"
+                title="拖动调整分栏大小"
+              >
+                <div className="absolute w-3 h-full cursor-col-resize" />
+                <div className="w-[1px] h-8 bg-gray-400/50 group-hover:bg-white" />
+              </div>
+
+              {/* Right Column - Compare Version (Target) */}
+              <div
+                ref={rightScrollRef}
+                onScroll={() => handleScroll('right')}
+                className="overflow-auto custom-scrollbar bg-white flex flex-col font-mono text-[13px] leading-relaxed select-text"
+                style={{ width: `${100 - splitPercent}%`, flexGrow: 0, flexShrink: 0 }}
+              >
+                {/* Version Sticky Header (Target) */}
+                <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex items-center justify-between text-xs text-gray-600 font-sans select-none shrink-0">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <Clock size={12} className="text-emerald-600" />
+                    <span>对比版本: {rightVer ? formatTime(rightVer.createdAt) : '无'}</span>
                   </div>
-                  <pre className="m-0 pl-1 whitespace-pre pr-8">{type === 'empty' ? ' ' : line.right.text || ' '}</pre>
+                  {rightVer && getTag(rightVer.saveType)}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Lines Content */}
+                <div className="py-4 flex-1">
+                  {diffResults.map((line, idx) => {
+                    const type = line.right.type;
+                    let bgClass = 'hover:bg-gray-55';
+                    let lineNumClass = 'text-gray-400';
+                    if (type === 'added') {
+                      bgClass = 'bg-emerald-50 text-emerald-950 border-l-4 border-emerald-500 hover:bg-emerald-100/70';
+                      lineNumClass = 'text-emerald-600 font-bold';
+                    } else if (type === 'empty') {
+                      bgClass = 'bg-gray-100/40 text-transparent select-none';
+                      lineNumClass = 'text-gray-200';
+                    } else {
+                      bgClass += ' border-l-4 border-transparent';
+                    }
+
+                    return (
+                      <div key={`right-${idx}`} className={`flex items-start shrink-0 min-w-max ${bgClass}`}>
+                        <div className={`w-12 shrink-0 text-right pr-3 select-none text-[11px] font-sans ${lineNumClass}`}>
+                          {type === 'empty' ? ' ' : line.right.lineNumber}
+                        </div>
+                        <pre className="m-0 pl-1 whitespace-pre pr-8">{type === 'empty' ? ' ' : line.right.text || ' '}</pre>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </main>
 
