@@ -9,7 +9,7 @@ export interface DocumentVersion {
   title: string;
   content: string; // TipTap JSON string
   createdAt: number;
-  saveType: 'auto' | 'manual';
+  saveType: 'auto' | 'manual' | 'published';
 }
 
 export class DuetDocDB extends Dexie {
@@ -42,6 +42,16 @@ export class DuetDocDB extends Dexie {
       chatSessions: 'id, createdAt',
       chatMessages: 'id, sessionId, createdAt',
       documentVersions: 'id, docId, createdAt',
+    });
+    this.version(3).stores({
+      knowledgeBases: 'id, createdAt',
+      groups: 'id, kbId, parentGroupId, createdAt',
+      documents: 'id, kbId, groupId, createdAt',
+      favoriteFolders: 'id, createdAt',
+      favoriteItems: 'id, docId, favoritedAt',
+      chatSessions: 'id, createdAt',
+      chatMessages: 'id, sessionId, createdAt',
+      documentVersions: 'id, docId, createdAt, [docId+createdAt]',
     });
   }
 }

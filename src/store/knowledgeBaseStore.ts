@@ -82,6 +82,25 @@ interface KnowledgeBaseStore {
 
 const generateId = () => nanoid(12);
 
+const enforceVersionLimit = async (docId: string) => {
+  try {
+    const versions = await db.documentVersions
+      .where('docId')
+      .equals(docId)
+      .toArray();
+    const targetVersions = versions
+      .filter(v => v.saveType === 'auto' || v.saveType === 'manual')
+      .sort((a, b) => a.createdAt - b.createdAt);
+    if (targetVersions.length > 50) {
+      const toDeleteCount = targetVersions.length - 50;
+      const toDeleteIds = targetVersions.slice(0, toDeleteCount).map(v => v.id);
+      await db.documentVersions.bulkDelete(toDeleteIds);
+    }
+  } catch (err) {
+    console.error('Failed to enforce version limit:', err);
+  }
+};
+
 // Preset Mock Data
 const initialKBs: KnowledgeBase[] = [
   {
@@ -513,10 +532,10 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
           if (latestVersion && (now - latestVersion.createdAt < FIVE_MINUTES)) {
             // Overwrite latest version if it is within 5 minutes
+            // We do NOT update the createdAt timestamp to avoid sliding window
             await db.documentVersions.update(latestVersion.id, {
               content: contentStr,
               title: data.title ?? doc.title,
-              createdAt: now,
             });
           } else {
             // Create a new version snapshot
@@ -530,13 +549,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
               saveType: 'auto',
             });
 
-            // Enforce limit of 50 versions per document
-            const updatedAutoVersions = [...autoVersions, { id: versionId, createdAt: now }];
-            if (updatedAutoVersions.length > 50) {
-              const toDeleteCount = updatedAutoVersions.length - 50;
-              const toDeleteIds = updatedAutoVersions.slice(0, toDeleteCount).map(v => v.id);
-              await db.documentVersions.bulkDelete(toDeleteIds);
-            }
+            // Enforce limit of 50 versions per document (auto + manual)
+            await enforceVersionLimit(id);
           }
         } catch (err) {
           console.error('Failed to save document version:', err);
@@ -575,6 +589,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         createdAt: now - 1, // slightly earlier so sorting works correctly
         saveType: 'auto',
       });
+
+      // Enforce limit of 50 versions after adding backup
+      await enforceVersionLimit(doc.id);
 
       const updatedDoc = {
         title: version.title,
