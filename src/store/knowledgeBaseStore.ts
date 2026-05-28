@@ -77,6 +77,7 @@ interface KnowledgeBaseStore {
   createMemo: (title?: string) => string;
   moveDocument: (id: string, targetKbId: string, targetGroupId: string | null) => void;
   moveGroup: (id: string, targetKbId: string, targetParentGroupId: string | null) => { success: boolean; error?: string };
+  restoreVersion: (versionId: string) => Promise<void>;
 }
 
 const generateId = () => nanoid(12);
@@ -486,11 +487,112 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   updateDocument: (id, data) => {
     const updatedAt = Date.now();
     db.documents.update(id, { ...data, updatedAt }).catch(err => console.error('Dexie error:', err));
+    
+    // Save version snapshot if content is updated
+    if (data.content !== undefined) {
+      const contentStr = data.content;
+      (async () => {
+        try {
+          const doc = get().documents.find(d => d.id === id);
+          if (!doc) return;
+
+          // Find the latest auto-save version
+          const versions = await db.documentVersions
+            .where('docId')
+            .equals(id)
+            .toArray();
+          
+          // Sort by createdAt ascending
+          const autoVersions = versions
+            .filter(v => v.saveType === 'auto')
+            .sort((a, b) => a.createdAt - b.createdAt);
+            
+          const latestVersion = autoVersions[autoVersions.length - 1];
+          const now = Date.now();
+          const FIVE_MINUTES = 5 * 60 * 1000;
+
+          if (latestVersion && (now - latestVersion.createdAt < FIVE_MINUTES)) {
+            // Overwrite latest version if it is within 5 minutes
+            await db.documentVersions.update(latestVersion.id, {
+              content: contentStr,
+              title: data.title ?? doc.title,
+              createdAt: now,
+            });
+          } else {
+            // Create a new version snapshot
+            const versionId = `ver-${nanoid(12)}`;
+            await db.documentVersions.add({
+              id: versionId,
+              docId: id,
+              title: data.title ?? doc.title,
+              content: contentStr,
+              createdAt: now,
+              saveType: 'auto',
+            });
+
+            // Enforce limit of 50 versions per document
+            const updatedAutoVersions = [...autoVersions, { id: versionId, createdAt: now }];
+            if (updatedAutoVersions.length > 50) {
+              const toDeleteCount = updatedAutoVersions.length - 50;
+              const toDeleteIds = updatedAutoVersions.slice(0, toDeleteCount).map(v => v.id);
+              await db.documentVersions.bulkDelete(toDeleteIds);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to save document version:', err);
+        }
+      })();
+    }
+
     set((state) => ({
       documents: state.documents.map((doc) =>
           doc.id === id ? { ...doc, ...data, updatedAt } : doc
       ),
     }));
+  },
+
+  restoreVersion: async (versionId) => {
+    try {
+      const version = await db.documentVersions.get(versionId);
+      if (!version) {
+        throw new Error('Version not found');
+      }
+
+      const doc = get().documents.find(d => d.id === version.docId);
+      if (!doc) {
+        throw new Error('Document not found');
+      }
+
+      const now = Date.now();
+
+      // Create backup snapshot of current content before restoring
+      const backupVersionId = `ver-${nanoid(12)}`;
+      await db.documentVersions.add({
+        id: backupVersionId,
+        docId: doc.id,
+        title: doc.title,
+        content: doc.content,
+        createdAt: now - 1, // slightly earlier so sorting works correctly
+        saveType: 'auto',
+      });
+
+      const updatedDoc = {
+        title: version.title,
+        content: version.content,
+        updatedAt: now,
+      };
+
+      await db.documents.update(doc.id, updatedDoc);
+
+      set((state) => ({
+        documents: state.documents.map((d) =>
+          d.id === doc.id ? { ...d, ...updatedDoc } : d
+        ),
+      }));
+    } catch (err) {
+      console.error('Failed to restore document version:', err);
+      throw err;
+    }
   },
 
   deleteDocument: (id) => {

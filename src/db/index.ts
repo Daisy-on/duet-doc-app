@@ -3,6 +3,15 @@ import type { KnowledgeBase, Group, Document } from '../store/knowledgeBaseStore
 import type { FavoriteFolder, FavoriteItem } from '../store/favoritesStore';
 import type { ChatSession, ChatMessage } from '../store/aiWritingStore';
 
+export interface DocumentVersion {
+  id: string;
+  docId: string;
+  title: string;
+  content: string; // TipTap JSON string
+  createdAt: number;
+  saveType: 'auto' | 'manual';
+}
+
 export class DuetDocDB extends Dexie {
   knowledgeBases!: Table<KnowledgeBase, string>;
   groups!: Table<Group, string>;
@@ -11,6 +20,7 @@ export class DuetDocDB extends Dexie {
   favoriteItems!: Table<FavoriteItem, string>;
   chatSessions!: Table<ChatSession, string>;
   chatMessages!: Table<ChatMessage, string>;
+  documentVersions!: Table<DocumentVersion, string>;
 
   constructor() {
     super('DuetDocDB');
@@ -22,6 +32,16 @@ export class DuetDocDB extends Dexie {
       favoriteItems: 'id, docId, favoritedAt',
       chatSessions: 'id, createdAt',
       chatMessages: 'id, sessionId, createdAt',
+    });
+    this.version(2).stores({
+      knowledgeBases: 'id, createdAt',
+      groups: 'id, kbId, parentGroupId, createdAt',
+      documents: 'id, kbId, groupId, createdAt',
+      favoriteFolders: 'id, createdAt',
+      favoriteItems: 'id, docId, favoritedAt',
+      chatSessions: 'id, createdAt',
+      chatMessages: 'id, sessionId, createdAt',
+      documentVersions: 'id, docId, createdAt',
     });
   }
 }

@@ -8,6 +8,7 @@ import AIWriting from './pages/AIWriting';
 import MemoHome from './pages/MemoHome';
 import MemoEdit from './pages/MemoEdit';
 import Favorites from './pages/Favorites';
+import DocHistory from './pages/DocHistory';
 import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
 import { useFavoritesStore } from './store/favoritesStore';
 import { useAIWritingStore } from './store/aiWritingStore';
@@ -61,6 +62,7 @@ function App() {
           <Route path="memo/:memoId" element={<MemoEdit />} />
           <Route path="favorites" element={<Favorites />} />
         </Route>
+        <Route path="kb/:kbId/doc/:docId/history" element={<DocHistory />} />
       </Routes>
     </BrowserRouter>
   );

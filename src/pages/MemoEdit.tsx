@@ -137,9 +137,13 @@ export default function MemoEdit() {
                 placeholder="无标题小记"
               />
               <div className="flex items-center gap-3 text-xs shrink-0">
-                <span className="text-text-secondary flex items-center gap-1">
+                <button
+                  onClick={() => navigate(`/kb/kb-memo-system/doc/${memoId}/history`)}
+                  className="text-text-secondary hover:text-accent hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                  title="查看历史版本"
+                >
                   <CloudUpload size={14} /> 已保存 {saveTime}
-                </span>
+                </button>
                 <span className="bg-pink-50 text-pink-600 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 border border-pink-200">
                   <StickyNote size={12} /> 独立小记
                 </span>
@@ -148,7 +152,13 @@ export default function MemoEdit() {
           </div>
           <div className="flex items-center gap-4 text-text-secondary">
             <span title="分享" className="cursor-pointer hover:text-text-primary transition-colors flex"><Share2 size={16} /></span>
-            <span title="历史记录" className="cursor-pointer hover:text-text-primary transition-colors flex"><History size={16} /></span>
+            <button
+              title="历史记录"
+              onClick={() => navigate(`/kb/kb-memo-system/doc/${memoId}/history`)}
+              className="cursor-pointer hover:text-text-primary transition-colors flex bg-transparent border-none p-0 outline-none"
+            >
+              <History size={16} />
+            </button>
             <span className="cursor-pointer hover:text-text-primary transition-colors flex"><MoreHorizontal size={16} /></span>
           </div>
         </header>
