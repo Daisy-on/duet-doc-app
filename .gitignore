@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# AI model files (大文件不要提交到 git 仓库里)
+public/ai-models/
