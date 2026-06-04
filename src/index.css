@@ -340,3 +340,11 @@ body.is-selecting-codeblock .code-block * {
   user-select: text !important;
   -webkit-user-select: text !important;
 }
+
+/* --- AI 生成幽灵文本的占位样式 --- */
+.duet-ghost-text {
+  color: #9ca3af;
+  pointer-events: none;
+  user-select: none;
+  white-space: pre-wrap;
+}
