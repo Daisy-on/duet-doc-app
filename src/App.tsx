@@ -12,6 +12,7 @@ import DocHistory from './pages/DocHistory';
 import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
 import { useFavoritesStore } from './store/favoritesStore';
 import { useAIWritingStore } from './store/aiWritingStore';
+import AITestPage from './pages/AITestPage';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,7 @@ function App() {
           <Route path="favorites" element={<Favorites />} />
         </Route>
         <Route path="kb/:kbId/doc/:docId/history" element={<DocHistory />} />
+        <Route path="ai-test" element={<AITestPage />} />
       </Routes>
     </BrowserRouter>
   );

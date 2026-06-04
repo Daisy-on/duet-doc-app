@@ -36,10 +36,10 @@ async function testTextGeneration() {
   const result = await generator(
     '今天天气很好，我决定',
     {
-      max_new_tokens: 30,          // 最多生成 30 个新 token
+      max_new_tokens: 12,          // 最多生成 12 个新 token
       temperature: 0.3,            // 低温度 = 更确定的输出
-      top_p: 0.9,
-      do_sample: true,
+      top_p: 0.7,                 // nucleus sampling，保留概率总和达到 0.7 的 token
+      do_sample: true,              // 开启/关闭采样，默认为 false（即贪心解码）
       return_full_text: false,     // 只返回新生成的文本，不重复输入
     }
   ) as TextGenerationOutput;
