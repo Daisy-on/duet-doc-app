@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core';
 
 export type GhostTextPromptInput = {
-  prompt: string;
+  messages: Array<{ role: string; content: string }>;
   contextText: string;
   cursorPos: number;
 };
@@ -39,15 +39,16 @@ export function buildGhostTextPrompt(editor: Editor): GhostTextPromptInput | nul
   return {
     cursorPos,
     contextText,
-    prompt: [
-      '请根据下面的文本，续写一句自然、简短的中文内容。',
-      '要求：只输出续写内容，不要重复原文，不要解释。',
-      '',
-      '文本：',
-      contextText,
-      '',
-      '续写：',
-    ].join('\n'),
+    messages: [
+      {
+        role: 'system',
+        content: '你是一个富有创造力的文本续写引擎。请根据用户的上文，自然地续写接下来的一句话或几个字。要求：\n1. 绝对不要重复上文已经出现的内容！\n2. 只需要输出紧接着的续写内容，使其可以直接拼接到编辑光标后面。\n3. 不要进行任何解释，不要输出思考过程。'
+      },
+      {
+        role: 'user',
+        content: `上文是：'${contextText}'\n请提供续写：`
+      }
+    ],
   };
 }
 

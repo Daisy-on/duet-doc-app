@@ -15,7 +15,7 @@ type LoadPayload = {
 };
 
 type GeneratePayload = {
-  prompt: string;
+  messages: Array<{ role: string; content: string }>;
   maxNewTokens?: number;
   temperature?: number;
   topP?: number;
@@ -35,7 +35,7 @@ type AiWorkerRequest =
 type AiWorkerResponse =
   | { type: 'load-progress'; payload: unknown }
   | { type: 'ready' }
-  | { type: 'result'; requestId: string; payload: { text: string } }
+  | { type: 'result'; requestId: string; payload: { text: string; inferenceTime?: number } }
   | { type: 'error'; requestId?: string; payload: { message: string } };
 
 let generator: TextGenerationPipeline | null = null;
@@ -47,14 +47,37 @@ function postMessageToMain(message: AiWorkerResponse) {
 
 function extractGeneratedText(result: TextGenerationOutput): string {
   const output = result as unknown;
+  console.log('[ghost-text] raw output:', output);
 
   if (Array.isArray(output)) {
-    const first = output[0] as { generated_text?: string } | undefined;
-    return first?.generated_text?.trim() ?? '';
+    const first = output[0] as any;
+    if (first && first.generated_text) {
+      if (typeof first.generated_text === 'string') {
+        return first.generated_text.trim();
+      }
+      if (Array.isArray(first.generated_text)) {
+        // 从对话数组中提取最后一条 assistant 角色的消息内容
+        const assistantMessage = [...first.generated_text]
+          .reverse()
+          .find((msg: any) => msg.role === 'assistant');
+        return assistantMessage?.content?.trim() ?? '';
+      }
+    }
   }
 
-  if (output && typeof output === 'object' && 'generated_text' in output) {
-    return String((output as { generated_text?: string }).generated_text ?? '').trim();
+  if (output && typeof output === 'object') {
+    if ('generated_text' in output) {
+      const genText = (output as any).generated_text;
+      if (typeof genText === 'string') {
+        return genText.trim();
+      }
+      if (Array.isArray(genText)) {
+        const assistantMessage = [...genText]
+          .reverse()
+          .find((msg: any) => msg.role === 'assistant');
+        return assistantMessage?.content?.trim() ?? '';
+      }
+    }
   }
 
   return '';
@@ -98,19 +121,23 @@ self.onmessage = async (event: MessageEvent<AiWorkerRequest>) => {
         return;
       }
 
-      const result = await generator(message.payload.prompt, {
-        max_new_tokens: message.payload.maxNewTokens ?? 12,
+      const startTime = performance.now();
+      const result = await generator(message.payload.messages, {
+        max_new_tokens: message.payload.maxNewTokens ?? 16,
         temperature: message.payload.temperature ?? 0.3,
         top_p: message.payload.topP ?? 0.7,
         do_sample: true,
         return_full_text: false,
       });
+      const duration = performance.now() - startTime;
+      console.log(`[ghost-text] inference completed in ${duration.toFixed(1)}ms`);
 
       postMessageToMain({
         type: 'result',
         requestId: message.requestId,
         payload: {
           text: extractGeneratedText(result as TextGenerationOutput),
+          inferenceTime: duration,
         },
       });
     }

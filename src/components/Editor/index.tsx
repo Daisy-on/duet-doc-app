@@ -105,47 +105,47 @@ export default function Editor() {
 
   // 幽灵文本调度函数：在选区更新时调用，清理先前的定时器和请求，根据当前文档内容和光标位置构建提示，延迟请求润色建议，并在返回后验证请求是否仍然相关，最后设置幽灵文本
   const scheduleGhostText = useCallback((editor: TiptapEditor) => {
-  if (ghostTextTimerRef.current) {
-    window.clearTimeout(ghostTextTimerRef.current);
-  }
+    if (ghostTextTimerRef.current) {
+      window.clearTimeout(ghostTextTimerRef.current);
+    }
 
-  editor.commands.clearGhostText();
-  clearActiveGhostTextRequest();
+    editor.commands.clearGhostText();
+    clearActiveGhostTextRequest();
 
-  if (!currentDocId) return;
+    if (!currentDocId) return;
 
-  const promptInput = buildGhostTextPrompt(editor);
-  if (!promptInput) return;
+    const promptInput = buildGhostTextPrompt(editor);
+    if (!promptInput) return;
 
-  const requestDocId = currentDocId;
-  const requestCursorPos = promptInput.cursorPos;
+    const requestDocId = currentDocId;
+    const requestCursorPos = promptInput.cursorPos;
 
-  ghostTextTimerRef.current = window.setTimeout(async () => {
-    const result = await requestGhostText({
-      prompt: promptInput.prompt,
-      docId: requestDocId,
-      cursorPos: requestCursorPos,
-      maxNewTokens: 8,
-    });
+    ghostTextTimerRef.current = window.setTimeout(async () => {
+      const result = await requestGhostText({
+        messages: promptInput.messages,
+        docId: requestDocId,
+        cursorPos: requestCursorPos,
+        maxNewTokens: 16,
+      });
 
-    if (!result?.text) return;
-    if (requestDocId !== currentDocIdRef.current) return;
-    if (editor.isDestroyed) return;
+      if (!result?.text) return;
+      if (requestDocId !== currentDocIdRef.current) return;
+      if (editor.isDestroyed) return;
 
-    const { from, to } = editor.state.selection;
-    if (from !== to) return;
-    if (from !== requestCursorPos) return;
+      const { from, to } = editor.state.selection;
+      if (from !== to) return;
+      if (from !== requestCursorPos) return;
 
-    const text = cleanGhostText(result.text, promptInput.contextText);
-    if (!text) return;
+      const text = cleanGhostText(result.text, promptInput.contextText);
+      if (!text) return;
 
-    editor.commands.setGhostText({
-      text,
-      pos: requestCursorPos,
-      requestId: result.requestId,
-    });
-  }, 700);
-}, [currentDocId]);
+      editor.commands.setGhostText({
+        text,
+        pos: requestCursorPos,
+        requestId: result.requestId,
+      });
+    }, 500);
+  }, [currentDocId]);
 
   const editor = useEditor({
     extensions: [
