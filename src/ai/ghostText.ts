@@ -7,7 +7,7 @@ export type GhostTextPromptInput = {
 };
 
 const MIN_CONTEXT_LENGTH = 8;
-const MAX_CONTEXT_LENGTH = 180;
+const MAX_CONTEXT_LENGTH = 48;
 
 function takeTailText(text: string, maxLength: number) {
   if (text.length <= maxLength) return text;

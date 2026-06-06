@@ -18,6 +18,13 @@ import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
+import { GhostTextExtension } from '../../extensions/GhostTextExtension';
+import { buildGhostTextPrompt, cleanGhostText } from '../../ai/ghostText';
+import {
+  clearActiveGhostTextRequest,
+  loadGhostTextModel,
+  requestGhostText,
+} from '../../ai/aiClient';
 
 interface BubblePos {
   top: number
@@ -74,6 +81,9 @@ export default function Editor() {
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
   const timerRef = useRef<number | null>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
+  // AI 润色的定时器和当前文档 ID 的 ref，用于在选区更新时请求润色建议，并在文档切换时清理定时器
+  const ghostTextTimerRef = useRef<number | null>(null);
+  const currentDocIdRef = useRef<string | undefined>(currentDocId);
 
   // Debounced updateDocument
   const debouncedUpdateDoc = useMemo(() => {
@@ -93,6 +103,50 @@ export default function Editor() {
     })
   }, [setHeadings])
 
+  // 幽灵文本调度函数：在选区更新时调用，清理先前的定时器和请求，根据当前文档内容和光标位置构建提示，延迟请求润色建议，并在返回后验证请求是否仍然相关，最后设置幽灵文本
+  const scheduleGhostText = useCallback((editor: TiptapEditor) => {
+  if (ghostTextTimerRef.current) {
+    window.clearTimeout(ghostTextTimerRef.current);
+  }
+
+  editor.commands.clearGhostText();
+  clearActiveGhostTextRequest();
+
+  if (!currentDocId) return;
+
+  const promptInput = buildGhostTextPrompt(editor);
+  if (!promptInput) return;
+
+  const requestDocId = currentDocId;
+  const requestCursorPos = promptInput.cursorPos;
+
+  ghostTextTimerRef.current = window.setTimeout(async () => {
+    const result = await requestGhostText({
+      prompt: promptInput.prompt,
+      docId: requestDocId,
+      cursorPos: requestCursorPos,
+      maxNewTokens: 8,
+    });
+
+    if (!result?.text) return;
+    if (requestDocId !== currentDocIdRef.current) return;
+    if (editor.isDestroyed) return;
+
+    const { from, to } = editor.state.selection;
+    if (from !== to) return;
+    if (from !== requestCursorPos) return;
+
+    const text = cleanGhostText(result.text, promptInput.contextText);
+    if (!text) return;
+
+    editor.commands.setGhostText({
+      text,
+      pos: requestCursorPos,
+      requestId: result.requestId,
+    });
+  }, 700);
+}, [currentDocId]);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -110,10 +164,12 @@ export default function Editor() {
       TableRow,
       TableHeader,
       TableCell,
+      GhostTextExtension,
     ],
     content: doc ? (doc.content.trim().startsWith('{') ? JSON.parse(doc.content) : doc.content) : '',
     onCreate: ({ editor }) => {
-      syncHeadings(editor)
+      syncHeadings(editor);
+      loadGhostTextModel();
     },
     onUpdate: ({ editor }) => {
       if (currentDocId) {
@@ -131,7 +187,8 @@ export default function Editor() {
         }
         debouncedUpdateDoc(currentDocId, updates)
       }
-      syncHeadings(editor)
+      syncHeadings(editor);
+      scheduleGhostText(editor);
     },
     onSelectionUpdate: ({ editor }) => {
       const { from, to } = editor.state.selection
@@ -198,8 +255,21 @@ export default function Editor() {
       if (timerRef.current) {
         clearTimeout(timerRef.current)
       }
+      if (ghostTextTimerRef.current) {
+        clearTimeout(ghostTextTimerRef.current);
+      }
+      clearActiveGhostTextRequest();
     }
   }, [])
+
+  useEffect(() => {
+    if (ghostTextTimerRef.current) {
+      clearTimeout(ghostTextTimerRef.current);
+    }
+
+    clearActiveGhostTextRequest();
+    editor?.commands.clearGhostText();
+  }, [currentDocId, editor]);
 
   // 同步外部 content 状态
   useEffect(() => {
@@ -207,11 +277,18 @@ export default function Editor() {
       const isJson = doc.content.trim().startsWith('{')
       const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML()
       if (doc.content !== currentContent) {
+        editor.commands.clearGhostText();
+        clearActiveGhostTextRequest();
         editor.commands.setContent(isJson ? JSON.parse(doc.content) : doc.content, { emitUpdate: false })
         syncHeadings(editor)
       }
     }
   }, [doc?.content, editor, syncHeadings])
+
+  // 文档切换时清理 AI 润色的定时器和请求
+  useEffect(() => {
+    currentDocIdRef.current = currentDocId;
+  }, [currentDocId]);
 
   return (
     <div ref={editorContainerRef} className="flex-1 px-16 py-10 overflow-y-auto relative">
