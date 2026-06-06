@@ -42,11 +42,11 @@ export function buildGhostTextPrompt(editor: Editor): GhostTextPromptInput | nul
     messages: [
       {
         role: 'system',
-        content: '你是一个富有创造力的文本续写引擎。请根据用户的上文，自然地续写接下来的一句话或几个字。要求：\n1. 绝对不要重复上文已经出现的内容！\n2. 只需要输出紧接着的续写内容，使其可以直接拼接到编辑光标后面。\n3. 不要进行任何解释，不要输出思考过程。'
+        content: '你是一个文本续写引擎。根据用户的上文，自然地续写接下来的一句话或几个字。绝对不要重复上文已经出现的内容！不进行任何解释，不输出思考过程。'
       },
       {
         role: 'user',
-        content: `上文是：'${contextText}'\n请提供续写：`
+        content: `上文是：'${contextText}'请提供续写`
       }
     ],
   };
