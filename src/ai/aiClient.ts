@@ -29,15 +29,8 @@ let isWorkerBusy = false;
 let inFlightResolve: ((value: GhostTextResult | null) => void) | null = null;
 let inFlightRequestId: string | null = null;
 
-// 等待发送的最新请求（最多只保留一个）
-let pendingPayload: {
-  requestId: string;
-  messages: Array<{ role: string; content: string }>;
-  maxNewTokens: number;
-  temperature: number;
-  topP: number;
-  resolve: (value: GhostTextResult | null) => void;
-} | null = null;
+let hasDroppedRequest = false;
+let cooldownTimer: number | null = null;
 
 function getWorker() {
   if (worker) return worker;
@@ -70,7 +63,15 @@ function getWorker() {
         inFlightResolve = null;
         inFlightRequestId = null;
         isWorkerBusy = false;
-        flushPending();
+
+        // 启动冷却重试
+        if (hasDroppedRequest) {
+          hasDroppedRequest = false;
+          if (cooldownTimer) window.clearTimeout(cooldownTimer);
+          cooldownTimer = window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('ghost-text-idle'));
+          }, 1000);
+        }
       }
       return;
     }
@@ -100,36 +101,21 @@ function getWorker() {
         currentResolve?.(null);
       }
 
-      // 发送排队中的最新请求
-      flushPending();
+      // 启动冷却重试
+      if (hasDroppedRequest) {
+        hasDroppedRequest = false;
+        if (cooldownTimer) window.clearTimeout(cooldownTimer);
+        cooldownTimer = window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('ghost-text-idle'));
+        }, 1000);
+      }
     }
   });
 
   return worker;
 }
 
-/** 如果有排队的请求，立即发送到 Worker */
-function flushPending() {
-  if (!pendingPayload || isWorkerBusy) return;
 
-  const p = pendingPayload;
-  pendingPayload = null;
-
-  isWorkerBusy = true;
-  inFlightRequestId = p.requestId;
-  inFlightResolve = p.resolve;
-
-  getWorker().postMessage({
-    type: 'generate',
-    requestId: p.requestId,
-    payload: {
-      messages: p.messages,
-      maxNewTokens: p.maxNewTokens,
-      temperature: p.temperature,
-      topP: p.topP,
-    },
-  });
-}
 
 export function loadGhostTextModel() {
   if (status === 'loading' || status === 'ready') return;
@@ -152,15 +138,12 @@ export function getGhostTextStatus() {
 
 export function clearActiveGhostTextRequest() {
   latestRequestId = null;
+  hasDroppedRequest = false;
 
-  // 清空排队请求，resolve(null) 防止调用方永远挂着
-  if (pendingPayload) {
-    pendingPayload.resolve(null);
-    pendingPayload = null;
+  if (cooldownTimer) {
+    window.clearTimeout(cooldownTimer);
+    cooldownTimer = null;
   }
-
-  // in-flight 请求无法中断，但标记 latestRequestId=null
-  // 等它返回时会因为 requestId 不匹配而被丢弃
 }
 
 export function requestGhostText(input: GhostTextRequest): Promise<GhostTextResult | null> {
@@ -171,37 +154,26 @@ export function requestGhostText(input: GhostTextRequest): Promise<GhostTextResu
   const requestId = crypto.randomUUID();
   latestRequestId = requestId;
 
+  if (isWorkerBusy) {
+    console.log(`[ghost-text] worker busy, dropping request: ${requestId}`);
+    hasDroppedRequest = true;
+    return Promise.resolve(null);
+  }
+
   return new Promise((resolve) => {
-    if (!isWorkerBusy) {
-      // Worker 空闲，立即发送
-      isWorkerBusy = true;
-      inFlightRequestId = requestId;
-      inFlightResolve = resolve;
+    isWorkerBusy = true;
+    inFlightRequestId = requestId;
+    inFlightResolve = resolve;
 
-      getWorker().postMessage({
-        type: 'generate',
-        requestId,
-        payload: {
-          messages: input.messages,
-          maxNewTokens: input.maxNewTokens ?? 16,
-          temperature: 0.3,
-          topP: 0.7,
-        },
-      });
-    } else {
-      // Worker 忙碌，覆盖排队请求（先 resolve 旧的 pending）
-      if (pendingPayload) {
-        pendingPayload.resolve(null);
-      }
-
-      pendingPayload = {
-        requestId,
+    getWorker().postMessage({
+      type: 'generate',
+      requestId,
+      payload: {
         messages: input.messages,
         maxNewTokens: input.maxNewTokens ?? 16,
         temperature: 0.3,
         topP: 0.7,
-        resolve,
-      };
-    }
+      },
+    });
   });
 }

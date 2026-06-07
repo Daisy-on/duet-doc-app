@@ -271,6 +271,22 @@ export default function Editor() {
     editor?.commands.clearGhostText();
   }, [currentDocId, editor]);
 
+  // 监听 AI Worker 空闲且之前有丢弃请求的自定义事件，以触发冷却重试
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleIdle = () => {
+      if (!editor.isDestroyed) {
+        scheduleGhostText(editor);
+      }
+    };
+
+    window.addEventListener('ghost-text-idle', handleIdle);
+    return () => {
+      window.removeEventListener('ghost-text-idle', handleIdle);
+    };
+  }, [editor, scheduleGhostText]);
+
   // 同步外部 content 状态
   useEffect(() => {
     if (editor && doc) {
