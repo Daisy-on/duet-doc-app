@@ -88,6 +88,21 @@ async function loadModel(payload: LoadPayload) {
   if (loadingPromise) return loadingPromise;
 
   loadingPromise = (async () => {
+    try {
+      if (navigator.gpu) {
+        const adapter = await navigator.gpu.requestAdapter();
+        console.log('[ghost-text] WebGPU Adapter 对象:', adapter);
+        if (adapter) {
+          const info = (adapter as any).info || ((adapter as any).requestAdapterInfo ? await (adapter as any).requestAdapterInfo() : null);
+          console.log('[ghost-text] WebGPU Adapter Info (显卡信息):', info);
+        } else {
+          console.warn('[ghost-text] navigator.gpu.requestAdapter() 返回了 null，WebGPU 在当前 Worker 被禁用！');
+        }
+      }
+    } catch (e) {
+      console.warn('[ghost-text] 获取 WebGPU Adapter 失败:', e);
+    }
+
     generator = (await pipeline('text-generation', payload.modelPath, {
       dtype: payload.dtype,
       device: payload.device,
@@ -120,6 +135,7 @@ self.onmessage = async (event: MessageEvent<AiWorkerRequest>) => {
         });
         return;
       }
+
 
       const startTime = performance.now();
       const result = await generator(message.payload.messages, {
