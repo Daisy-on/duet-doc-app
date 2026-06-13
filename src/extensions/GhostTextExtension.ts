@@ -19,6 +19,7 @@ declare module '@tiptap/core' {
     ghostText: {
       setGhostText: (payload: GhostTextPayload) => ReturnType;
       clearGhostText: () => ReturnType;
+      acceptGhostText: () => ReturnType;
     };
   }
 }
@@ -52,6 +53,20 @@ export const GhostTextExtension = Extension.create({
           }
           return true;
         },
+
+      acceptGhostText:
+        () =>
+        ({ tr, dispatch, state }) => {
+          const ghostText = ghostTextPluginKey.getState(state);
+          if (!ghostText?.text) return false;
+          if (dispatch) {
+            tr.insertText(ghostText.text, ghostText.pos);
+            tr.setMeta(ghostTextPluginKey, {
+              type: 'clear',
+            } satisfies GhostTextMeta);
+          }
+          return true;
+        },
     };
   },
 
@@ -59,6 +74,9 @@ export const GhostTextExtension = Extension.create({
     return {
       Escape: () => {
         return this.editor.commands.clearGhostText();
+      },
+      Tab: () => {
+        return this.editor.commands.acceptGhostText();
       },
     };
   },
