@@ -1,4 +1,4 @@
-const GHOST_TEXT_MODEL_PATH = '/ai-models/qwen3.5-0.8b/';
+const GHOST_TEXT_MODEL_PATH = '/ai-models/qwen3.5-0.8b-opt/';
 
 type GhostTextStatus = 'idle' | 'loading' | 'ready' | 'error';
 

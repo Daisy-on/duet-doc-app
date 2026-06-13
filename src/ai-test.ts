@@ -10,10 +10,10 @@ async function testTextGeneration() {
   const startLoad = performance.now();
 
   // 初始化 text-generation pipeline
-  // 路径指向 public/ai-models/qwen3.5-0.8b/（Vite 会自动映射 public/ 为根路径）
+  // 路径指向 public/ai-models/qwen3.5-0.8b-opt/（Vite 会自动映射 public/ 为根路径）
   const generator = await pipeline(
     'text-generation',
-    '/ai-models/qwen3.5-0.8b/',   // 注意末尾斜杠
+    '/ai-models/qwen3.5-0.8b-opt/',   // 注意末尾斜杠
     {
       dtype: 'q4f16',             // 使用 q4f16 量化
       device: 'webgpu',           // 优先 WebGPU；如果不支持会自动降级到 wasm
