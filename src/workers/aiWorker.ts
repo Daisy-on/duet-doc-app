@@ -140,9 +140,10 @@ self.onmessage = async (event: MessageEvent<AiWorkerRequest>) => {
       const startTime = performance.now();
       const result = await generator(message.payload.messages, {
         max_new_tokens: message.payload.maxNewTokens ?? 16,
-        temperature: message.payload.temperature ?? 0.3,
+        temperature: message.payload.temperature ?? 0.5,
         top_p: message.payload.topP ?? 0.7,
         do_sample: true,
+        repetition_penalty: 1.15,
         return_full_text: false,
       });
       const duration = performance.now() - startTime;

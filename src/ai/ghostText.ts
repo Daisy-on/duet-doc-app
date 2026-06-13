@@ -7,7 +7,7 @@ export type GhostTextPromptInput = {
 };
 
 const MIN_CONTEXT_LENGTH = 8;
-const MAX_CONTEXT_LENGTH = 48;
+const MAX_CONTEXT_LENGTH = 150;
 
 function takeTailText(text: string, maxLength: number) {
   if (text.length <= maxLength) return text;
@@ -42,11 +42,11 @@ export function buildGhostTextPrompt(editor: Editor): GhostTextPromptInput | nul
     messages: [
       {
         role: 'system',
-        content: '你是一个文本续写引擎。根据用户的上文，自然地续写接下来的一句话或几个字。绝对不要重复上文已经出现的内容！不进行任何解释，不输出思考过程。'
+        content: '你是一个文本续写助手。请直接、无缝地续写用户给出的文字。绝对不能重复用户已经输入的字！不要做任何解释，不要输出除了续写内容之外的任何字符。'
       },
       {
         role: 'user',
-        content: `上文是：'${contextText}'请提供续写`
+        content: contextText
       }
     ],
   };
@@ -57,19 +57,31 @@ export function cleanGhostText(rawText: string, contextText: string) {
 
   if (!text) return '';
 
-  if (text.startsWith(contextText)) {
-    text = text.slice(contextText.length).trimStart();
-  }
-
+  // 1. 先进行基础格式清理（去除引号、前缀等引导语）
   text = text
     .replace(/^续写[:：]\s*/, '')
     .replace(/^["“]/, '')
     .replace(/["”]$/, '')
     .trim();
 
+  // 2. 只提取第一行
   const firstLine = text.split(/\r?\n/).find((line) => line.trim().length > 0);
   text = firstLine?.trim() ?? '';
 
+  // 3. 智能重叠消除：检查生成文本头部是否重复了上文的尾部
+  let overlapLength = 0;
+  const maxOverlapCheck = Math.min(text.length, contextText.length);
+  for (let i = maxOverlapCheck; i > 0; i--) {
+    if (contextText.endsWith(text.slice(0, i))) {
+      overlapLength = i;
+      break;
+    }
+  }
+  if (overlapLength > 0) {
+    text = text.slice(overlapLength).trimStart();
+  }
+
+  // 4. 句号截断与字数限制
   const sentenceEndIndex = text.search(/[。！？!?]/);
   if (sentenceEndIndex >= 0) {
     text = text.slice(0, sentenceEndIndex + 1);
