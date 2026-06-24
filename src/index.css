@@ -348,3 +348,8 @@ body.is-selecting-codeblock .code-block * {
   user-select: none;
   white-space: pre-wrap;
 }
+
+/* --- 助手输入框打开时编辑区失焦选区背景高亮样式 --- */
+.duet-blur-selection {
+  background-color: var(--color-selection-bg) !important;
+}
