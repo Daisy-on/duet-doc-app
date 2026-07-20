@@ -28,6 +28,10 @@ export interface AIRequest {
   selectedText?: string;
   contexts?: AIContext[];
   options?: AIOptions;
+  metadata?: {
+    sessionId?: string;
+    documentId?: string;
+  };
 }
 
 export type StreamEventType =

@@ -93,7 +93,7 @@ function parseAndEmitEvent(rawBlock: string, callbacks: StreamCallbacks) {
         if (data.text) callbacks.onTextDelta?.(data.text);
         break;
       case 'reasoning_delta':
-        if (data.reasoningText) callbacks.onReasoningDelta?.(data.reasoningText);
+        if (data.text) callbacks.onReasoningDelta?.(data.text);
         break;
       case 'finish':
         callbacks.onFinish?.();
