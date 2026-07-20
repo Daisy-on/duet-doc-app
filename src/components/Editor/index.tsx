@@ -16,7 +16,7 @@ import { useParams } from 'react-router-dom'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { Sparkles, MoreVertical, X } from 'lucide-react'
+import { Sparkles, MoreVertical } from 'lucide-react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
@@ -28,6 +28,8 @@ import {
   loadGhostTextModel,
   requestGhostText,
 } from '../../ai/aiClient';
+import type { CloudAITask } from '../../ai/types';
+import { AIAssistantPopover } from './AIAssistantPopover';
 
 interface BubblePos {
   top: number
@@ -92,6 +94,7 @@ export default function Editor() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantPos, setAssistantPos] = useState<BubblePos | null>(null);
   const [assistantInput, setAssistantInput] = useState('');
+  const [assistantTask, setAssistantTask] = useState<CloudAITask>('rewrite');
   const [savedSelection, setSavedSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const assistantRef = useRef<HTMLDivElement>(null);
 
@@ -285,12 +288,13 @@ export default function Editor() {
   })
 
   // 唤起智能助手输入框
-  const openAssistant = useCallback((defaultText: string) => {
+  const openAssistant = useCallback((defaultText: string, task: CloudAITask = 'rewrite') => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, ' ');
     setSavedSelection({ from, to, text });
     setAssistantInput(defaultText);
+    setAssistantTask(task);
 
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
@@ -460,7 +464,7 @@ export default function Editor() {
               onMouseDown={(e) => {
                 e.preventDefault() // 防止点击时失去选区
                 e.stopPropagation()
-                openAssistant('')
+                openAssistant('', 'rewrite')
               }}
             >
               <Sparkles size={14} /> AI 润色
@@ -471,7 +475,7 @@ export default function Editor() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                openAssistant('用更正式的口吻改写以下内容')
+                openAssistant('用更正式的口吻改写以下内容', 'rewrite')
               }}
             >更正式</div>
             <div
@@ -479,7 +483,7 @@ export default function Editor() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                openAssistant('扩写选中的文本内容')
+                openAssistant('扩写选中的文本内容', 'expand')
               }}
             >扩写</div>
             <div
@@ -487,7 +491,7 @@ export default function Editor() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                openAssistant('解释一下这段话的意思')
+                openAssistant('解释一下这段话的意思', 'explain')
               }}
             >解释一下</div>
             <div
@@ -502,61 +506,21 @@ export default function Editor() {
         </div>
       )}
 
-      {/* 智能助手悬浮输入框：白色主题，无灵感值 */}
+      {/* 智能助手悬浮输入框与预览区 */}
       {isAssistantOpen && assistantPos && (
-        <div
-          ref={assistantRef}
-          className="fixed z-50 animate-modal-scale-in"
-          style={{
-            top: assistantPos.top,
-            left: assistantPos.left,
+        <AIAssistantPopover
+          assistantPos={assistantPos}
+          assistantRef={assistantRef}
+          task={assistantTask}
+          defaultInstruction={assistantInput}
+          savedSelection={savedSelection}
+          editor={editor}
+          onClose={() => {
+            setIsAssistantOpen(false);
+            setAssistantPos(null);
+            setAssistantInput('');
           }}
-        >
-          <div className="bg-white text-zinc-800 rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-xl border border-zinc-200/80 w-[460px]">
-            {/* Sparkles Icon */}
-            <div className="flex items-center justify-center text-indigo-500 shrink-0">
-              <Sparkles size={16} />
-            </div>
-            
-            {/* Input Field */}
-            <input
-              type="text"
-              className="flex-1 bg-transparent border-none outline-none text-zinc-800 placeholder-zinc-400 text-[13px] h-6"
-              placeholder="向智能助手提问..."
-              value={assistantInput}
-              onChange={(e) => setAssistantInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  console.log('[AI Assistant] Submit command:', assistantInput, 'on text:', savedSelection?.text);
-                  setIsAssistantOpen(false);
-                  setAssistantPos(null);
-                  setAssistantInput('');
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setIsAssistantOpen(false);
-                  setAssistantPos(null);
-                  setAssistantInput('');
-                }
-              }}
-              autoFocus
-            />
-
-            {/* Actions */}
-            <div className="flex items-center gap-1.5 shrink-0 select-none">
-              <button
-                className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-all cursor-pointer p-1 rounded-md flex"
-                onClick={() => {
-                  setIsAssistantOpen(false);
-                  setAssistantPos(null);
-                  setAssistantInput('');
-                }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
+        />
       )}
       
       <LinkHoverPopover editor={editor} containerRef={editorContainerRef} />
