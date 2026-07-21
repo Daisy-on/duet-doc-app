@@ -5,7 +5,8 @@ import { useLayoutStore } from '../store';
 
 export default function AIChatListPanel() {
   const navigate = useNavigate();
-  const { sessionId } = useParams<{ sessionId?: string }>();
+  const params = useParams<{ '*': string }>();
+  const sessionId = params['*'] || undefined;
   const { sessions, createSession, deleteSession, activeSessionId, setActiveSessionId } = useAIWritingStore();
   const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useLayoutStore();
 

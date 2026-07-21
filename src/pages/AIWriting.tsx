@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Send, BrainCircuit, Plus, X, ChevronDown, ChevronUp, Loader2, FileText, FileUp, Sparkles, Square
+  Send, BrainCircuit, Plus, X, ChevronDown, ChevronUp, Loader2, FileText, FileUp, Sparkles, Square,
+  RotateCcw, Copy, FilePlus, StickyNote, Check
 } from 'lucide-react';
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBDocSelectorModal from '../components/modals/KBDocSelectorModal';
+import KBChooserModal from '../components/modals/KBChooserModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import type { ReferencedDoc } from '../store/aiWritingStore';
+import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import { useAIChat } from '../hooks/useAIChat';
 
@@ -90,27 +93,39 @@ function renderInlineStyles(text: string): React.ReactNode {
 }
 
 export default function AIWriting() {
-  const { sessionId } = useParams<{ sessionId?: string }>();
+  const params = useParams<{ '*': string }>();
+  const sessionId = params['*'] || undefined;
   const navigate = useNavigate();
   
   const { 
     sessions, messages, activeSessionId, createSession, 
-    isThinkingEnabled, initStore,
+    isThinkingEnabled,
     setIsThinkingEnabled, setActiveSessionId
   } = useAIWritingStore();
 
+  const { createDocument, createMemo, updateDocument } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
 
   const currentSessionId = sessionId || activeSessionId;
   const sessionMessages = messages.filter((m) => m.sessionId === currentSessionId);
+  const currentSession = sessions.find((s) => s.id === currentSessionId);
 
-  const { isGenerating, sendChatMessage, stopGeneration } = useAIChat(currentSessionId);
+  const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(currentSessionId);
 
   // Local state
   const [inputText, setInputText] = useState('');
   const [referencedDocs, setReferencedDocs] = useState<ReferencedDoc[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
+
+  // Copied toast state per message
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [toastText, setToastText] = useState<string | null>(null);
+
+  // KBChooser Modal State
+  const [isKBChooserOpen, setIsKBChooserOpen] = useState(false);
+  const [kbChooserTargetContent, setKbChooserTargetContent] = useState('');
+  const [kbChooserDefaultTitle, setKbChooserDefaultTitle] = useState('');
 
   // Menu/Modal anchors & states
   const [attachMenuAnchorEl, setAttachMenuAnchorEl] = useState<HTMLElement | null>(null);
@@ -119,10 +134,13 @@ export default function AIWriting() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 初始化 IndexedDB
+  // Toast auto-clear
   useEffect(() => {
-    initStore();
-  }, [initStore]);
+    if (toastText) {
+      const timer = setTimeout(() => setToastText(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastText]);
 
   // Auto-redirect to first session if URL is /ai-writing and sessions exist
   useEffect(() => {
@@ -163,7 +181,7 @@ export default function AIWriting() {
     
     let targetSessionId = currentSessionId;
     if (!targetSessionId) {
-      targetSessionId = await createSession(inputText.trim().substring(0, 15) || '新对话');
+      targetSessionId = await createSession('新对话');
       navigate(`/ai-writing/${targetSessionId}`);
     }
 
@@ -174,7 +192,7 @@ export default function AIWriting() {
     setReferencedDocs([]);
     setAttachedFiles([]);
 
-    await sendChatMessage(textToSend, payloadDocs);
+    await sendChatMessage(textToSend, payloadDocs, targetSessionId);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -199,6 +217,40 @@ export default function AIWriting() {
     }));
   };
 
+  // 复制文本
+  const handleCopyText = (msgId: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  // 一键保存到小记
+  const handleSaveToMemo = (content: string) => {
+    const memoTitle = currentSession?.title && currentSession.title !== '新对话' 
+      ? `AI 小记: ${currentSession.title}` 
+      : 'AI 对话摘录';
+    const memoId = createMemo(memoTitle);
+    updateDocument(memoId, { content });
+    setToastText(`已成功保存到轻量小记「${memoTitle}」`);
+  };
+
+  // 唤起生成文档弹窗
+  const handleOpenDocChooser = (content: string) => {
+    const defaultDocTitle = currentSession?.title && currentSession.title !== '新对话'
+      ? currentSession.title
+      : 'AI 写作总结';
+    setKbChooserTargetContent(content);
+    setKbChooserDefaultTitle(defaultDocTitle);
+    setIsKBChooserOpen(true);
+  };
+
+  // 确认在具体知识库下生成文档
+  const handleConfirmCreateDoc = (kbId: string, groupId: string | null, title: string) => {
+    const docId = createDocument(kbId, groupId, title);
+    updateDocument(docId, { content: kbChooserTargetContent });
+    setToastText(`已成功生成文档「${title}」！可在对应知识库中查看`);
+  };
+
   const starterPrompts = [
     { title: '分析竞品优势', desc: '基于引用的知识库文章撰写竞品优势分析报告' },
     { title: '总结文档核心', desc: '提取这篇文章的几个核心结论和未来规划建议' },
@@ -208,6 +260,10 @@ export default function AIWriting() {
   const selectPrompt = (prompt: typeof starterPrompts[0]) => {
     setInputText(prompt.title + '：' + prompt.desc);
   };
+
+  // 寻找最后一条 Assistant 消息的 ID
+  const assistantMsgs = sessionMessages.filter((m) => m.role === 'assistant');
+  const lastAssistantMsgId = assistantMsgs[assistantMsgs.length - 1]?.id;
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -238,6 +294,14 @@ export default function AIWriting() {
             <span className="font-medium">后端已连接</span>
           </div>
         </header>
+
+        {/* Global Notification Toast */}
+        {toastText && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-gray-900/90 text-white text-xs px-4 py-2 rounded-xl shadow-xl border border-gray-700 backdrop-blur flex items-center gap-2 animate-dropdown-fade-in">
+            <Check size={14} className="text-emerald-400" />
+            <span>{toastText}</span>
+          </div>
+        )}
 
         {/* Messages Stream */}
         <div 
@@ -277,11 +341,12 @@ export default function AIWriting() {
               {sessionMessages.map((msg) => {
                 const isUser = msg.role === 'user';
                 const isExpanded = expandedThinking[msg.id] !== false;
+                const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
 
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                    className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                   >
                     <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
                       {isUser ? '您' : 'Duet AI'}
@@ -360,6 +425,61 @@ export default function AIWriting() {
                       )}
                     </div>
 
+                    {/* AI 消息底部操作工具栏 (仅非 streaming 状态展示) */}
+                    {!isUser && msg.status !== 'streaming' && msg.content && (
+                      <div className={`flex items-center gap-1.5 mt-1.5 px-1 transition-all duration-200 ${
+                        isLastAssistant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}>
+                        {/* 重新生成 (仅最新一条 AI 回答可用) */}
+                        <button
+                          onClick={() => regenerateResponse(msg.id)}
+                          disabled={isGenerating || !isLastAssistant}
+                          className={`p-1 rounded-lg transition-colors ${
+                            isGenerating || !isLastAssistant
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-text-secondary hover:text-indigo-600 hover:bg-gray-100 cursor-pointer'
+                          }`}
+                          title={isLastAssistant ? "重新生成回答" : "仅最新一条回答可重新生成"}
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+
+                        {/* 复制 */}
+                        <button
+                          onClick={() => handleCopyText(msg.id, msg.content)}
+                          className="p-1 text-text-secondary hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                          title="复制回答"
+                        >
+                          {copiedMsgId === msg.id ? (
+                            <Check size={12} className="text-emerald-500" />
+                          ) : (
+                            <Copy size={12} />
+                          )}
+                        </button>
+
+                        <div className="w-px h-3 bg-border-color mx-0.5" />
+
+                        {/* 生成文档 */}
+                        <button
+                          onClick={() => handleOpenDocChooser(msg.content)}
+                          className="h-6 px-2 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
+                        >
+                          <FilePlus size={11} />
+                          <span>生成文档</span>
+                        </button>
+
+                        {/* 保存到小记 */}
+                        <button
+                          onClick={() => handleSaveToMemo(msg.content)}
+                          className="h-6 px-2 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
+                        >
+                          <StickyNote size={11} />
+                          <span>保存到小记</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Timestamp */}
                     <div className="text-[9px] text-text-secondary mt-1 px-1">
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -511,6 +631,14 @@ export default function AIWriting() {
             setReferencedDocs((prev) => [...prev, doc]);
           }
         }}
+      />
+
+      {/* KB Chooser Modal for generating documents */}
+      <KBChooserModal
+        isOpen={isKBChooserOpen}
+        onClose={() => setIsKBChooserOpen(false)}
+        defaultTitle={kbChooserDefaultTitle}
+        onConfirm={handleConfirmCreateDoc}
       />
     </div>
   );

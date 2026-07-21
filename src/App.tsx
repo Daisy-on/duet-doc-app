@@ -56,8 +56,7 @@ function App() {
           <Route index element={<Workbench />} />
           <Route path="kb/:kbId" element={<KnowledgeBaseHome />} />
           <Route path="kb/:kbId/doc/:docId" element={<DocEdit />} />
-          <Route path="ai-writing" element={<AIWriting />} />
-          <Route path="ai-writing/:sessionId" element={<AIWriting />} />
+          <Route path="ai-writing/*" element={<AIWriting />} />
           <Route path="memo" element={<MemoHome />} />
           <Route path="memo/:memoId" element={<MemoEdit />} />
           <Route path="favorites" element={<Favorites />} />

@@ -59,24 +59,16 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
 
   initStore: async () => {
     try {
-      // 迁移清理旧的 Demo/Mock 会话数据
-      const mockSessionIds = ['session-nextjs', 'session-container-queries'];
-      for (const mockId of mockSessionIds) {
-        await db.chatSessions.delete(mockId);
-        await db.chatMessages.where('sessionId').equals(mockId).delete();
-      }
-
-      const sessions = await db.chatSessions.toArray();
-      const messages = await db.chatMessages.toArray();
-      sessions.sort((a, b) => b.updatedAt - a.updatedAt);
-
-      set({
-        sessions,
-        messages,
-        activeSessionId: sessions[0]?.id || null,
+      const dbSessions = await db.chatSessions.toArray();
+      dbSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+      const dbMessages = await db.chatMessages.orderBy('createdAt').toArray();
+      set({ 
+        sessions: dbSessions, 
+        messages: dbMessages,
+        activeSessionId: dbSessions[0]?.id || null,
       });
-    } catch (error) {
-      console.error('Failed to initialize AIWritingStore from Dexie:', error);
+    } catch (err) {
+      console.error('Failed to init AI Writing Store:', err);
     }
   },
 

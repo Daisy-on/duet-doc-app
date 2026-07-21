@@ -32,14 +32,49 @@ export function useAIChat(sessionId: string | null) {
     setIsGenerating(false);
   }, []);
 
+  // 异步给新 Session 自动生成简短优雅标题
+  const summarizeAndSetTitle = useCallback(async (targetSessionId: string, userPrompt: string) => {
+    try {
+      let titleResult = '';
+      await AIDispatcher.streamCloudTask(
+        {
+          task: 'chat',
+          messages: [
+            {
+              role: 'user',
+              content: `请总结下面这句话为一句极其简短的标题（绝对不要超过 10 个字，不要带标点或引号，直接输出标题文字）：\n\n"${userPrompt}"`,
+            },
+          ],
+          options: { thinking: false, temperature: 0.3, maxTokens: 20 },
+        },
+        {
+          onTextDelta: (delta) => {
+            titleResult += delta;
+          },
+          onFinish: async () => {
+            const cleanTitle = titleResult.trim().replace(/^["'「」]/, '').replace(/["'「」]$/, '').slice(0, 15);
+            if (cleanTitle) {
+              const updatedAt = Date.now();
+              await db.chatSessions.update(targetSessionId, { title: cleanTitle, updatedAt });
+              useAIWritingStore.setState((state) => ({
+                sessions: state.sessions.map((s) => (s.id === targetSessionId ? { ...s, title: cleanTitle, updatedAt } : s)),
+              }));
+            }
+          },
+        }
+      );
+    } catch {
+      // 失败默默忽略，使用默认兜底
+    }
+  }, []);
+
   const sendChatMessage = useCallback(
-    async (userContent: string, referencedDocs: ReferencedDoc[] = []) => {
-      if (!sessionId || !userContent.trim() || isGenerating) return;
+    async (userContent: string, referencedDocs: ReferencedDoc[] = [], overrideSessionId?: string) => {
+      const targetSessionId = overrideSessionId || sessionId;
+      if (!targetSessionId || !userContent.trim() || isGenerating) return;
 
       stopGeneration();
       setIsGenerating(true);
-
-      const targetSessionId = sessionId;
 
       // 1. 创建 User 消息并保存
       const userMsg: ChatMessage = {
@@ -51,6 +86,12 @@ export function useAIChat(sessionId: string | null) {
         createdAt: Date.now(),
       };
       await addMessage(userMsg);
+
+      // 如果当前 Session 标题还是默认的 "新对话"，触发后台智能摘要标题
+      const targetSession = useAIWritingStore.getState().sessions.find((s) => s.id === targetSessionId);
+      if (targetSession && (targetSession.title === '新对话' || !targetSession.title)) {
+        summarizeAndSetTitle(targetSessionId, userContent.trim());
+      }
 
       // 2. 创建 Assistant 内存草稿
       const assistantMsgId = `msg-${nanoid(12)}`;
@@ -225,7 +266,44 @@ export function useAIChat(sessionId: string | null) {
         abortControllerRef.current = null;
       }
     },
-    [sessionId, isGenerating, isThinkingEnabled, addMessage, updateMessageStream, commitMessage, removeMessage, stopGeneration]
+    [sessionId, isGenerating, isThinkingEnabled, addMessage, updateMessageStream, commitMessage, removeMessage, stopGeneration, summarizeAndSetTitle]
+  );
+
+  // 重新生成当前 Assistant 回答
+  const regenerateResponse = useCallback(
+    async (assistantMsgId: string) => {
+      if (!sessionId || isGenerating) return;
+
+      const currentMessages = useAIWritingStore.getState().messages;
+      const sessionMsgs = currentMessages.filter((m) => m.sessionId === sessionId).sort((a, b) => a.createdAt - b.createdAt);
+
+      const targetIdx = sessionMsgs.findIndex((m) => m.id === assistantMsgId);
+      if (targetIdx === -1) return;
+
+      // 找到上条 User 消息
+      let prevUserMsg: ChatMessage | null = null;
+      for (let i = targetIdx - 1; i >= 0; i--) {
+        if (sessionMsgs[i].role === 'user') {
+          prevUserMsg = sessionMsgs[i];
+          break;
+        }
+      }
+
+      if (!prevUserMsg) return;
+
+      // 移除从目标 Assistant 消息开始及其后的所有消息
+      const toDeleteMsgs = sessionMsgs.slice(targetIdx);
+      for (const m of toDeleteMsgs) {
+        await removeMessage(m.id);
+      }
+
+      // 注意：上一条 User 消息也在之前的删除列表中被保留了，我们需要重新触发回答。
+      // 为了让 sendChatMessage 能直接针对那条 User 消息生成回复，先把那条 User 消息也移除，然后用其 prompt 重新 call sendChatMessage
+      await removeMessage(prevUserMsg.id);
+
+      await sendChatMessage(prevUserMsg.content, prevUserMsg.referencedDocs || []);
+    },
+    [sessionId, isGenerating, removeMessage, sendChatMessage]
   );
 
   useEffect(() => {
@@ -237,6 +315,7 @@ export function useAIChat(sessionId: string | null) {
   return {
     isGenerating,
     sendChatMessage,
+    regenerateResponse,
     stopGeneration,
   };
 }
