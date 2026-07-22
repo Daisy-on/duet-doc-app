@@ -51,7 +51,7 @@ interface AIWritingStore {
 
 const generateId = () => nanoid(12);
 
-export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
+export const useAIWritingStore = create<AIWritingStore>((set) => ({
   sessions: [],
   messages: [],
   activeSessionId: null,
@@ -119,18 +119,6 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, msg],
     }));
-
-    // 如果是首条用户消息，自动更新 Session 标题
-    const session = get().sessions.find((s) => s.id === msg.sessionId);
-    if (session && session.title === '新对话' && msg.role === 'user') {
-      const cleanContent = msg.content.trim().replace(/[\r\n]+/g, ' ');
-      const newTitle = cleanContent.length > 30 ? cleanContent.slice(0, 30) : cleanContent;
-      const updatedAt = Date.now();
-      await db.chatSessions.update(msg.sessionId, { title: newTitle, updatedAt });
-      set((state) => ({
-        sessions: state.sessions.map((s) => (s.id === msg.sessionId ? { ...s, title: newTitle, updatedAt } : s)),
-      }));
-    }
   },
 
   updateMessageStream: (id, updates) => {

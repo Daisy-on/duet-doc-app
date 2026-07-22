@@ -10,8 +10,8 @@ export default function AIChatListPanel() {
   const { sessions, createSession, deleteSession, activeSessionId, setActiveSessionId } = useAIWritingStore();
   const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useLayoutStore();
 
-  const handleCreateSession = () => {
-    const newId = createSession();
+  const handleCreateSession = async () => {
+    const newId = await createSession();
     navigate(`/ai-writing/${newId}`);
   };
 
