@@ -152,10 +152,19 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   },
 
   addMessage: async (msg) => {
+    const now = Date.now();
     await db.chatMessages.add(msg);
-    set((state) => ({
-      messages: [...state.messages, msg],
-    }));
+    await db.chatSessions.update(msg.sessionId, { updatedAt: now });
+
+    set((state) => {
+      const updatedSessions = state.sessions.map((s) =>
+        s.id === msg.sessionId ? { ...s, updatedAt: now } : s
+      );
+      return {
+        messages: [...state.messages, msg],
+        sessions: sortSessions(updatedSessions),
+      };
+    });
   },
 
   updateMessageStream: (id, updates) => {
@@ -165,10 +174,19 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   },
 
   commitMessage: async (msg) => {
+    const now = Date.now();
     await db.chatMessages.put(msg);
-    set((state) => ({
-      messages: state.messages.map((m) => (m.id === msg.id ? msg : m)),
-    }));
+    await db.chatSessions.update(msg.sessionId, { updatedAt: now });
+
+    set((state) => {
+      const updatedSessions = state.sessions.map((s) =>
+        s.id === msg.sessionId ? { ...s, updatedAt: now } : s
+      );
+      return {
+        messages: state.messages.map((m) => (m.id === msg.id ? msg : m)),
+        sessions: sortSessions(updatedSessions),
+      };
+    });
   },
 
   removeMessage: async (id) => {

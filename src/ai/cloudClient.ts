@@ -66,7 +66,9 @@ export async function streamCloudAI(
       parseAndEmitEvent(buffer, callbacks);
     }
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') return;
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw err;
+    }
     callbacks.onError?.({ code: 'STREAM_ERROR', message: err instanceof Error ? err.message : 'Stream processing failed' });
   }
 }

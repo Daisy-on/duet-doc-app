@@ -4,6 +4,7 @@ import { AIDispatcher } from '../ai/dispatcher';
 import type { AIMessage, AIContext, AIRequest } from '../ai/types';
 import { useAIWritingStore, type ChatMessage, type ReferencedDoc } from '../store/aiWritingStore';
 import { db } from '../db';
+import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARS = 30000;
@@ -157,7 +158,7 @@ export function useAIChat(sessionId: string | null) {
               contexts.push({
                 sourceId: fullDoc.id,
                 title: fullDoc.title,
-                content: fullDoc.content,
+                content: extractPlainTextFromTiptap(fullDoc.content),
                 sourceType: 'document',
               });
             }
@@ -224,9 +225,7 @@ export function useAIChat(sessionId: string | null) {
                 status: 'complete',
               };
 
-              if (activeSessionIdRef.current === targetSessionId) {
-                await commitMessage(finalMessage);
-              }
+              await commitMessage(finalMessage);
               setIsGenerating(false);
               abortControllerRef.current = null;
             },
