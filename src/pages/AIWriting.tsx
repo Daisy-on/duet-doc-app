@@ -135,6 +135,32 @@ export default function AIWriting() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Backend health status state
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/v1/health');
+        if (res.ok) {
+          if (isMounted) setBackendStatus('connected');
+        } else {
+          if (isMounted) setBackendStatus('disconnected');
+        }
+      } catch {
+        if (isMounted) setBackendStatus('disconnected');
+      }
+    };
+
+    checkHealth();
+    const timer = setInterval(checkHealth, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   // Toast auto-clear
   useEffect(() => {
     if (toastText) {
@@ -289,8 +315,30 @@ export default function AIWriting() {
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-text-secondary bg-gray-50 border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            <span className="font-medium">后端已连接</span>
+            <span className="relative flex h-2 w-2">
+              {backendStatus === 'connected' && (
+                <span
+                  className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                  style={{ animationDuration: '2.5s' }}
+                />
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  backendStatus === 'connected'
+                    ? 'bg-emerald-500'
+                    : backendStatus === 'disconnected'
+                    ? 'bg-red-500'
+                    : 'bg-gray-400'
+                }`}
+              />
+            </span>
+            <span className="font-medium">
+              {backendStatus === 'connected'
+                ? '后端已连接'
+                : backendStatus === 'disconnected'
+                ? '后端已离线'
+                : '检测连接中...'}
+            </span>
           </div>
         </header>
 
@@ -314,7 +362,7 @@ export default function AIWriting() {
               </div>
               <h3 className="text-xl font-bold text-text-primary mb-2">今天想写点什么？</h3>
               <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
-                引用知识库文档，或是直接提问。Duet AI 具备端云结合大模型推理能力，协助你快速撰写、精炼与重构文本。
+                引用知识库文档，或是直接提问。Duet AI 具备端云协同的大模型推理能力，协助你快速撰写、精炼与重构文本。
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
