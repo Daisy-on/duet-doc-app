@@ -52,7 +52,7 @@ export default function MemoHome() {
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md hover:shadow-indigo-500/10 transition-all cursor-pointer hover:-translate-y-0.5"
             >
               <Plus size={14} />
-              <span>新建第一条小记</span>
+              <span>新建一条小记</span>
             </button>
           </div>
         </div>

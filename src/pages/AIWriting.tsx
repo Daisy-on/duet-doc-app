@@ -13,6 +13,7 @@ import type { ReferencedDoc } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import { useAIChat } from '../hooks/useAIChat';
+import { markdownToHtml, getSmartTitle } from '../utils/markdownUtils';
 
 // Simple Markdown parser for beautiful text display
 function parseMarkdown(text: string): React.ReactNode[] {
@@ -226,19 +227,19 @@ export default function AIWriting() {
 
   // 一键保存到小记
   const handleSaveToMemo = (content: string) => {
-    const memoTitle = currentSession?.title && currentSession.title !== '新对话' 
+    const rawTitle = currentSession?.title && currentSession.title !== '新对话' 
       ? `AI 小记: ${currentSession.title}` 
-      : 'AI 对话摘录';
+      : undefined;
+    const memoTitle = getSmartTitle(content, rawTitle || 'AI 对话摘录');
     const memoId = createMemo(memoTitle);
-    updateDocument(memoId, { content });
+    const htmlContent = markdownToHtml(content);
+    updateDocument(memoId, { content: htmlContent });
     setToastText(`已成功保存到轻量小记「${memoTitle}」`);
   };
 
   // 唤起生成文档弹窗
   const handleOpenDocChooser = (content: string) => {
-    const defaultDocTitle = currentSession?.title && currentSession.title !== '新对话'
-      ? currentSession.title
-      : 'AI 写作总结';
+    const defaultDocTitle = getSmartTitle(content, currentSession?.title);
     setKbChooserTargetContent(content);
     setKbChooserDefaultTitle(defaultDocTitle);
     setIsKBChooserOpen(true);
@@ -247,7 +248,8 @@ export default function AIWriting() {
   // 确认在具体知识库下生成文档
   const handleConfirmCreateDoc = (kbId: string, groupId: string | null, title: string) => {
     const docId = createDocument(kbId, groupId, title);
-    updateDocument(docId, { content: kbChooserTargetContent });
+    const htmlContent = markdownToHtml(kbChooserTargetContent);
+    updateDocument(docId, { content: htmlContent });
     setToastText(`已成功生成文档「${title}」！可在对应知识库中查看`);
   };
 

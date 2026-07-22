@@ -42,17 +42,22 @@ export function useAIChat(sessionId: string | null) {
           messages: [
             {
               role: 'user',
-              content: `请总结下面这句话为一句极其简短的标题（绝对不要超过 10 个字，不要带标点或引号，直接输出标题文字）：\n\n"${userPrompt}"`,
+              content: `请总结下面这句话为一句简短完整的标题（绝对不要超过 20 个字，不要带标点、引号或省略号，直接输出完整标题文字）：\n\n"${userPrompt}"`,
             },
           ],
-          options: { thinking: false, temperature: 0.3, maxTokens: 20 },
+          options: { thinking: false, temperature: 0.3, maxTokens: 40 },
         },
         {
           onTextDelta: (delta) => {
             titleResult += delta;
           },
           onFinish: async () => {
-            const cleanTitle = titleResult.trim().replace(/^["'「」]/, '').replace(/["'「」]$/, '').slice(0, 15);
+            const cleanTitle = titleResult
+              .trim()
+              .replace(/^["'「」]/, '')
+              .replace(/["'「」]$/, '')
+              .replace(/(\.\.\.|\u2026)$/, '')
+              .slice(0, 30);
             if (cleanTitle) {
               const updatedAt = Date.now();
               await db.chatSessions.update(targetSessionId, { title: cleanTitle, updatedAt });

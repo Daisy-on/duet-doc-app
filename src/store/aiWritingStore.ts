@@ -123,7 +123,8 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
     // 如果是首条用户消息，自动更新 Session 标题
     const session = get().sessions.find((s) => s.id === msg.sessionId);
     if (session && session.title === '新对话' && msg.role === 'user') {
-      const newTitle = msg.content.length > 15 ? msg.content.substring(0, 15) + '...' : msg.content;
+      const cleanContent = msg.content.trim().replace(/[\r\n]+/g, ' ');
+      const newTitle = cleanContent.length > 30 ? cleanContent.slice(0, 30) : cleanContent;
       const updatedAt = Date.now();
       await db.chatSessions.update(msg.sessionId, { title: newTitle, updatedAt });
       set((state) => ({
