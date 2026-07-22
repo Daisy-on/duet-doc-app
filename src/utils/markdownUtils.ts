@@ -21,16 +21,30 @@ export function markdownToHtml(markdownText: string): string {
   }
 }
 
+const GENERIC_TITLES = new Set([
+  '总结', '概述', '结论', '回答', '简介', '小结', '说明', '分析', '注意事项', '提示', '核心要点',
+  'summary', 'overview', 'conclusion', 'note', 'introduction', 'notes'
+]);
+
+function isGenericTitle(title: string): boolean {
+  const lower = title.toLowerCase().trim().replace(/[:：\s]/g, '');
+  return GENERIC_TITLES.has(lower) || lower.length <= 2;
+}
+
 /**
  * Extracts a clean, non-truncated document title from Markdown content or prompt context.
  */
 export function getSmartTitle(content: string, fallbackTitle?: string): string {
+  const cleanFallback = fallbackTitle && fallbackTitle !== '新对话' 
+    ? fallbackTitle.trim().replace(/(\.\.\.|\u2026)$/, '').trim() 
+    : undefined;
+
   if (content) {
     // 1. Check for markdown headings (# Heading or ## Heading)
     const headingMatch = content.match(/^#+\s+(.+)$/m);
     if (headingMatch && headingMatch[1].trim()) {
       const cleanHeading = headingMatch[1].replace(/[*_`]/g, '').trim();
-      if (cleanHeading.length > 0) {
+      if (cleanHeading.length > 0 && !isGenericTitle(cleanHeading)) {
         return cleanHeading.slice(0, 50);
       }
     }
@@ -39,20 +53,17 @@ export function getSmartTitle(content: string, fallbackTitle?: string): string {
     const boldMatch = content.match(/^\*\*(.+?)\*\*/m);
     if (boldMatch && boldMatch[1].trim()) {
       const cleanBold = boldMatch[1].replace(/[:：]/g, '').trim();
-      if (cleanBold.length > 0 && cleanBold.length <= 40) {
+      if (cleanBold.length > 0 && cleanBold.length <= 40 && !isGenericTitle(cleanBold)) {
         return cleanBold;
       }
     }
   }
 
-  // 3. Fallback to provided session title / user prompt
-  if (fallbackTitle && fallbackTitle !== '新对话' && fallbackTitle.trim().length > 0) {
-    const cleanTitle = fallbackTitle.trim().replace(/(\.\.\.|\u2026)$/, '').trim();
-    if (cleanTitle) {
-      return cleanTitle.slice(0, 50);
-    }
+  // 3. Fallback to provided session title / user prompt if valid
+  if (cleanFallback && !isGenericTitle(cleanFallback)) {
+    return cleanFallback.slice(0, 50);
   }
 
   // 4. Ultimate fallback
-  return 'AI 写作文档';
+  return cleanFallback || 'AI 写作文档';
 }

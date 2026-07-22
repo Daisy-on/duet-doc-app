@@ -24,6 +24,7 @@ export interface ChatSession {
   title: string;
   createdAt: number;
   updatedAt: number;
+  isPinned?: boolean;
 }
 
 interface AIWritingStore {
@@ -36,6 +37,7 @@ interface AIWritingStore {
 
   // Actions
   createSession: (title?: string) => Promise<string>;
+  updateSession: (id: string, updates: Partial<ChatSession>) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   setActiveSessionId: (id: string | null) => void;
   setIsThinkingEnabled: (enabled: boolean) => void;
@@ -51,6 +53,15 @@ interface AIWritingStore {
 
 const generateId = () => nanoid(12);
 
+const sortSessions = (sessions: ChatSession[]) => {
+  return [...sessions].sort((a, b) => {
+    if (!!a.isPinned !== !!b.isPinned) {
+      return a.isPinned ? -1 : 1;
+    }
+    return b.updatedAt - a.updatedAt;
+  });
+};
+
 export const useAIWritingStore = create<AIWritingStore>((set) => ({
   sessions: [],
   messages: [],
@@ -60,12 +71,12 @@ export const useAIWritingStore = create<AIWritingStore>((set) => ({
   initStore: async () => {
     try {
       const dbSessions = await db.chatSessions.toArray();
-      dbSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+      const sorted = sortSessions(dbSessions);
       const dbMessages = await db.chatMessages.orderBy('createdAt').toArray();
       set({ 
-        sessions: dbSessions, 
+        sessions: sorted, 
         messages: dbMessages,
-        activeSessionId: dbSessions[0]?.id || null,
+        activeSessionId: sorted[0]?.id || null,
       });
     } catch (err) {
       console.error('Failed to init AI Writing Store:', err);
@@ -87,6 +98,14 @@ export const useAIWritingStore = create<AIWritingStore>((set) => ({
       activeSessionId: id,
     }));
     return id;
+  },
+
+  updateSession: async (id, updates) => {
+    await db.chatSessions.update(id, updates);
+    set((state) => {
+      const updated = state.sessions.map((s) => (s.id === id ? { ...s, ...updates } : s));
+      return { sessions: sortSessions(updated) };
+    });
   },
 
   deleteSession: async (id) => {
