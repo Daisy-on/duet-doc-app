@@ -8,7 +8,7 @@ export default function AIChatListPanel() {
   const navigate = useNavigate();
   const params = useParams<{ '*': string }>();
   const sessionId = params['*'] || undefined;
-  const { sessions, createSession, updateSession, deleteSession, activeSessionId, setActiveSessionId } = useAIWritingStore();
+  const { sessions, createSession, updateSession, deleteSession, setActiveSessionId } = useAIWritingStore();
   const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useLayoutStore();
 
   const [popoverOpenId, setPopoverOpenId] = useState<string | null>(null);
@@ -27,6 +27,9 @@ export default function AIChatListPanel() {
   }, []);
 
   const handleCreateSession = async () => {
+    // 空白对话页面点击 + 图标无效
+    if (!sessionId) return;
+
     const newId = await createSession();
     navigate(`/ai-writing/${newId}`);
   };
@@ -141,7 +144,7 @@ export default function AIChatListPanel() {
                 </div>
               ) : (
                 sessions.map((session) => {
-                  const isActive = session.id === sessionId || (session.id === activeSessionId && !sessionId);
+                  const isActive = session.id === sessionId;
                   const isRenaming = renamingSessionId === session.id;
 
                   return (

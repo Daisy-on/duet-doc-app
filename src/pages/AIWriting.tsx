@@ -99,7 +99,7 @@ export default function AIWriting() {
   const navigate = useNavigate();
   
   const { 
-    sessions, messages, activeSessionId, createSession, 
+    sessions, messages, createSession, 
     isThinkingEnabled,
     setIsThinkingEnabled, setActiveSessionId
   } = useAIWritingStore();
@@ -107,11 +107,11 @@ export default function AIWriting() {
   const { createDocument, createMemo, updateDocument } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
 
-  const currentSessionId = sessionId || activeSessionId;
+  const currentSessionId = sessionId;
   const sessionMessages = messages.filter((m) => m.sessionId === currentSessionId);
   const currentSession = sessions.find((s) => s.id === currentSessionId);
 
-  const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(currentSessionId);
+  const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(currentSessionId || null);
 
   // Local state
   const [inputText, setInputText] = useState('');
@@ -143,13 +143,10 @@ export default function AIWriting() {
     }
   }, [toastText]);
 
-  // Auto-redirect to first session if URL is /ai-writing and sessions exist
+  // Sync activeSessionId with URL route param
   useEffect(() => {
-    if (!sessionId && sessions.length > 0) {
-      setActiveSessionId(sessions[0].id);
-      navigate(`/ai-writing/${sessions[0].id}`);
-    }
-  }, [sessionId, sessions, navigate, setActiveSessionId]);
+    setActiveSessionId(sessionId || null);
+  }, [sessionId, setActiveSessionId]);
 
   // Scroll to bottom on new messages
   useEffect(() => {

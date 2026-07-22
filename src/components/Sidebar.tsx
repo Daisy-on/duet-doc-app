@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Home, Sparkles, StickyNote, Star, Folder, Search, Plus, MoreHorizontal } from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
+import { useAIWritingStore } from '../store/aiWritingStore';
 import { useLayoutStore } from '../store';
 import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
@@ -10,6 +11,7 @@ import KbActionMenu from './menus/KbActionMenu';
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
   const navigate = useNavigate();
+  const { lastVisitedSessionId } = useAIWritingStore();
   const {
     knowledgeBases,
     updateKnowledgeBase,
@@ -81,7 +83,7 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/ai-writing" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink to={lastVisitedSessionId ? `/ai-writing/${lastVisitedSessionId}` : '/ai-writing'} tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
             {({ isActive }) => (
               <>
                 <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> AI 写作

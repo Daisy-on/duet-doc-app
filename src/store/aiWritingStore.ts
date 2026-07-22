@@ -31,6 +31,7 @@ interface AIWritingStore {
   sessions: ChatSession[];
   messages: ChatMessage[];
   activeSessionId: string | null;
+  lastVisitedSessionId: string | null;
   isThinkingEnabled: boolean;
 
   initStore: () => Promise<void>;
@@ -62,10 +63,11 @@ const sortSessions = (sessions: ChatSession[]) => {
   });
 };
 
-export const useAIWritingStore = create<AIWritingStore>((set) => ({
+export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   sessions: [],
   messages: [],
   activeSessionId: null,
+  lastVisitedSessionId: null,
   isThinkingEnabled: true,
 
   initStore: async () => {
@@ -76,7 +78,7 @@ export const useAIWritingStore = create<AIWritingStore>((set) => ({
       set({ 
         sessions: sorted, 
         messages: dbMessages,
-        activeSessionId: sorted[0]?.id || null,
+        activeSessionId: null,
       });
     } catch (err) {
       console.error('Failed to init AI Writing Store:', err);
@@ -84,6 +86,16 @@ export const useAIWritingStore = create<AIWritingStore>((set) => ({
   },
 
   createSession: async (title = '新对话') => {
+    const state = get();
+    // 检查是否已经存在未发送消息的空 Session，直接复用，避免创建多个空的“新对话”
+    const existingEmpty = state.sessions.find(
+      (s) => s.title === '新对话' && !state.messages.some((m) => m.sessionId === s.id)
+    );
+    if (existingEmpty) {
+      set({ activeSessionId: existingEmpty.id, lastVisitedSessionId: existingEmpty.id });
+      return existingEmpty.id;
+    }
+
     const id = `session-${generateId()}`;
     const newSession: ChatSession = {
       id,
@@ -93,9 +105,10 @@ export const useAIWritingStore = create<AIWritingStore>((set) => ({
     };
 
     await db.chatSessions.add(newSession);
-    set((state) => ({
-      sessions: [newSession, ...state.sessions],
+    set((s) => ({
+      sessions: [newSession, ...s.sessions],
       activeSessionId: id,
+      lastVisitedSessionId: id,
     }));
     return id;
   },
@@ -117,16 +130,21 @@ export const useAIWritingStore = create<AIWritingStore>((set) => ({
     set((state) => {
       const filteredSessions = state.sessions.filter((s) => s.id !== id);
       const newActiveId = state.activeSessionId === id ? filteredSessions[0]?.id || null : state.activeSessionId;
+      const newLastVisited = state.lastVisitedSessionId === id ? filteredSessions[0]?.id || null : state.lastVisitedSessionId;
       return {
         sessions: filteredSessions,
         messages: state.messages.filter((m) => m.sessionId !== id),
         activeSessionId: newActiveId,
+        lastVisitedSessionId: newLastVisited,
       };
     });
   },
 
   setActiveSessionId: (id) => {
-    set({ activeSessionId: id });
+    set((state) => ({
+      activeSessionId: id,
+      lastVisitedSessionId: id ? id : state.lastVisitedSessionId,
+    }));
   },
 
   setIsThinkingEnabled: (enabled) => {
