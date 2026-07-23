@@ -13,86 +13,9 @@ import type { ReferencedDoc } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import { useAIChat } from '../hooks/useAIChat';
+import { renderMarkdownToHtml } from '../utils/markdownRenderer';
 import { markdownToHtml, getSmartTitle } from '../utils/markdownUtils';
 import { buildApiUrl } from '../utils/apiUtils';
-
-// Simple Markdown parser for beautiful text display
-function parseMarkdown(text: string): React.ReactNode[] {
-  const lines = text.split('\n');
-  let inCodeBlock = false;
-  let codeContent: string[] = [];
-
-  return lines.map((line, idx) => {
-    if (line.trim().startsWith('```')) {
-      if (inCodeBlock) {
-        inCodeBlock = false;
-        const code = codeContent.join('\n');
-        codeContent = [];
-        return (
-          <pre key={idx} className="bg-gray-900 text-gray-100 p-4 rounded-lg my-2 font-mono text-xs md:text-[13px] overflow-x-auto shadow-inner border border-gray-800">
-            <code>{code}</code>
-          </pre>
-        );
-      } else {
-        inCodeBlock = true;
-        return null;
-      }
-    }
-
-    if (inCodeBlock) {
-      codeContent.push(line);
-      return null;
-    }
-
-    if (line.startsWith('### ')) {
-      return (
-        <h4 key={idx} className="text-base font-bold text-text-primary mt-4 mb-2">
-          {line.replace('### ', '')}
-        </h4>
-      );
-    }
-
-    if (line.startsWith('## ')) {
-      return (
-        <h3 key={idx} className="text-lg font-bold text-text-primary mt-5 mb-2.5">
-          {line.replace('## ', '')}
-        </h3>
-      );
-    }
-
-    if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-      const content = line.trim().substring(2);
-      return (
-        <ul key={idx} className="list-disc pl-5 my-1.5 text-sm text-text-primary leading-relaxed">
-          <li>{renderInlineStyles(content)}</li>
-        </ul>
-      );
-    }
-
-    if (line.trim() === '') {
-      return <div key={idx} className="h-2" />;
-    }
-
-    return (
-      <p key={idx} className="text-sm text-text-primary leading-relaxed my-2">
-        {renderInlineStyles(line)}
-      </p>
-    );
-  }).filter(Boolean) as React.ReactNode[];
-}
-
-function renderInlineStyles(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold text-text-primary">{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={i} className="bg-gray-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-[11px] border border-gray-200">{part.slice(1, -1)}</code>;
-    }
-    return part;
-  });
-}
 
 export default function AIWriting() {
   const params = useParams<{ '*': string }>();
@@ -451,10 +374,10 @@ export default function AIWriting() {
 
                         {/* 深度思考过程折叠卡片 */}
                         {!isUser && msg.thinkingContent && (
-                          <div className="mb-3 border-l-2 border-indigo-200 bg-gray-50/70 rounded-r-lg overflow-hidden">
+                          <div className="mb-3.5 border-l-2 border-indigo-300/80 bg-gray-50/80 rounded-r-xl overflow-hidden">
                             <button
                               onClick={() => toggleThinkingNode(msg.id)}
-                              className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold text-text-secondary bg-gray-100/60 hover:bg-gray-100 transition-colors"
+                              className="w-full flex items-center justify-between px-3.5 py-2 text-[11px] font-bold text-text-secondary bg-gray-100/70 hover:bg-gray-100 transition-colors"
                             >
                               <span className="flex items-center gap-1.5 text-indigo-600">
                                 <BrainCircuit size={13} className={msg.status === 'streaming' ? 'animate-spin-slow' : ''} />
@@ -463,7 +386,7 @@ export default function AIWriting() {
                               {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             </button>
                             {isExpanded && (
-                              <div className="p-3 text-[11px] font-mono text-text-secondary whitespace-pre-wrap leading-relaxed">
+                              <div className="p-3.5 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed border-t border-indigo-100/60">
                                 {msg.thinkingContent}
                                 {msg.status === 'streaming' && !msg.content && (
                                   <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
@@ -478,12 +401,15 @@ export default function AIWriting() {
                           {isUser ? (
                             <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                           ) : (
-                            <>
-                              {parseMarkdown(msg.content)}
+                            <div className="relative">
+                              <div
+                                className="markdown-body text-sm text-text-primary leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }}
+                              />
                               {msg.status === 'streaming' && msg.content && (
-                                <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
+                                <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
                               )}
-                            </>
+                            </div>
                           )}
                         </div>
 
