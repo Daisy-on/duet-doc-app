@@ -1,10 +1,12 @@
+import { logAITrace } from './aiLogger';
+
 const GHOST_TEXT_MODEL_PATH = '/ai-models/qwen3.5-0.8b-opt/';
 
 type GhostTextStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 type WorkerResponse =
   | { type: 'load-progress'; payload: unknown }
-  | { type: 'ready' }
+  | { type: 'ready'; payload?: { deviceName?: string } }
   | { type: 'result'; requestId: string; payload: { text: string; inferenceTime?: number } }
   | { type: 'error'; requestId?: string; payload: { message: string } };
 
@@ -23,14 +25,17 @@ export type GhostTextResult = {
 let worker: Worker | null = null;
 let status: GhostTextStatus = 'idle';
 let latestRequestId: string | null = null;
+let detectedGpuDevice = 'webgpu';
 
-// 单飞队列状态
+// 单飞队列状态与测速
 let isWorkerBusy = false;
 let inFlightResolve: ((value: GhostTextResult | null) => void) | null = null;
 let inFlightRequestId: string | null = null;
+let inFlightStartedAt = 0;
 
 let hasDroppedRequest = false;
 let cooldownTimer: number | null = null;
+let lastLoggedProgressPercent = -1;
 
 function getWorker() {
   if (worker) return worker;
@@ -43,22 +48,63 @@ function getWorker() {
     const message = event.data;
 
     if (message.type === 'load-progress') {
-      console.log('[ghost-text] model loading:', message.payload);
+      const payload = message.payload as { progress?: number; status?: string } | undefined;
+      const progress = typeof payload?.progress === 'number' ? Math.round(payload.progress) : undefined;
+
+      if (progress !== undefined) {
+        // 阀化日志输出：25%, 50%, 75%, 100%
+        if (progress % 25 === 0 && progress !== lastLoggedProgressPercent) {
+          lastLoggedProgressPercent = progress;
+          logAITrace({
+            requestId: 'model-init',
+            runtime: 'local',
+            kind: 'model-load',
+            task: 'ghost-text-load',
+            status: 'started',
+            progress,
+            device: detectedGpuDevice,
+            dtype: 'q4f16',
+          });
+        }
+      }
       return;
     }
 
     if (message.type === 'ready') {
       status = 'ready';
-      console.log('[ghost-text] model ready');
+      if (message.payload?.deviceName) {
+        detectedGpuDevice = message.payload.deviceName;
+      }
+      logAITrace({
+        requestId: 'model-init',
+        runtime: 'local',
+        kind: 'model-load',
+        task: 'ghost-text-load',
+        status: 'completed',
+        progress: 100,
+        device: detectedGpuDevice,
+        dtype: 'q4f16',
+      });
       return;
     }
 
     if (message.type === 'error') {
       status = status === 'loading' ? 'error' : status;
-      console.error('[ghost-text] worker error:', message.payload.message);
 
-      // 当前 in-flight 请求出错，resolve(null) 通知调用方
+      // 当前 in-flight 请求出错
       if (message.requestId && message.requestId === inFlightRequestId) {
+        logAITrace({
+          requestId: message.requestId,
+          runtime: 'local',
+          kind: 'generation',
+          task: 'ghost-text',
+          status: 'failed',
+          errorCode: 'WORKER_ERROR',
+          errorMessage: message.payload.message,
+          device: detectedGpuDevice,
+          dtype: 'q4f16',
+        });
+
         inFlightResolve?.(null);
         inFlightResolve = null;
         inFlightRequestId = null;
@@ -80,24 +126,34 @@ function getWorker() {
       // in-flight 请求完成
       const currentResolve = inFlightResolve;
       const currentRequestId = inFlightRequestId;
+      const totalLatencyMs = performance.now() - inFlightStartedAt;
+
       inFlightResolve = null;
       inFlightRequestId = null;
       isWorkerBusy = false;
 
-      const inferenceTimeStr = message.payload.inferenceTime !== undefined 
-        ? `${message.payload.inferenceTime.toFixed(1)}ms` 
-        : 'unknown';
+      const isAccepted = currentRequestId === latestRequestId && !!currentResolve;
+      const traceStatus = isAccepted ? 'completed' : 'stale';
 
-      // 判断是否是最新的请求
-      if (currentRequestId === latestRequestId && currentResolve) {
-        console.log(`[ghost-text] result accepted: ${message.requestId} (inference: ${inferenceTimeStr})`);
+      logAITrace({
+        requestId: message.requestId,
+        runtime: 'local',
+        kind: 'generation',
+        task: 'ghost-text',
+        status: traceStatus,
+        model: 'qwen3.5-0.8b-opt',
+        device: detectedGpuDevice,
+        dtype: 'q4f16',
+        inferenceMs: message.payload.inferenceTime,
+        totalLatencyMs,
+      });
+
+      if (isAccepted) {
         currentResolve({
           requestId: message.requestId,
           text: message.payload.text,
         });
       } else {
-        // 过期请求，丢弃结果
-        console.log(`[ghost-text] result discarded (stale): ${message.requestId} (inference: ${inferenceTimeStr})`);
         currentResolve?.(null);
       }
 
@@ -114,8 +170,6 @@ function getWorker() {
 
   return worker;
 }
-
-
 
 export function loadGhostTextModel() {
   if (status === 'loading' || status === 'ready') return;
@@ -147,15 +201,31 @@ export function clearActiveGhostTextRequest() {
 }
 
 export function requestGhostText(input: GhostTextRequest): Promise<GhostTextResult | null> {
+  const requestId = crypto.randomUUID();
+
   if (status !== 'ready') {
+    logAITrace({
+      requestId,
+      runtime: 'local',
+      kind: 'generation',
+      task: 'ghost-text',
+      status: 'skipped',
+      errorMessage: 'Model not ready',
+    });
     return Promise.resolve(null);
   }
 
-  const requestId = crypto.randomUUID();
   latestRequestId = requestId;
 
   if (isWorkerBusy) {
-    console.log(`[ghost-text] worker busy, dropping request: ${requestId}`);
+    logAITrace({
+      requestId,
+      runtime: 'local',
+      kind: 'generation',
+      task: 'ghost-text',
+      status: 'dropped',
+      errorMessage: 'Worker busy',
+    });
     hasDroppedRequest = true;
     return Promise.resolve(null);
   }
@@ -164,6 +234,7 @@ export function requestGhostText(input: GhostTextRequest): Promise<GhostTextResu
     isWorkerBusy = true;
     inFlightRequestId = requestId;
     inFlightResolve = resolve;
+    inFlightStartedAt = performance.now();
 
     getWorker().postMessage({
       type: 'generate',

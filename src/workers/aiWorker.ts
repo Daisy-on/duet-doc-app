@@ -34,7 +34,7 @@ type AiWorkerRequest =
 
 type AiWorkerResponse =
   | { type: 'load-progress'; payload: unknown }
-  | { type: 'ready' }
+  | { type: 'ready'; payload?: { deviceName?: string } }
   | { type: 'result'; requestId: string; payload: { text: string; inferenceTime?: number } }
   | { type: 'error'; requestId?: string; payload: { message: string } };
 
@@ -45,12 +45,20 @@ function postMessageToMain(message: AiWorkerResponse) {
   self.postMessage(message);
 }
 
+interface TiptapGeneratedMessage {
+  role?: string;
+  content?: string;
+}
+
+interface TiptapGeneratedOutput {
+  generated_text?: string | TiptapGeneratedMessage[];
+}
+
 function extractGeneratedText(result: TextGenerationOutput): string {
   const output = result as unknown;
-  console.log('[ghost-text] raw output:', output);
 
   if (Array.isArray(output)) {
-    const first = output[0] as any;
+    const first = output[0] as TiptapGeneratedOutput | undefined;
     if (first && first.generated_text) {
       if (typeof first.generated_text === 'string') {
         return first.generated_text.trim();
@@ -59,7 +67,7 @@ function extractGeneratedText(result: TextGenerationOutput): string {
         // 从对话数组中提取最后一条 assistant 角色的消息内容
         const assistantMessage = [...first.generated_text]
           .reverse()
-          .find((msg: any) => msg.role === 'assistant');
+          .find((msg) => msg.role === 'assistant');
         return assistantMessage?.content?.trim() ?? '';
       }
     }
@@ -67,14 +75,14 @@ function extractGeneratedText(result: TextGenerationOutput): string {
 
   if (output && typeof output === 'object') {
     if ('generated_text' in output) {
-      const genText = (output as any).generated_text;
+      const genText = (output as TiptapGeneratedOutput).generated_text;
       if (typeof genText === 'string') {
         return genText.trim();
       }
       if (Array.isArray(genText)) {
         const assistantMessage = [...genText]
           .reverse()
-          .find((msg: any) => msg.role === 'assistant');
+          .find((msg) => msg.role === 'assistant');
         return assistantMessage?.content?.trim() ?? '';
       }
     }
@@ -83,25 +91,36 @@ function extractGeneratedText(result: TextGenerationOutput): string {
   return '';
 }
 
+async function detectGpuDevice(): Promise<string> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.gpu) {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (adapter) {
+        const adapterObj = adapter as {
+          info?: { vendor?: string; device?: string; description?: string; architecture?: string };
+          requestAdapterInfo?: () => Promise<{ vendor?: string; device?: string; description?: string; architecture?: string }>;
+        };
+        const info = adapterObj.info || (adapterObj.requestAdapterInfo ? await adapterObj.requestAdapterInfo() : null);
+        if (info) {
+          const parts = [info.vendor, info.device || info.description].filter(Boolean);
+          const name = parts.length > 0 ? parts.join(' ') : 'GPU';
+          const arch = info.architecture ? ` (${info.architecture})` : '';
+          return `webgpu (${name}${arch})`;
+        }
+      }
+    }
+  } catch {
+    // Ignore detection errors
+  }
+  return 'webgpu';
+}
+
 async function loadModel(payload: LoadPayload) {
   if (generator) return;
   if (loadingPromise) return loadingPromise;
 
   loadingPromise = (async () => {
-    try {
-      if (navigator.gpu) {
-        const adapter = await navigator.gpu.requestAdapter();
-        console.log('[ghost-text] WebGPU Adapter 对象:', adapter);
-        if (adapter) {
-          const info = (adapter as any).info || ((adapter as any).requestAdapterInfo ? await (adapter as any).requestAdapterInfo() : null);
-          console.log('[ghost-text] WebGPU Adapter Info (显卡信息):', info);
-        } else {
-          console.warn('[ghost-text] navigator.gpu.requestAdapter() 返回了 null，WebGPU 在当前 Worker 被禁用！');
-        }
-      }
-    } catch (e) {
-      console.warn('[ghost-text] 获取 WebGPU Adapter 失败:', e);
-    }
+    const deviceName = await detectGpuDevice();
 
     generator = (await pipeline('text-generation', payload.modelPath, {
       dtype: payload.dtype,
@@ -111,7 +130,7 @@ async function loadModel(payload: LoadPayload) {
       },
     })) as TextGenerationPipeline;
 
-    postMessageToMain({ type: 'ready' });
+    postMessageToMain({ type: 'ready', payload: { deviceName } });
   })();
 
   return loadingPromise;
@@ -147,7 +166,6 @@ self.onmessage = async (event: MessageEvent<AiWorkerRequest>) => {
         return_full_text: false,
       });
       const duration = performance.now() - startTime;
-      console.log(`[ghost-text] inference completed in ${duration.toFixed(1)}ms`);
 
       postMessageToMain({
         type: 'result',

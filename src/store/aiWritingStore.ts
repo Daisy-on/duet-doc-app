@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { db } from '../db';
+import type { AIResponseMetadata } from '../ai/types';
 
 export interface ReferencedDoc {
   id: string;
@@ -17,6 +18,7 @@ export interface ChatMessage {
   thinkingContent?: string;
   webSearchUrls?: { title: string; url: string }[];
   referencedDocs?: ReferencedDoc[];
+  aiMetadata?: AIResponseMetadata;
 }
 
 export interface ChatSession {

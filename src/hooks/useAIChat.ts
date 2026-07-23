@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { AIDispatcher } from '../ai/dispatcher';
-import type { AIMessage, AIContext, AIRequest } from '../ai/types';
+import type { AIMessage, AIContext, AIRequest, AIResponseMetadata } from '../ai/types';
 import { useAIWritingStore, type ChatMessage, type ReferencedDoc } from '../store/aiWritingStore';
 import { db } from '../db';
 import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
@@ -200,10 +200,20 @@ export function useAIChat(sessionId: string | null) {
         });
       };
 
+      const currentResponseMetadata: AIResponseMetadata = {};
+
       try {
         await AIDispatcher.streamCloudTask(
           request,
           {
+            onStart: (event) => {
+              if (event) {
+                if (event.requestId) currentResponseMetadata.requestId = event.requestId;
+                if (event.provider) currentResponseMetadata.provider = event.provider;
+                if (event.model) currentResponseMetadata.model = event.model;
+                if (event.routeReason) currentResponseMetadata.routeReason = event.routeReason;
+              }
+            },
             onReasoningDelta: (delta) => {
               reasoningBufferRef.current += delta;
               scheduleRAFUpdate();
@@ -212,10 +222,21 @@ export function useAIChat(sessionId: string | null) {
               textBufferRef.current += delta;
               scheduleRAFUpdate();
             },
-            onFinish: async () => {
+            onUsage: (event) => {
+              if (event.usage) currentResponseMetadata.usage = event.usage;
+              if (event.routeReason) currentResponseMetadata.routeReason = event.routeReason;
+            },
+            onFinish: async (event) => {
               if (rafIdRef.current) {
                 cancelAnimationFrame(rafIdRef.current);
                 rafIdRef.current = null;
+              }
+
+              if (event) {
+                if (event.finishReason) currentResponseMetadata.finishReason = event.finishReason;
+                if (event.ttftMs) currentResponseMetadata.ttftMs = event.ttftMs;
+                if (event.totalLatencyMs) currentResponseMetadata.totalLatencyMs = event.totalLatencyMs;
+                if (event.routeReason) currentResponseMetadata.routeReason = event.routeReason;
               }
 
               const finalMessage: ChatMessage = {
@@ -223,6 +244,7 @@ export function useAIChat(sessionId: string | null) {
                 thinkingContent: reasoningBufferRef.current,
                 content: textBufferRef.current,
                 status: 'complete',
+                aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
               };
 
               await commitMessage(finalMessage);
@@ -243,6 +265,7 @@ export function useAIChat(sessionId: string | null) {
                   thinkingContent: reasoningBufferRef.current,
                   content: textBufferRef.current,
                   status: 'error',
+                  aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
                 };
                 await commitMessage(finalMessage);
               } else {
@@ -264,6 +287,7 @@ export function useAIChat(sessionId: string | null) {
               thinkingContent: reasoningBufferRef.current,
               content: textBufferRef.current,
               status: 'stopped',
+              aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
             };
             await commitMessage(stoppedMessage);
           } else {
