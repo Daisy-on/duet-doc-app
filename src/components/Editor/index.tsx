@@ -23,11 +23,7 @@ import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { GhostTextExtension } from '../../extensions/GhostTextExtension';
 import { buildGhostTextPrompt, cleanGhostText } from '../../ai/ghostText';
-import {
-  clearActiveGhostTextRequest,
-  loadGhostTextModel,
-  requestGhostText,
-} from '../../ai/aiClient';
+import { AIDispatcher } from '../../ai/dispatcher';
 import type { CloudAITask } from '../../ai/types';
 import { AIAssistantPopover } from './AIAssistantPopover';
 
@@ -135,7 +131,7 @@ export default function Editor() {
     }
 
     editor.commands.clearGhostText();
-    clearActiveGhostTextRequest();
+    AIDispatcher.clearGhostTextRequest();
 
     if (!currentDocId) return;
 
@@ -146,7 +142,7 @@ export default function Editor() {
     const requestCursorPos = promptInput.cursorPos;
 
     ghostTextTimerRef.current = window.setTimeout(async () => {
-      const result = await requestGhostText({
+      const result = await AIDispatcher.requestGhostText({
         messages: promptInput.messages,
         docId: requestDocId,
         cursorPos: requestCursorPos,
@@ -219,7 +215,7 @@ export default function Editor() {
     content: doc ? (doc.content.trim().startsWith('{') ? JSON.parse(doc.content) : doc.content) : '',
     onCreate: ({ editor }) => {
       syncHeadings(editor);
-      loadGhostTextModel();
+      AIDispatcher.loadGhostTextModel();
     },
     onUpdate: ({ editor }) => {
       if (currentDocId) {
@@ -368,7 +364,7 @@ export default function Editor() {
       if (ghostTextTimerRef.current) {
         clearTimeout(ghostTextTimerRef.current);
       }
-      clearActiveGhostTextRequest();
+      AIDispatcher.clearGhostTextRequest();
     }
   }, [])
 
@@ -377,7 +373,7 @@ export default function Editor() {
       clearTimeout(ghostTextTimerRef.current);
     }
 
-    clearActiveGhostTextRequest();
+    AIDispatcher.clearGhostTextRequest();
     editor?.commands.clearGhostText();
   }, [currentDocId, editor]);
 
@@ -435,7 +431,7 @@ export default function Editor() {
       const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML()
       if (doc.content !== currentContent) {
         editor.commands.clearGhostText();
-        clearActiveGhostTextRequest();
+        AIDispatcher.clearGhostTextRequest();
         editor.commands.setContent(isJson ? JSON.parse(doc.content) : doc.content, { emitUpdate: false })
         syncHeadings(editor)
       }

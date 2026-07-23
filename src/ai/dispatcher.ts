@@ -1,4 +1,5 @@
 import {
+  loadGhostTextModel as loadLocalGhostTextModel,
   requestGhostText as requestLocalGhostText,
   clearActiveGhostTextRequest,
   getGhostTextStatus,
@@ -15,11 +16,15 @@ import type { AIRequest, StreamCallbacks } from './types';
 
 export const AIDispatcher = {
   // --- 本地端侧 AI 路由 ---
+  loadGhostTextModel(): void {
+    loadLocalGhostTextModel();
+  },
+
   requestGhostText(input: GhostTextRequest): Promise<GhostTextResult | null> {
     return requestLocalGhostText(input);
   },
 
-  clearGhostText(): void {
+  clearGhostTextRequest(): void {
     clearActiveGhostTextRequest();
   },
 
