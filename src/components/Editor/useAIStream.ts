@@ -39,17 +39,32 @@ export function useAIStream() {
             setGeneratedText((prev) => prev + delta);
           },
           onFinish: () => {
-            setIsGenerating(false);
-            abortControllerRef.current = null;
+            if (abortControllerRef.current === controller) {
+              setIsGenerating(false);
+              abortControllerRef.current = null;
+            }
           },
           onError: (err) => {
-            setError(err);
-            setIsGenerating(false);
-            abortControllerRef.current = null;
+            if (abortControllerRef.current === controller) {
+              setError(err);
+              setIsGenerating(false);
+              abortControllerRef.current = null;
+            }
           },
         },
         controller.signal
-      );
+      ).catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Ignore abort error silently in UI
+          return;
+        }
+        console.error('streamCloudTask failed:', err);
+        if (abortControllerRef.current === controller) {
+          setError({ code: 'UNEXPECTED_ERROR', message: err instanceof Error ? err.message : String(err) });
+          setIsGenerating(false);
+          abortControllerRef.current = null;
+        }
+      });
     },
     [abortStream]
   );

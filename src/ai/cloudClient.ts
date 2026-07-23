@@ -1,13 +1,12 @@
 import type { AIRequest, StreamCallbacks, AIStreamEventData } from './types';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+import { buildApiUrl } from '../utils/apiUtils';
 
 export async function streamCloudAI(
   request: AIRequest,
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
-  const url = `${API_BASE_URL}/api/v1/ai/stream`;
+  const url = buildApiUrl('/api/v1/ai/stream');
 
   let response: Response;
   try {
@@ -20,7 +19,9 @@ export async function streamCloudAI(
       signal,
     });
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') return;
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw err;
+    }
     callbacks.onError?.({ code: 'NETWORK_ERROR', message: err instanceof Error ? err.message : 'Network request failed' });
     return;
   }

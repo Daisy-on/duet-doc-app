@@ -226,10 +226,12 @@ export function useAIChat(sessionId: string | null) {
               };
 
               await commitMessage(finalMessage);
-              setIsGenerating(false);
-              abortControllerRef.current = null;
+              if (abortControllerRef.current === controller) {
+                setIsGenerating(false);
+                abortControllerRef.current = null;
+              }
             },
-            onError: async (_err) => {
+            onError: async () => {
               if (rafIdRef.current) {
                 cancelAnimationFrame(rafIdRef.current);
                 rafIdRef.current = null;
@@ -246,8 +248,10 @@ export function useAIChat(sessionId: string | null) {
               } else {
                 await removeMessage(assistantMsgId);
               }
-              setIsGenerating(false);
-              abortControllerRef.current = null;
+              if (abortControllerRef.current === controller) {
+                setIsGenerating(false);
+                abortControllerRef.current = null;
+              }
             },
           },
           controller.signal
@@ -266,8 +270,10 @@ export function useAIChat(sessionId: string | null) {
             await removeMessage(assistantMsgId);
           }
         }
-        setIsGenerating(false);
-        abortControllerRef.current = null;
+        if (abortControllerRef.current === controller) {
+          setIsGenerating(false);
+          abortControllerRef.current = null;
+        }
       }
     },
     [sessionId, isGenerating, isThinkingEnabled, addMessage, updateMessageStream, commitMessage, removeMessage, stopGeneration, summarizeAndSetTitle]

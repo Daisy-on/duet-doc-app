@@ -14,6 +14,7 @@ import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import { useAIChat } from '../hooks/useAIChat';
 import { markdownToHtml, getSmartTitle } from '../utils/markdownUtils';
+import { buildApiUrl } from '../utils/apiUtils';
 
 // Simple Markdown parser for beautiful text display
 function parseMarkdown(text: string): React.ReactNode[] {
@@ -142,7 +143,7 @@ export default function AIWriting() {
     let isMounted = true;
     const checkHealth = async () => {
       try {
-        const res = await fetch('/api/v1/health');
+        const res = await fetch(buildApiUrl('/api/v1/health'));
         if (res.ok) {
           if (isMounted) setBackendStatus('connected');
         } else {

@@ -1,3 +1,10 @@
+interface TiptapNode {
+  type?: string;
+  text?: string;
+  content?: TiptapNode[];
+  [key: string]: unknown;
+}
+
 /**
  * Utility to safely extract clean plain text from Tiptap JSON content string or object.
  * Prevents passing raw JSON node structures to LLM prompt context.
@@ -5,7 +12,7 @@
 export function extractPlainTextFromTiptap(rawContent: string | object | null | undefined): string {
   if (!rawContent) return '';
 
-  let jsonObj: any = rawContent;
+  let jsonObj: unknown = rawContent;
   if (typeof rawContent === 'string') {
     try {
       jsonObj = JSON.parse(rawContent);
@@ -21,7 +28,7 @@ export function extractPlainTextFromTiptap(rawContent: string | object | null | 
 
   const textPieces: string[] = [];
 
-  function traverse(node: any) {
+  function traverse(node: TiptapNode) {
     if (!node) return;
 
     if (node.type === 'text' && typeof node.text === 'string') {
@@ -32,13 +39,13 @@ export function extractPlainTextFromTiptap(rawContent: string | object | null | 
       for (const child of node.content) {
         traverse(child);
       }
-      if (['paragraph', 'heading', 'codeBlock', 'bulletList', 'orderedList', 'listItem', 'tableRow'].includes(node.type)) {
+      if (node.type && ['paragraph', 'heading', 'codeBlock', 'bulletList', 'orderedList', 'listItem', 'tableRow'].includes(node.type)) {
         textPieces.push('\n');
       }
     }
   }
 
-  traverse(jsonObj);
+  traverse(jsonObj as TiptapNode);
 
   return textPieces.join('').replace(/\n+/g, '\n').trim();
 }
