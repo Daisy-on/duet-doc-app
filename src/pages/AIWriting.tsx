@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Send, BrainCircuit, Plus, X, ChevronDown, ChevronUp, Loader2, FileText, FileUp, Sparkles, Square,
@@ -29,7 +29,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
         const code = codeContent.join('\n');
         codeContent = [];
         return (
-          <pre key={idx} className="bg-gray-900 text-gray-100 p-4 rounded-lg my-2 font-mono text-xs overflow-x-auto shadow-inner border border-gray-800">
+          <pre key={idx} className="bg-gray-900 text-gray-100 p-4 rounded-lg my-2 font-mono text-xs md:text-[13px] overflow-x-auto shadow-inner border border-gray-800">
             <code>{code}</code>
           </pre>
         );
@@ -46,7 +46,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
 
     if (line.startsWith('### ')) {
       return (
-        <h4 key={idx} className="text-sm font-bold text-text-primary mt-4 mb-2">
+        <h4 key={idx} className="text-base font-bold text-text-primary mt-4 mb-2">
           {line.replace('### ', '')}
         </h4>
       );
@@ -54,7 +54,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
 
     if (line.startsWith('## ')) {
       return (
-        <h3 key={idx} className="text-base font-bold text-text-primary mt-5 mb-2.5">
+        <h3 key={idx} className="text-lg font-bold text-text-primary mt-5 mb-2.5">
           {line.replace('## ', '')}
         </h3>
       );
@@ -63,7 +63,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
     if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
       const content = line.trim().substring(2);
       return (
-        <ul key={idx} className="list-disc pl-5 my-1 text-xs text-text-secondary leading-relaxed">
+        <ul key={idx} className="list-disc pl-5 my-1.5 text-sm text-text-primary leading-relaxed">
           <li>{renderInlineStyles(content)}</li>
         </ul>
       );
@@ -74,7 +74,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
     }
 
     return (
-      <p key={idx} className="text-xs text-text-secondary leading-relaxed my-1.5">
+      <p key={idx} className="text-sm text-text-primary leading-relaxed my-2">
         {renderInlineStyles(line)}
       </p>
     );
@@ -109,7 +109,10 @@ export default function AIWriting() {
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
 
   const currentSessionId = sessionId;
-  const sessionMessages = messages.filter((m) => m.sessionId === currentSessionId);
+  const sessionMessages = useMemo(
+    () => messages.filter((m) => m.sessionId === currentSessionId),
+    [messages, currentSessionId]
+  );
   const currentSession = sessions.find((s) => s.id === currentSessionId);
 
   const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(currentSessionId || null);
@@ -135,6 +138,9 @@ export default function AIWriting() {
   const [isDocSelectorOpen, setIsDocSelectorOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastMsgCountRef = useRef(0);
+  const lastSessionIdRef = useRef<string | null>(null);
 
   // Backend health status state
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
@@ -175,12 +181,29 @@ export default function AIWriting() {
     setActiveSessionId(sessionId || null);
   }, [sessionId, setActiveSessionId]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages, session change, or generating
   useEffect(() => {
-    if (scrollRef.current) {
+    if (!scrollRef.current) return;
+
+    const isNewSession = currentSessionId !== lastSessionIdRef.current;
+    const isNewMsgAdded = sessionMessages.length > lastMsgCountRef.current;
+
+    lastSessionIdRef.current = currentSessionId || null;
+    lastMsgCountRef.current = sessionMessages.length;
+
+    if (isNewSession || isNewMsgAdded || isGenerating) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [sessionMessages, isGenerating]);
+  }, [currentSessionId, sessionMessages.length, isGenerating]);
+
+  // Auto-resize textarea height (min 2 lines ~52px, max 10 lines ~220px)
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 52), 220);
+    textarea.style.height = `${newHeight}px`;
+  }, [inputText]);
 
   // 自动折叠完成的 Thinking
   useEffect(() => {
@@ -311,7 +334,7 @@ export default function AIWriting() {
             <div className="flex items-center gap-3 ml-1 min-w-0">
               <h2 className="text-[15px] font-bold text-text-primary truncate">和 Duet AI 一起写作</h2>
               <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
-                {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4-Flash'}
+                {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
               </span>
             </div>
           </div>
@@ -354,10 +377,10 @@ export default function AIWriting() {
         {/* Messages Stream */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-6 py-6 md:px-12 space-y-6"
+          className="flex-1 overflow-y-auto px-4 py-6 md:px-6 space-y-6"
         >
           {sessionMessages.length === 0 ? (
-            <div className="max-w-2xl mx-auto pt-12 flex flex-col items-center">
+            <div className="max-w-4xl mx-auto pt-12 flex flex-col items-center">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-400 to-pink-400 flex items-center justify-center text-white shadow-lg mb-6 animate-pulse">
                 <Sparkles size={28} />
               </div>
@@ -385,7 +408,7 @@ export default function AIWriting() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto flex flex-col space-y-5">
+            <div className="max-w-4xl mx-auto flex flex-col space-y-6">
               {sessionMessages.map((msg) => {
                 const isUser = msg.role === 'user';
                 const isExpanded = expandedThinking[msg.id] !== false;
@@ -396,15 +419,17 @@ export default function AIWriting() {
                     key={msg.id}
                     className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                   >
-                    <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
-                      {isUser ? '您' : 'Duet AI'}
-                    </div>
+                    {!isUser && (
+                      <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
+                        Duet AI
+                      </div>
+                    )}
 
                     <div
-                      className={`relative px-4 py-3 rounded-2xl shadow-sm border ${
+                      className={`relative rounded-2xl shadow-sm border ${
                         isUser
-                          ? 'bg-indigo-50 border-indigo-100 rounded-tr-none text-text-primary max-w-[80%] self-end'
-                          : 'bg-white border-border-color rounded-tl-none text-text-primary w-full'
+                          ? 'bg-indigo-50 border-indigo-100 rounded-tr-none text-text-primary max-w-[85%] self-end px-4 py-3'
+                          : 'bg-white border-border-color rounded-tl-none text-text-primary w-full px-5 py-4'
                       }`}
                     >
                       {/* 引用文档标签 */}
@@ -436,7 +461,7 @@ export default function AIWriting() {
                             {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                           </button>
                           {isExpanded && (
-                            <div className="p-3 text-[11px] font-mono text-text-secondary italic whitespace-pre-wrap leading-relaxed">
+                            <div className="p-3 text-[11px] font-mono text-text-secondary whitespace-pre-wrap leading-relaxed">
                               {msg.thinkingContent}
                               {msg.status === 'streaming' && !msg.content && (
                                 <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
@@ -449,7 +474,7 @@ export default function AIWriting() {
                       {/* 消息正文 */}
                       <div className="space-y-1.5">
                         {isUser ? (
-                          <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                         ) : (
                           <>
                             {parseMarkdown(msg.content)}
@@ -552,8 +577,8 @@ export default function AIWriting() {
         </div>
 
         {/* Bottom Input Area */}
-        <div className="p-4 border-t border-border-color bg-white shrink-0">
-          <div className="max-w-3xl mx-auto flex flex-col gap-2 relative">
+        <div className="px-4 py-4 md:px-6 bg-bg-main shrink-0">
+          <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
             
             {/* Attachment badges above input */}
             {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
@@ -592,14 +617,15 @@ export default function AIWriting() {
             )}
 
             {/* Main Textarea Container */}
-            <div className="border border-border-color focus-within:border-accent bg-bg-panel focus-within:bg-white rounded-xl shadow-sm transition-all overflow-hidden flex flex-col">
+            <div className="border border-border-color focus-within:border-accent bg-white rounded-xl shadow-sm transition-all overflow-hidden flex flex-col">
               <textarea
+                ref={textareaRef}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={currentSessionId ? "向 Duet AI 提问，输入并发送..." : "在这里输入对话，点击发送或回车开启新对话..."}
-                rows={2}
-                className="w-full resize-none bg-transparent px-4 py-3 outline-none text-xs text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none"
+                placeholder={currentSessionId ? "与 Duet AI 对话，输入并发送..." : "在这里输入对话，点击发送或回车开启新对话..."}
+                className="w-full resize-none bg-transparent px-4 py-3 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
+                style={{ minHeight: '52px' }}
               />
 
               {/* Input Toolbar */}
@@ -628,10 +654,10 @@ export default function AIWriting() {
                         ? 'bg-indigo-50 border-indigo-200 text-accent font-semibold'
                         : 'bg-white border-border-color text-text-secondary hover:bg-gray-100'
                     }`}
-                    title="切换 DeepSeek V4-Pro (深度思考) / V4-Flash (快速)"
+                    title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
                   >
                     <BrainCircuit size={12} className={isThinkingEnabled ? 'animate-pulse' : ''} />
-                    <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '快速模式 (V4-Flash)'}</span>
+                    <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
                   </button>
                 </div>
 

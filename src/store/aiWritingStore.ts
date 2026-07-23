@@ -70,7 +70,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   messages: [],
   activeSessionId: null,
   lastVisitedSessionId: null,
-  isThinkingEnabled: true,
+  isThinkingEnabled: false,
 
   initStore: async () => {
     try {

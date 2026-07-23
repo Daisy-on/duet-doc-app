@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2, MessageSquare, Sparkles, MoreHorizontal, Pin, Pen } from 'lucide-react';
 import { useAIWritingStore, type ChatSession } from '../store/aiWritingStore';
 import { useLayoutStore } from '../store';
+import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 
 export default function AIChatListPanel() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function AIChatListPanel() {
   const [popoverOpenId, setPopoverOpenId] = useState<string | null>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
+  const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,17 +36,19 @@ export default function AIChatListPanel() {
     navigate(`/ai-writing/${newId}`);
   };
 
-  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const confirmDelete = () => {
+    if (!sessionToDelete) return;
+    const id = sessionToDelete.id;
     deleteSession(id);
     if (sessionId === id) {
-      const remaining = sessions.filter(s => s.id !== id);
+      const remaining = sessions.filter((s) => s.id !== id);
       if (remaining.length > 0) {
         navigate(`/ai-writing/${remaining[0].id}`);
       } else {
         navigate('/ai-writing');
       }
     }
+    setSessionToDelete(null);
   };
 
   const handleTogglePin = (id: string, currentPinned?: boolean, e?: React.MouseEvent) => {
@@ -226,7 +230,7 @@ export default function AIChatListPanel() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setPopoverOpenId(null);
-                                handleDeleteSession(session.id, e);
+                                setSessionToDelete(session);
                               }}
                               className="w-full text-left px-3 py-1.5 hover:bg-hover-bg text-red-500 flex items-center gap-2 transition-colors cursor-pointer"
                             >
@@ -250,6 +254,19 @@ export default function AIChatListPanel() {
           className="absolute top-0 -right-[2px] w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
         />
       </aside>
+
+      {/* Session Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!sessionToDelete}
+        onClose={() => setSessionToDelete(null)}
+        onConfirm={confirmDelete}
+        title="确认删除此对话记录？"
+        description={
+          <>
+            确定要删除对话 <span className="font-semibold text-text-primary">「{sessionToDelete?.title}」</span> 吗？删除后对话内容及历史回复将无法恢复。
+          </>
+        }
+      />
     </>
   );
 }
