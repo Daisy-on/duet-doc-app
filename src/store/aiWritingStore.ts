@@ -16,6 +16,7 @@ export interface ChatMessage {
   createdAt: number;
   status?: 'streaming' | 'complete' | 'stopped' | 'error';
   thinkingContent?: string;
+  thinkingDurationMs?: number;
   webSearchUrls?: { title: string; url: string }[];
   referencedDocs?: ReferencedDoc[];
   aiMetadata?: AIResponseMetadata;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Send, BrainCircuit, Plus, X, ChevronDown, ChevronUp, Loader2, FileText, FileUp, Sparkles, Square,
+  Send, BrainCircuit, Plus, X, ChevronRight, Loader2, FileText, FileUp, Sparkles, Square,
   RotateCcw, Copy, FilePlus, StickyNote, Check
 } from 'lucide-react';
 import AIChatListPanel from '../components/AIChatListPanel';
@@ -9,13 +9,28 @@ import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBDocSelectorModal from '../components/modals/KBDocSelectorModal';
 import KBChooserModal from '../components/modals/KBChooserModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
-import type { ReferencedDoc } from '../store/aiWritingStore';
+import type { ChatMessage, ReferencedDoc } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import { useAIChat } from '../hooks/useAIChat';
 import { renderMarkdownToHtml } from '../utils/markdownRenderer';
 import { markdownToHtml, getSmartTitle } from '../utils/markdownUtils';
 import { buildApiUrl } from '../utils/apiUtils';
+
+function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
+  if (msg.status === 'streaming' && !msg.content) {
+    return `思考中 ${liveSeconds || 1}s...`;
+  }
+  if (msg.thinkingDurationMs) {
+    const sec = Math.max(1, Math.round(msg.thinkingDurationMs / 1000));
+    return `思考了 ${sec}s`;
+  }
+  if (msg.thinkingContent) {
+    const approxSec = Math.max(1, Math.round(msg.thinkingContent.length / 50));
+    return `思考了 ${approxSec}s`;
+  }
+  return '思考完成';
+}
 
 export default function AIWriting() {
   const params = useParams<{ '*': string }>();
@@ -127,6 +142,54 @@ export default function AIWriting() {
     const newHeight = Math.min(Math.max(textarea.scrollHeight, 52), 220);
     textarea.style.height = `${newHeight}px`;
   }, [inputText]);
+
+  // Real-time timer for live streaming thinking seconds
+  const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setLiveThinkingSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setLiveThinkingSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isGenerating]);
+
+  // Global event delegation for code block copy buttons
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const handleContainerClick = (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLButtonElement | null;
+      if (!btn) return;
+
+      const rawCode = btn.getAttribute('data-code');
+      if (!rawCode) return;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawCode, 'text/html');
+      const textToCopy = doc.body.textContent || rawCode;
+
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        const label = btn.querySelector('.copy-label');
+        if (label) {
+          const originalText = label.textContent;
+          label.textContent = '已复制';
+          btn.classList.add('text-emerald-400');
+          setTimeout(() => {
+            label.textContent = originalText;
+            btn.classList.remove('text-emerald-400');
+          }, 2000);
+        }
+      });
+    };
+
+    container.addEventListener('click', handleContainerClick);
+    return () => container.removeEventListener('click', handleContainerClick);
+  }, []);
 
   // 自动折叠完成的 Thinking
   useEffect(() => {
@@ -345,7 +408,7 @@ export default function AIWriting() {
                       className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                     >
                       {!isUser && (
-                        <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
+                        <div className="text-[14px] text-text-secondary font-bold mb-1 px-1">
                           Duet AI
                         </div>
                       )}
@@ -372,21 +435,22 @@ export default function AIWriting() {
                           </div>
                         )}
 
-                        {/* 深度思考过程折叠卡片 */}
+                        {/* 深度思考过程 (ChatGPT 风格: "思考了 12s ›") */}
                         {!isUser && msg.thinkingContent && (
-                          <div className="mb-3.5 border-l-2 border-indigo-300/80 bg-gray-50/80 rounded-r-xl overflow-hidden">
+                          <div className="mb-2">
                             <button
+                              type="button"
                               onClick={() => toggleThinkingNode(msg.id)}
-                              className="w-full flex items-center justify-between px-3.5 py-2 text-[11px] font-bold text-text-secondary bg-gray-100/70 hover:bg-gray-100 transition-colors"
+                              className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors py-1 cursor-pointer font-sans select-none"
                             >
-                              <span className="flex items-center gap-1.5 text-indigo-600">
-                                <BrainCircuit size={13} className={msg.status === 'streaming' ? 'animate-spin-slow' : ''} />
-                                深度思考过程
-                              </span>
-                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              <span className="font-medium">{getThinkingLabel(msg, liveThinkingSeconds)}</span>
+                              <ChevronRight
+                                size={14}
+                                className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-text-primary' : 'text-text-secondary'}`}
+                              />
                             </button>
                             {isExpanded && (
-                              <div className="p-3.5 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed border-t border-indigo-100/60">
+                              <div className="pl-3 my-1.5 border-l-2 border-border-color/80 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed space-y-1">
                                 {msg.thinkingContent}
                                 {msg.status === 'streaming' && !msg.content && (
                                   <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />

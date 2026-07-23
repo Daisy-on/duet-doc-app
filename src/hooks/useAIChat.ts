@@ -186,8 +186,8 @@ export function useAIChat(sessionId: string | null) {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      reasoningBufferRef.current = '';
-      textBufferRef.current = '';
+      let thinkingStartTime = 0;
+      let thinkingDurationMs = 0;
 
       const scheduleRAFUpdate = () => {
         if (rafIdRef.current !== null) return;
@@ -215,10 +215,16 @@ export function useAIChat(sessionId: string | null) {
               }
             },
             onReasoningDelta: (delta) => {
+              if (!thinkingStartTime) {
+                thinkingStartTime = Date.now();
+              }
               reasoningBufferRef.current += delta;
               scheduleRAFUpdate();
             },
             onTextDelta: (delta) => {
+              if (thinkingStartTime && !thinkingDurationMs) {
+                thinkingDurationMs = Date.now() - thinkingStartTime;
+              }
               textBufferRef.current += delta;
               scheduleRAFUpdate();
             },
@@ -232,6 +238,10 @@ export function useAIChat(sessionId: string | null) {
                 rafIdRef.current = null;
               }
 
+              if (thinkingStartTime && !thinkingDurationMs) {
+                thinkingDurationMs = Date.now() - thinkingStartTime;
+              }
+
               if (event) {
                 if (event.finishReason) currentResponseMetadata.finishReason = event.finishReason;
                 if (event.ttftMs) currentResponseMetadata.ttftMs = event.ttftMs;
@@ -242,6 +252,7 @@ export function useAIChat(sessionId: string | null) {
               const finalMessage: ChatMessage = {
                 ...assistantDraft,
                 thinkingContent: reasoningBufferRef.current,
+                thinkingDurationMs: thinkingDurationMs || undefined,
                 content: textBufferRef.current,
                 status: 'complete',
                 aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
@@ -263,6 +274,7 @@ export function useAIChat(sessionId: string | null) {
                 const finalMessage: ChatMessage = {
                   ...assistantDraft,
                   thinkingContent: reasoningBufferRef.current,
+                  thinkingDurationMs: thinkingDurationMs || undefined,
                   content: textBufferRef.current,
                   status: 'error',
                   aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
@@ -285,6 +297,7 @@ export function useAIChat(sessionId: string | null) {
             const stoppedMessage: ChatMessage = {
               ...assistantDraft,
               thinkingContent: reasoningBufferRef.current,
+              thinkingDurationMs: thinkingDurationMs || undefined,
               content: textBufferRef.current,
               status: 'stopped',
               aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
