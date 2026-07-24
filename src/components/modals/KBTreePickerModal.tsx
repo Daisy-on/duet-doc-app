@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Folder, ChevronDown, ChevronRight, FileText, Check } from 'lucide-react';
+import { X, Search, Folder, ChevronDown, ChevronRight, FileText, Check, AlertCircle } from 'lucide-react';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../../store/knowledgeBaseStore';
 import type { Group, Document, KnowledgeBase } from '../../store/knowledgeBaseStore';
 
@@ -12,6 +12,8 @@ export interface KBTreePickerModalProps {
   subtitle?: React.ReactNode;
   showSearch?: boolean;
   confirmText?: string;
+  forbiddenGroupIds?: string[];
+  validateSelection?: (kbId: string, groupId: string | null) => string | null;
   onSelectDoc?: (doc: { id: string; title: string }) => void;
   onSelectFolder?: (targetKbId: string, targetGroupId: string | null) => void;
   onCreateDoc?: (targetKbId: string, targetGroupId: string | null, title: string) => void;
@@ -26,6 +28,8 @@ export default function KBTreePickerModal({
   subtitle,
   showSearch = true, // 统一默认开启搜索，保持场景展现 100% 一致
   confirmText = mode === 'document' ? '确认引用' : mode === 'create-doc' ? '确认创建' : '确认移动',
+  forbiddenGroupIds = [],
+  validateSelection,
   onSelectDoc,
   onSelectFolder,
   onCreateDoc,
@@ -124,12 +128,17 @@ export default function KBTreePickerModal({
     }
   };
 
+  const validationError =
+    validateSelection && selectedKbId
+      ? validateSelection(selectedKbId, selectedGroupId)
+      : null;
+
   const isConfirmDisabled =
-    mode === 'document'
+    (mode === 'document'
       ? !selectedDocId
       : mode === 'create-doc'
       ? !selectedKbId || !docTitle.trim()
-      : !selectedKbId;
+      : !selectedKbId) || !!validationError;
 
   // Filtered documents when search is active (document mode)
   const filteredDocs = searchQuery.trim()
@@ -145,6 +154,7 @@ export default function KBTreePickerModal({
     ? groups.filter(
         (g) =>
           g.kbId !== MEMO_KB_ID &&
+          !forbiddenGroupIds.includes(g.id) &&
           g.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
@@ -172,8 +182,14 @@ export default function KBTreePickerModal({
 
   // Group Node rendering for tree
   const GroupNode = ({ group, depth }: { group: Group; depth: number }) => {
+    if (forbiddenGroupIds.includes(group.id)) {
+      return null;
+    }
+
     const isExpanded = !!expandedNodes[group.id];
-    const subGroups = getChildGroups(group.id, group.kbId);
+    const subGroups = getChildGroups(group.id, group.kbId).filter(
+      (sub) => !forbiddenGroupIds.includes(sub.id)
+    );
     const groupDocs = documents.filter((doc) => doc.groupId === group.id);
     const hasFolderChildren = subGroups.length > 0;
     const hasChildren = mode === 'document' ? hasFolderChildren || groupDocs.length > 0 : hasFolderChildren;
@@ -387,7 +403,9 @@ export default function KBTreePickerModal({
             <div className="space-y-3">
               {visibleKBs.map((kb) => {
                 const isExpanded = !!expandedNodes[kb.id];
-                const kbRootGroups = getChildGroups(null, kb.id);
+                const kbRootGroups = getChildGroups(null, kb.id).filter(
+                  (g) => !forbiddenGroupIds.includes(g.id)
+                );
                 const kbDocs = documents.filter((doc) => doc.kbId === kb.id);
                 const rootDocs = kbDocs.filter((doc) => doc.groupId === null);
                 const hasFolderContent = kbRootGroups.length > 0;
@@ -479,26 +497,33 @@ export default function KBTreePickerModal({
         </div>
 
         {/* Selected target info banner (统一在三种场景下展示，保持 100% 结构一致) */}
-        <div className="mt-3 px-3 py-2 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-text-secondary shrink-0">
-          {mode === 'document' ? (
-            selectedDocId ? (
+        {validationError ? (
+          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs flex items-center gap-2 font-medium shrink-0">
+            <AlertCircle size={14} className="shrink-0" />
+            <span>{validationError}</span>
+          </div>
+        ) : (
+          <div className="mt-3 px-3 py-2 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-text-secondary shrink-0">
+            {mode === 'document' ? (
+              selectedDocId ? (
+                <>
+                  已选择引用文档：<span className="font-semibold text-accent mx-1">“{selectedDocTitle}”</span>
+                </>
+              ) : (
+                <span className="text-text-ghost">请在上方列表中选择需要引用的文档</span>
+              )
+            ) : selectedKbId ? (
               <>
-                已选择引用文档：<span className="font-semibold text-accent mx-1">“{selectedDocTitle}”</span>
+                {mode === 'create-doc' ? '文档将生成保存至：' : '准备移动至：'}
+                <span className="font-semibold text-accent ml-1">
+                  {fullPathList.join(' / ')}
+                </span>
               </>
             ) : (
-              <span className="text-text-ghost">请在上方列表中选择需要引用的文档</span>
-            )
-          ) : selectedKbId ? (
-            <>
-              {mode === 'create-doc' ? '文档将生成保存至：' : '准备移动至：'}
-              <span className="font-semibold text-accent ml-1">
-                {fullPathList.join(' / ')}
-              </span>
-            </>
-          ) : (
-            <span className="text-text-ghost">请在上方列表中选择目标知识库或目录</span>
-          )}
-        </div>
+              <span className="text-text-ghost">请在上方列表中选择目标知识库或目录</span>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex justify-end gap-3 mt-4 pt-2 shrink-0">

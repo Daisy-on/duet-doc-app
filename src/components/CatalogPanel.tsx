@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Search, ChevronDown, ChevronRight, FileText, MoreHorizontal } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
@@ -10,7 +10,6 @@ import GroupActionMenu from './menus/GroupActionMenu';
 import DocActionMenu from './menus/DocActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import KBTreePickerModal from './modals/KBTreePickerModal';
-import MoveGroupModal from './modals/MoveGroupModal';
 
 interface DocTreeItemProps {
   doc: Document;
@@ -453,6 +452,35 @@ export default function CatalogPanel() {
   // Group move states
   const [isMoveGroupModalOpen, setIsMoveGroupModalOpen] = useState(false);
   const [selectedGroupForMove, setSelectedGroupForMove] = useState<Group | null>(null);
+
+  // Calculate forbidden group IDs for group moving
+  const moveGroupForbiddenIds = useMemo(() => {
+    if (!selectedGroupForMove) return [];
+    return [selectedGroupForMove.id, ...getDescendantGroupIds(selectedGroupForMove.id)];
+  }, [selectedGroupForMove, getDescendantGroupIds]);
+
+  // Calculate moving group's max relative depth
+  const moveGroupMaxRelativeDepth = useMemo(() => {
+    if (!selectedGroupForMove) return 0;
+    const G = selectedGroupForMove;
+    const descendantIds = getDescendantGroupIds(G.id);
+    const descendants = descendantIds
+      .map((id) => groups.find((g) => g.id === id)!)
+      .filter(Boolean);
+
+    return descendants.reduce((max, d) => Math.max(max, d.depth - G.depth), 0);
+  }, [selectedGroupForMove, getDescendantGroupIds, groups]);
+
+  // Validate target position for move group
+  const validateMoveGroupSelection = (targetKbId: string, targetGroupId: string | null) => {
+    if (!selectedGroupForMove) return null;
+    const targetParentGroup = groups.find((g) => g.id === targetGroupId);
+    const newDepthOfG = targetKbId ? (targetGroupId ? (targetParentGroup ? targetParentGroup.depth + 1 : 0) : 0) : 0;
+    if (newDepthOfG + moveGroupMaxRelativeDepth > 5) {
+      return '目标位置层级过深，移动后将超出系统最大 6 层层级限制。';
+    }
+    return null;
+  };
 
   const handleConfirmMoveGroup = (targetKbId: string, targetGroupId: string | null) => {
     if (selectedGroupForMove) {
@@ -979,15 +1007,23 @@ export default function CatalogPanel() {
 
       {/* Group Move Modal */}
       {selectedGroupForMove && (
-        <MoveGroupModal
+        <KBTreePickerModal
           isOpen={isMoveGroupModalOpen}
           onClose={() => {
             setIsMoveGroupModalOpen(false);
             setSelectedGroupForMove(null);
           }}
-          groupId={selectedGroupForMove.id}
-          groupName={selectedGroupForMove.name}
-          onConfirm={handleConfirmMoveGroup}
+          title="移动分组层级"
+          subtitle={
+            <span>
+              分组：<span className="font-semibold text-text-primary">“{selectedGroupForMove.name}”</span>
+            </span>
+          }
+          mode="folder"
+          confirmText="确认移动"
+          forbiddenGroupIds={moveGroupForbiddenIds}
+          validateSelection={validateMoveGroupSelection}
+          onSelectFolder={handleConfirmMoveGroup}
         />
       )}
     </>
