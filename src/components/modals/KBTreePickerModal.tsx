@@ -151,7 +151,24 @@ export default function KBTreePickerModal({
 
   // Find target names for confirmation info banner
   const targetKb = knowledgeBases.find((kb) => kb.id === selectedKbId);
-  const targetGroup = groups.find((g) => g.id === selectedGroupId);
+
+  // Helper to build full group ancestor path names
+  const getFullGroupPath = (groupId: string | null): string[] => {
+    if (!groupId) return [];
+    const path: string[] = [];
+    let currId: string | null = groupId;
+    while (currId) {
+      const g = groups.find((item) => item.id === currId);
+      if (!g) break;
+      path.unshift(g.name);
+      currId = g.parentGroupId;
+    }
+    return path;
+  };
+
+  const fullPathList = selectedKbId
+    ? [targetKb?.name || '', ...getFullGroupPath(selectedGroupId)].filter(Boolean)
+    : [];
 
   // Group Node rendering for tree
   const GroupNode = ({ group, depth }: { group: Group; depth: number }) => {
@@ -474,12 +491,9 @@ export default function KBTreePickerModal({
           ) : selectedKbId ? (
             <>
               {mode === 'create-doc' ? '文档将生成保存至：' : '准备移动至：'}
-              <span className="font-semibold text-accent mx-1">{targetKb?.name}</span>
-              {targetGroup && (
-                <>
-                  / <span className="font-semibold text-accent mx-1">{targetGroup.name}</span>
-                </>
-              )}
+              <span className="font-semibold text-accent ml-1">
+                {fullPathList.join(' / ')}
+              </span>
             </>
           ) : (
             <span className="text-text-ghost">请在上方列表中选择目标知识库或目录</span>

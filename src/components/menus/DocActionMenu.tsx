@@ -73,7 +73,7 @@ export default function DocActionMenu({
           top: `${coords.top}px`,
           left: `${coords.left}px`,
         }}
-        className="z-50 w-44 bg-white border border-border-color rounded-lg shadow-lg py-1.5 animate-dropdown-fade-in"
+        className="z-50 w-44 bg-white border border-border-color rounded-xl shadow-lg py-1.5 animate-dropdown-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -108,7 +108,7 @@ export default function DocActionMenu({
           className="w-full px-3.5 py-2 text-[13px] font-medium text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
         >
           <ArrowRightLeft size={14} className="text-gray-500" />
-          <span>移动目录</span>
+          <span>移动到其他目录</span>
         </button>
       </div>
     </>
