@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
-import KBDocSelectorModal from '../components/modals/KBDocSelectorModal';
+import KBTreePickerModal from '../components/modals/KBTreePickerModal';
 import KBChooserModal from '../components/modals/KBChooserModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import type { ChatMessage, ReferencedDoc } from '../store/aiWritingStore';
@@ -690,10 +690,12 @@ export default function AIWriting() {
       />
 
       {/* KB Document selector Modal */}
-      <KBDocSelectorModal
+      <KBTreePickerModal
         isOpen={isDocSelectorOpen}
         onClose={() => setIsDocSelectorOpen(false)}
-        onSelect={(doc) => {
+        title="选择知识库文档"
+        mode="document"
+        onSelectDoc={(doc) => {
           if (!referencedDocs.some(d => d.id === doc.id)) {
             setReferencedDocs((prev) => [...prev, doc]);
           }

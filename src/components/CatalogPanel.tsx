@@ -9,7 +9,7 @@ import GroupAddMenu from './menus/GroupAddMenu';
 import GroupActionMenu from './menus/GroupActionMenu';
 import DocActionMenu from './menus/DocActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
-import MoveToKBModal from './modals/MoveToKBModal';
+import KBTreePickerModal from './modals/KBTreePickerModal';
 import MoveGroupModal from './modals/MoveGroupModal';
 
 interface DocTreeItemProps {
@@ -944,15 +944,20 @@ export default function CatalogPanel() {
 
       {/* Document Move Modal */}
       {selectedDocForMove && (
-        <MoveToKBModal
+        <KBTreePickerModal
           isOpen={isMoveModalOpen}
           onClose={() => {
             setIsMoveModalOpen(false);
             setSelectedDocForMove(null);
           }}
-          documentId={selectedDocForMove.id}
-          documentTitle={selectedDocForMove.title}
-          onConfirm={handleConfirmMove}
+          title="移动文档至知识库"
+          mode="folder"
+          subtitle={
+            <span>
+              文档：<span className="font-semibold text-text-primary">“{selectedDocForMove.title}”</span>
+            </span>
+          }
+          onSelectFolder={handleConfirmMove}
         />
       )}
 

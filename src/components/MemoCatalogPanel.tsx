@@ -6,7 +6,7 @@ import { useLayoutStore } from '../store';
 import type { Document } from '../store/knowledgeBaseStore';
 import MemoActionMenu from './menus/MemoActionMenu';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
-import MoveToKBModal from './modals/MoveToKBModal';
+import KBTreePickerModal from './modals/KBTreePickerModal';
 
 export default function MemoCatalogPanel() {
   const navigate = useNavigate();
@@ -291,15 +291,20 @@ export default function MemoCatalogPanel() {
 
       {/* Move Document Modal */}
       {selectedMemo && (
-        <MoveToKBModal
+        <KBTreePickerModal
           isOpen={isMoveModalOpen}
           onClose={() => {
             setIsMoveModalOpen(false);
             setSelectedMemo(null);
           }}
-          documentId={selectedMemo.id}
-          documentTitle={selectedMemo.title}
-          onConfirm={handleConfirmMove}
+          title="移动文档至知识库"
+          mode="folder"
+          subtitle={
+            <span>
+              文档：<span className="font-semibold text-text-primary">“{selectedMemo.title}”</span>
+            </span>
+          }
+          onSelectFolder={handleConfirmMove}
         />
       )}
     </>
