@@ -372,7 +372,7 @@ export default function AIWriting() {
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-400 to-pink-400 flex items-center justify-center text-white shadow-lg mb-6 animate-pulse">
                   <Sparkles size={28} />
                 </div>
-                <h3 className="text-xl font-bold text-text-primary mb-2">今天想写点什么？</h3>
+                <h1 className="text-xl font-bold text-text-primary mb-2">今天想写点什么？</h1>
                 <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
                   引用知识库文档，或是直接提问。Duet AI 具备端云协同的大模型推理能力，协助你快速撰写、精炼与重构文本。
                 </p>
@@ -608,21 +608,21 @@ export default function AIWriting() {
                 </div>
               )}
 
-              {/* Main Textarea Container */}
-              <div className="border border-border-color focus-within:border-accent bg-white rounded-xl shadow-sm transition-all overflow-hidden flex flex-col">
+              {/* Main Textarea Container (Kimi Unified Style) */}
+              <div className="border border-border-color focus-within:border-accent bg-white rounded-2xl md:rounded-[24px] shadow-sm transition-all overflow-hidden flex flex-col p-2 gap-2">
                 <textarea
                   ref={textareaRef}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={currentSessionId ? "与 Duet AI 对话，输入并发送..." : "在这里输入对话，点击发送或回车开启新对话..."}
-                  className="w-full resize-none bg-transparent px-4 py-3 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
+                  placeholder={currentSessionId ? "与 Duet AI 对话，输入并发送..." : "与 Duet AI 开启新对话..."}
+                  className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
                   style={{ minHeight: '52px' }}
                 />
 
-                {/* Input Toolbar */}
-                <div className="px-4 py-2 bg-gray-50 border-t border-border-color/50 flex justify-between items-center shrink-0">
-                  <div className="flex items-center gap-3">
+                {/* Input Toolbar (Unified 0px inner padding for exact symmetric margins) */}
+                <div className="p-0 bg-transparent flex justify-between items-center shrink-0">
+                  <div className="flex items-center gap-2.5">
                     <div className="relative">
                       <button
                         type="button"
@@ -630,35 +630,35 @@ export default function AIWriting() {
                           setAttachMenuAnchorEl(e.currentTarget);
                           setIsAttachMenuOpen(!isAttachMenuOpen);
                         }}
-                        className="w-7 h-7 rounded-lg hover:bg-gray-200/70 border border-border-color text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                        className="w-8 h-8 rounded-full hover:bg-gray-100 text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
                         title="引用知识库文档"
                       >
-                        <Plus size={14} />
+                        <Plus size={16} />
                       </button>
                     </div>
 
-                    {/* Thinking toggle */}
+                    {/* Thinking toggle (Pill shape) */}
                     <button
                       type="button"
                       onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
-                      className={`h-7 px-2.5 rounded-lg border flex items-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
+                      className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
                         isThinkingEnabled
                           ? 'bg-indigo-50 border-indigo-200 text-accent font-semibold'
-                          : 'bg-white border-border-color text-text-secondary hover:bg-gray-100'
+                          : 'bg-white border-border-color/80 text-text-secondary hover:bg-gray-50'
                       }`}
                       title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
                     >
-                      <BrainCircuit size={12} className={isThinkingEnabled ? 'animate-pulse' : ''} />
+                      <BrainCircuit size={13} className={isThinkingEnabled ? 'animate-pulse' : ''} />
                       <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
                     </button>
                   </div>
 
-                  {/* Send or Stop Button */}
+                  {/* Send or Stop Button (Circular) */}
                   {isGenerating ? (
                     <button
                       type="button"
                       onClick={stopGeneration}
-                      className="w-8 h-8 rounded-lg bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-md"
+                      className="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
                       title="停止生成"
                     >
                       <Square size={12} className="fill-current" />
@@ -667,10 +667,10 @@ export default function AIWriting() {
                     <button
                       type="button"
                       onClick={handleSend}
-                      className="w-8 h-8 rounded-lg bg-accent hover:bg-indigo-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-md hover:shadow-indigo-500/10"
+                      className="w-8 h-8 rounded-full bg-accent hover:bg-indigo-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
                       title="发送消息"
                     >
-                      <Send size={13} />
+                      <Send size={14} />
                     </button>
                   )}
                 </div>
