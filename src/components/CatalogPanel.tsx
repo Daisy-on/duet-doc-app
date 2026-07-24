@@ -59,7 +59,7 @@ function DocTreeItem({
   return (
     <div
       onClick={handleDocClick}
-      className={`text-[13px] py-1.5 px-2 pr-2 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+      className={`text-[13px] py-2 px-2 pr-2 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
         isDocActive
           ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[22px]'
           : 'text-text-secondary'
@@ -80,7 +80,7 @@ function DocTreeItem({
               if (e.key === 'Enter') handleFinishRenameDoc();
               else if (e.key === 'Escape') handleCancelRenameDoc();
             }}
-            className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+            className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
             autoFocus
             onClick={(e) => e.stopPropagation()}
             onFocus={(e) => e.target.select()}
@@ -224,7 +224,7 @@ function GroupTreeNode({
       {/* Group Row */}
       <div
         onClick={handleGroupClick}
-        className={`text-xs font-semibold text-text-primary py-2 px-1.5 mt-0.5 flex items-center justify-between hover:bg-hover-bg rounded-md cursor-pointer group/row transition-colors ${
+        className={`text-[13px] font-semibold text-text-primary py-1 px-2 mt-0.5 flex items-center justify-between hover:bg-hover-bg rounded-md cursor-pointer group/row transition-colors ${
           activeAddMenuId === group.id || activeActionMenuId === group.id ? 'bg-hover-bg' : ''
         }`}
         style={{ paddingLeft: `${groupPaddingLeft}px` }}
@@ -241,7 +241,7 @@ function GroupTreeNode({
               type="text"
               value={renamingName}
               onChange={(e) => setRenamingName(e.target.value)}
-              className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+              className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
               autoFocus
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.target.select()}
@@ -348,10 +348,10 @@ function GroupTreeNode({
           {/* Inline creation input for children of this group */}
           {creatingParentId === group.id && (
             <div
-              className="p-1 mt-1 flex items-center gap-1.5 border border-accent/40 bg-indigo-50/20 rounded-md"
+              className="py-1.5 px-2 mt-0.5 flex items-center gap-1.5 rounded-md"
               style={{ paddingLeft: `${(depth + 1) * 8 + 6}px` }}
             >
-              <ChevronDown size={14} className="text-accent shrink-0" />
+              <ChevronDown size={14} className="text-text-secondary shrink-0" />
               <input
                 type="text"
                 value={newGroupName}
@@ -361,7 +361,7 @@ function GroupTreeNode({
                   if (e.key === 'Enter') handleFinishCreateGroup();
                   else if (e.key === 'Escape') setCreatingParentId(undefined);
                 }}
-                className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+                className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
                 autoFocus
                 onFocus={(e) => e.target.select()}
               />
@@ -605,36 +605,52 @@ export default function CatalogPanel() {
     }));
   };
 
+  const [isResizing, setIsResizing] = useState(false);
+
   // Drag resize handler
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    setIsResizing(true);
+    document.body.classList.add('select-none', 'cursor-col-resize');
+
     const startX = e.clientX;
     const startWidth = catalogWidth;
+    let animationFrameId: number | null = null;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const newWidth = startWidth + deltaX;
-      const minWidth = 220;
-      const maxWidth = Math.floor(window.innerWidth / 3);
+      if (animationFrameId !== null) return;
 
-      if (newWidth < minWidth) {
-        const overflow = minWidth - newWidth;
-        if (overflow > minWidth / 2) {
-          setIsCatalogCollapsed(true);
-        } else {
+      animationFrameId = requestAnimationFrame(() => {
+        animationFrameId = null;
+        const deltaX = moveEvent.clientX - startX;
+        const newWidth = startWidth + deltaX;
+        const minWidth = 220;
+        const maxWidth = Math.floor(window.innerWidth / 3);
+
+        if (newWidth < minWidth) {
+          const overflow = minWidth - newWidth;
+          if (overflow > minWidth / 2) {
+            setIsCatalogCollapsed(true);
+          } else {
+            setIsCatalogCollapsed(false);
+            setCatalogWidth(minWidth);
+          }
+        } else if (newWidth > maxWidth) {
+          setCatalogWidth(maxWidth);
           setIsCatalogCollapsed(false);
-          setCatalogWidth(minWidth);
+        } else {
+          setCatalogWidth(newWidth);
+          setIsCatalogCollapsed(false);
         }
-      } else if (newWidth > maxWidth) {
-        setCatalogWidth(maxWidth);
-        setIsCatalogCollapsed(false);
-      } else {
-        setCatalogWidth(newWidth);
-        setIsCatalogCollapsed(false);
-      }
+      });
     };
 
     const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.classList.remove('select-none', 'cursor-col-resize');
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -658,8 +674,8 @@ export default function CatalogPanel() {
     <>
       <aside
         style={{ width: isCatalogCollapsed ? 0 : `${catalogWidth}px` }}
-        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out ${
-          isCatalogCollapsed ? 'overflow-visible' : 'overflow-hidden'
+        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none z-20 overflow-visible ${
+          isResizing ? '!transition-none' : 'transition-all duration-150 ease-out'
         }`}
       >
         {/* Render content only when not collapsed */}
@@ -746,8 +762,8 @@ export default function CatalogPanel() {
 
               {/* Inline edit container for creating a new root group */}
               {creatingParentId === null && (
-                <div className="p-2 mt-2 flex items-center gap-1.5 border border-accent/40 bg-indigo-50/20 rounded-md">
-                  <ChevronDown size={14} className="text-accent shrink-0" />
+                <div className="py-1.5 px-2 mt-1 flex items-center gap-1.5 rounded-md" style={{ paddingLeft: '6px' }}>
+                  <ChevronDown size={14} className="text-text-secondary shrink-0" />
                   <input
                     type="text"
                     value={newGroupName}
@@ -757,7 +773,7 @@ export default function CatalogPanel() {
                       if (e.key === 'Enter') handleFinishCreateGroup();
                       else if (e.key === 'Escape') setCreatingParentId(undefined);
                     }}
-                    className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+                    className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
                     autoFocus
                     onFocus={(e) => e.target.select()}
                   />

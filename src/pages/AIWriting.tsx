@@ -4,6 +4,10 @@ import {
   Send, BrainCircuit, Plus, X, ChevronRight, Loader2, FileText, FileUp, Sparkles, Square,
   RotateCcw, Copy, FilePlus, StickyNote, Check
 } from 'lucide-react';
+import LottieRaw from 'lottie-react';
+import moonAnimation from '../assets/Moon.json';
+
+const Lottie = (LottieRaw as any)?.default || LottieRaw;
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBTreePickerModal from '../components/modals/KBTreePickerModal';
@@ -368,9 +372,9 @@ export default function AIWriting() {
           {/* Messages Stream */}
           <div className="flex-1 py-6">
             {sessionMessages.length === 0 ? (
-              <div className="max-w-4xl mx-auto pt-12 flex flex-col items-center">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-400 to-pink-400 flex items-center justify-center text-white shadow-lg mb-6 animate-pulse">
-                  <Sparkles size={28} />
+              <div className="max-w-4xl mx-auto pt-8 flex flex-col items-center">
+                <div className="w-28 h-28 mb-3 flex items-center justify-center select-none">
+                  <Lottie animationData={moonAnimation} loop={true} className="w-full h-full" />
                 </div>
                 <h1 className="text-xl font-bold text-text-primary mb-2">今天想写点什么？</h1>
                 <p className="text-xs text-text-secondary mb-8 text-center max-w-md">

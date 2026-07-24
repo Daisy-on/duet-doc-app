@@ -83,35 +83,51 @@ export default function MemoCatalogPanel() {
     }
   };
 
+  const [isResizing, setIsResizing] = useState(false);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    setIsResizing(true);
+    document.body.classList.add('select-none', 'cursor-col-resize');
+
     const startX = e.clientX;
     const startWidth = catalogWidth;
+    let animationFrameId: number | null = null;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const newWidth = startWidth + deltaX;
-      const minWidth = 220;
-      const maxWidth = Math.floor(window.innerWidth / 3);
+      if (animationFrameId !== null) return;
 
-      if (newWidth < minWidth) {
-        const overflow = minWidth - newWidth;
-        if (overflow > minWidth / 2) {
-          setIsCatalogCollapsed(true);
-        } else {
+      animationFrameId = requestAnimationFrame(() => {
+        animationFrameId = null;
+        const deltaX = moveEvent.clientX - startX;
+        const newWidth = startWidth + deltaX;
+        const minWidth = 220;
+        const maxWidth = Math.floor(window.innerWidth / 3);
+
+        if (newWidth < minWidth) {
+          const overflow = minWidth - newWidth;
+          if (overflow > minWidth / 2) {
+            setIsCatalogCollapsed(true);
+          } else {
+            setIsCatalogCollapsed(false);
+            setCatalogWidth(minWidth);
+          }
+        } else if (newWidth > maxWidth) {
+          setCatalogWidth(maxWidth);
           setIsCatalogCollapsed(false);
-          setCatalogWidth(minWidth);
+        } else {
+          setCatalogWidth(newWidth);
+          setIsCatalogCollapsed(false);
         }
-      } else if (newWidth > maxWidth) {
-        setCatalogWidth(maxWidth);
-        setIsCatalogCollapsed(false);
-      } else {
-        setCatalogWidth(newWidth);
-        setIsCatalogCollapsed(false);
-      }
+      });
     };
 
     const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.classList.remove('select-none', 'cursor-col-resize');
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -128,8 +144,8 @@ export default function MemoCatalogPanel() {
     <>
       <aside
         style={{ width: isCatalogCollapsed ? 0 : `${catalogWidth}px` }}
-        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none transition-all duration-150 ease-out ${
-          isCatalogCollapsed ? 'overflow-visible' : 'overflow-hidden'
+        className={`relative bg-bg-panel border-r border-border-color flex flex-col h-full select-none z-20 overflow-visible ${
+          isResizing ? '!transition-none' : 'transition-all duration-150 ease-out'
         }`}
       >
         {!isCatalogCollapsed && (
@@ -186,7 +202,7 @@ export default function MemoCatalogPanel() {
                         navigate(`/memo/${memo.id}`);
                       }
                     }}
-                    className={`text-[13px] py-1.5 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+                    className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
                       isActive
                         ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[10px]'
                         : 'text-text-secondary'
@@ -204,7 +220,7 @@ export default function MemoCatalogPanel() {
                             if (e.key === 'Enter') handleFinishRename();
                             else if (e.key === 'Escape') handleCancelRename();
                           }}
-                          className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+                          className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                           onFocus={(e) => e.target.select()}
