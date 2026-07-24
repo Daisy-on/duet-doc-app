@@ -11,7 +11,6 @@ const Lottie = (LottieRaw as any)?.default || LottieRaw;
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBTreePickerModal from '../components/modals/KBTreePickerModal';
-import KBChooserModal from '../components/modals/KBChooserModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import type { ChatMessage, ReferencedDoc } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
@@ -707,11 +706,14 @@ export default function AIWriting() {
       />
 
       {/* KB Chooser Modal for generating documents */}
-      <KBChooserModal
+      <KBTreePickerModal
         isOpen={isKBChooserOpen}
         onClose={() => setIsKBChooserOpen(false)}
+        title="生成为知识库文档"
+        subtitle="选择目标知识库或目录，将当前回答转存为文档"
+        mode="create-doc"
         defaultTitle={kbChooserDefaultTitle}
-        onConfirm={handleConfirmCreateDoc}
+        onCreateDoc={handleConfirmCreateDoc}
       />
     </div>
   );

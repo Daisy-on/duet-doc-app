@@ -7,12 +7,14 @@ export interface KBTreePickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  mode: 'document' | 'folder';
+  mode: 'document' | 'folder' | 'create-doc';
+  defaultTitle?: string;
   subtitle?: React.ReactNode;
   showSearch?: boolean;
   confirmText?: string;
   onSelectDoc?: (doc: { id: string; title: string }) => void;
   onSelectFolder?: (targetKbId: string, targetGroupId: string | null) => void;
+  onCreateDoc?: (targetKbId: string, targetGroupId: string | null, title: string) => void;
 }
 
 export default function KBTreePickerModal({
@@ -20,13 +22,18 @@ export default function KBTreePickerModal({
   onClose,
   title,
   mode,
+  defaultTitle = '',
   subtitle,
   showSearch = true, // 统一默认开启搜索，保持场景展现 100% 一致
-  confirmText = mode === 'document' ? '确认引用' : '确认移动',
+  confirmText = mode === 'document' ? '确认引用' : mode === 'create-doc' ? '确认创建' : '确认移动',
   onSelectDoc,
   onSelectFolder,
+  onCreateDoc,
 }: KBTreePickerModalProps) {
   const { knowledgeBases, documents, groups, getChildGroups } = useKnowledgeBaseStore();
+
+  // Mode: document title state (for create-doc mode)
+  const [docTitle, setDocTitle] = useState(defaultTitle);
 
   // Mode: document selection states
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -59,6 +66,7 @@ export default function KBTreePickerModal({
       setExpandedNodes(defaultExpanded);
 
       // Reset selection states
+      setDocTitle(defaultTitle);
       setSelectedDocId(null);
       setSelectedDocTitle('');
       setSelectedKbId(null);
@@ -68,7 +76,7 @@ export default function KBTreePickerModal({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, defaultTitle]);
 
   if (!isOpen) return null;
 
@@ -103,6 +111,11 @@ export default function KBTreePickerModal({
         onSelectDoc({ id: selectedDocId, title: selectedDocTitle });
         onClose();
       }
+    } else if (mode === 'create-doc') {
+      if (selectedKbId && onCreateDoc) {
+        onCreateDoc(selectedKbId, selectedGroupId, docTitle.trim() || '未命名文档');
+        onClose();
+      }
     } else {
       if (selectedKbId && onSelectFolder) {
         onSelectFolder(selectedKbId, selectedGroupId);
@@ -112,7 +125,11 @@ export default function KBTreePickerModal({
   };
 
   const isConfirmDisabled =
-    mode === 'document' ? !selectedDocId : !selectedKbId;
+    mode === 'document'
+      ? !selectedDocId
+      : mode === 'create-doc'
+      ? !selectedKbId || !docTitle.trim()
+      : !selectedKbId;
 
   // Filtered documents when search is active (document mode)
   const filteredDocs = searchQuery.trim()
@@ -143,14 +160,14 @@ export default function KBTreePickerModal({
     const groupDocs = documents.filter((doc) => doc.groupId === group.id);
     const hasFolderChildren = subGroups.length > 0;
     const hasChildren = mode === 'document' ? hasFolderChildren || groupDocs.length > 0 : hasFolderChildren;
-    const isFolderSelected = mode === 'folder' && selectedGroupId === group.id;
+    const isFolderSelected = (mode === 'folder' || mode === 'create-doc') && selectedGroupId === group.id;
 
     return (
       <div className="space-y-1">
         {/* Folder Row */}
         <div
           onClick={(e) => {
-            if (mode === 'folder') {
+            if (mode === 'folder' || mode === 'create-doc') {
               handleSelectGroup(group, e);
             } else if (hasChildren) {
               toggleNode(group.id, e);
@@ -243,6 +260,22 @@ export default function KBTreePickerModal({
             <X size={16} />
           </button>
         </div>
+
+        {/* Title Input for create-doc mode */}
+        {mode === 'create-doc' && (
+          <div className="mb-3 shrink-0">
+            <label className="block text-[11px] font-bold text-text-secondary mb-1">
+              文档标题
+            </label>
+            <input
+              type="text"
+              value={docTitle}
+              onChange={(e) => setDocTitle(e.target.value)}
+              placeholder="输入文档标题..."
+              className="w-full text-xs text-text-primary bg-bg-panel px-3 py-2 border border-border-color rounded-xl outline-none focus:border-accent focus:bg-white transition-colors font-medium"
+            />
+          </div>
+        )}
 
         {/* Unified Search Bar */}
         {showSearch && (
@@ -342,14 +375,14 @@ export default function KBTreePickerModal({
                 const rootDocs = kbDocs.filter((doc) => doc.groupId === null);
                 const hasFolderContent = kbRootGroups.length > 0;
                 const hasContent = mode === 'document' ? hasFolderContent || rootDocs.length > 0 : hasFolderContent;
-                const isKbSelected = mode === 'folder' && selectedKbId === kb.id && selectedGroupId === null;
+                const isKbSelected = (mode === 'folder' || mode === 'create-doc') && selectedKbId === kb.id && selectedGroupId === null;
 
                 return (
                   <div key={kb.id} className="space-y-1">
                     {/* KB Row */}
                     <div
                       onClick={(e) => {
-                        if (mode === 'folder') {
+                        if (mode === 'folder' || mode === 'create-doc') {
                           handleSelectKbRoot(kb, e);
                         } else if (hasContent) {
                           toggleNode(kb.id, e);
@@ -380,7 +413,7 @@ export default function KBTreePickerModal({
                         />
                         <span className="truncate">
                           {kb.name}
-                          {mode === 'folder' && (
+                          {(mode === 'folder' || mode === 'create-doc') && (
                             <span className="text-[10px] text-text-secondary font-normal ml-1">(根目录)</span>
                           )}
                         </span>
@@ -428,7 +461,7 @@ export default function KBTreePickerModal({
           )}
         </div>
 
-        {/* Selected target info banner (统一在两种场景下展示，保持 100% 结构一致) */}
+        {/* Selected target info banner (统一在三种场景下展示，保持 100% 结构一致) */}
         <div className="mt-3 px-3 py-2 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-text-secondary shrink-0">
           {mode === 'document' ? (
             selectedDocId ? (
@@ -440,7 +473,7 @@ export default function KBTreePickerModal({
             )
           ) : selectedKbId ? (
             <>
-              准备移动至：
+              {mode === 'create-doc' ? '文档将生成保存至：' : '准备移动至：'}
               <span className="font-semibold text-accent mx-1">{targetKb?.name}</span>
               {targetGroup && (
                 <>
