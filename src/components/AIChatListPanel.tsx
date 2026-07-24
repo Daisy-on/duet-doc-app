@@ -9,7 +9,7 @@ export default function AIChatListPanel() {
   const navigate = useNavigate();
   const params = useParams<{ '*': string }>();
   const sessionId = params['*'] || undefined;
-  const { sessions, createSession, updateSession, deleteSession, setActiveSessionId } = useAIWritingStore();
+  const { sessions, updateSession, deleteSession, setActiveSessionId } = useAIWritingStore();
   const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useLayoutStore();
 
   const [popoverOpenId, setPopoverOpenId] = useState<string | null>(null);
@@ -28,12 +28,11 @@ export default function AIChatListPanel() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleCreateSession = async () => {
-    // 空白对话页面点击 + 图标无效
+  const handleCreateSession = () => {
+    // 已经在草稿页面，无需导航；否则切换至空白草稿页
     if (!sessionId) return;
-
-    const newId = await createSession();
-    navigate(`/ai-writing/${newId}`);
+    setActiveSessionId(null);
+    navigate('/ai-writing');
   };
 
   const confirmDelete = () => {

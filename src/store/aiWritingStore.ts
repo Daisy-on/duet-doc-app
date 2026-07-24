@@ -76,8 +76,17 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   initStore: async () => {
     try {
       const dbSessions = await db.chatSessions.toArray();
-      const sorted = sortSessions(dbSessions);
       const dbMessages = await db.chatMessages.orderBy('createdAt').toArray();
+      const messageSessionIds = new Set(dbMessages.map((m) => m.sessionId));
+
+      // 过滤并自动清理数据库里没有实际消息记录的空白历史 Session
+      const validSessions = dbSessions.filter((s) => messageSessionIds.has(s.id));
+      const emptySessionIds = dbSessions.filter((s) => !messageSessionIds.has(s.id)).map((s) => s.id);
+      if (emptySessionIds.length > 0) {
+        await db.chatSessions.bulkDelete(emptySessionIds);
+      }
+
+      const sorted = sortSessions(validSessions);
       set({ 
         sessions: sorted, 
         messages: dbMessages,

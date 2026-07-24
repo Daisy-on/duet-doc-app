@@ -128,7 +128,7 @@ export default function KnowledgeBaseHome() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleCreateDocument}
-              className="px-4 py-1.5 bg-accent hover:bg-indigo-700 text-white rounded-lg text-[13px] font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-[13px] font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <FileText size={14} />
               <span>新建文档</span>
