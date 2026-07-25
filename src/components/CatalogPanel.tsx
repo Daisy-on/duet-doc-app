@@ -58,17 +58,17 @@ function DocTreeItem({
   return (
     <div
       onClick={handleDocClick}
-      className={`text-[13px] py-2 px-2 pr-2 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+      className={`text-[13px] py-1.5 px-1.5 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
         isDocActive
-          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[22px]'
+          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none'
           : 'text-text-secondary'
       } ${
         activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''
       }`}
       style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
     >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <FileText size={14} className={isDocActive ? 'text-accent' : 'text-text-secondary'} />
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <FileText size={14} className={`shrink-0 ${isDocActive ? 'text-accent' : 'text-text-secondary'}`} />
         {isRenamingDoc ? (
           <input
             type="text"
@@ -79,7 +79,7 @@ function DocTreeItem({
               if (e.key === 'Enter') handleFinishRenameDoc();
               else if (e.key === 'Escape') handleCancelRenameDoc();
             }}
-            className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+            className="w-full text-xs text-text-primary bg-white px-1.5 py-0.5 border border-accent rounded outline-none shadow-xs"
             autoFocus
             onClick={(e) => e.stopPropagation()}
             onFocus={(e) => e.target.select()}
@@ -211,7 +211,7 @@ function GroupTreeNode({
 
   // 8px indentation per level without visual capping
   const groupPaddingLeft = depth * 8 + 6;
-  const docPaddingLeft = depth * 8 + 24;
+  const docPaddingLeft = depth * 8 + 18;
 
   const handleGroupClick = () => {
     if (isRenaming) return;
@@ -823,7 +823,7 @@ export default function CatalogPanel() {
                           doc={doc}
                           kbId={kbId}
                           docId={docId}
-                          paddingLeft={24}
+                          paddingLeft={18}
                           renamingDocId={renamingDocId}
                           renamingDocTitle={renamingDocTitle}
                           setRenamingDocTitle={setRenamingDocTitle}

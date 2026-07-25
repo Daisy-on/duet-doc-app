@@ -548,7 +548,7 @@ export default function AIWriting() {
                       )}
 
                       {/* Timestamp */}
-                      <div className="text-[9px] text-text-secondary mt-1 px-1">
+                      <div className="text-[12px] text-text-secondary mt-1 px-1">
                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
