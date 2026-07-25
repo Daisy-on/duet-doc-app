@@ -12,6 +12,19 @@ export interface DocumentVersion {
   saveType: 'auto' | 'manual' | 'published';
 }
 
+export interface DocumentAsset {
+  id: string;
+  docId: string;
+  kind: 'image';
+  blob: Blob;
+  mimeType: string;
+  fileName?: string;
+  size: number;
+  width?: number;
+  height?: number;
+  createdAt: number;
+}
+
 export class DuetDocDB extends Dexie {
   knowledgeBases!: Table<KnowledgeBase, string>;
   groups!: Table<Group, string>;
@@ -21,6 +34,7 @@ export class DuetDocDB extends Dexie {
   chatSessions!: Table<ChatSession, string>;
   chatMessages!: Table<ChatMessage, string>;
   documentVersions!: Table<DocumentVersion, string>;
+  assets!: Table<DocumentAsset, string>;
 
   constructor() {
     super('DuetDocDB');
@@ -53,8 +67,33 @@ export class DuetDocDB extends Dexie {
       chatMessages: 'id, sessionId, createdAt',
       documentVersions: 'id, docId, createdAt, [docId+createdAt]',
     });
+    this.version(4).stores({
+      knowledgeBases: 'id, createdAt',
+      groups: 'id, kbId, parentGroupId, createdAt',
+      documents: 'id, kbId, groupId, createdAt',
+      favoriteFolders: 'id, createdAt',
+      favoriteItems: 'id, docId, favoritedAt',
+      chatSessions: 'id, createdAt',
+      chatMessages: 'id, sessionId, createdAt',
+      documentVersions: 'id, docId, createdAt, [docId+createdAt]',
+      assets: 'id, docId, createdAt',
+    });
   }
 }
 
 export const db = new DuetDocDB();
+
+/**
+ * 级联删除指定文档列表对应的全套记录（文档主体、历史版本、关联图片资产、收藏项）
+ */
+export async function deleteDocumentsCascade(docIds: string[]) {
+  if (!docIds || docIds.length === 0) return;
+  await db.transaction('rw', [db.documents, db.documentVersions, db.assets, db.favoriteItems], async () => {
+    await db.documents.bulkDelete(docIds);
+    await db.documentVersions.where('docId').anyOf(docIds).delete();
+    await db.assets.where('docId').anyOf(docIds).delete();
+    await db.favoriteItems.where('docId').anyOf(docIds).delete();
+  });
+}
+
 export default db;

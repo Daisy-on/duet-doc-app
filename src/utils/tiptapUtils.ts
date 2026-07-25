@@ -35,6 +35,12 @@ export function extractPlainTextFromTiptap(rawContent: string | object | null | 
       textPieces.push(node.text);
     }
 
+    if (node.type === 'image') {
+      const attrs = node.attrs as { alt?: string; title?: string } | undefined;
+      const altText = attrs?.alt || attrs?.title || '图片';
+      textPieces.push(`[Image: ${altText}]`);
+    }
+
     if (Array.isArray(node.content)) {
       for (const child of node.content) {
         traverse(child);

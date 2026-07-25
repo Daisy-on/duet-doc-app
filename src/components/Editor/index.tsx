@@ -27,6 +27,7 @@ import { AIDispatcher } from '../../ai/dispatcher';
 import type { CloudAITask } from '../../ai/types';
 import { AIAssistantPopover } from './AIAssistantPopover';
 import { normalizeUrl } from '../../utils/urlUtils';
+import LocalImageExtension from '../../extensions/LocalImageExtension';
 
 interface BubblePos {
   top: number
@@ -197,6 +198,9 @@ export default function Editor() {
       TableHeader,
       TableCell,
       GhostTextExtension,
+      LocalImageExtension.configure({
+        getDocId: () => currentDocIdRef.current || null,
+      }),
       Extension.create({
         name: 'assistantSelectionHighlight',
         addProseMirrorPlugins() {

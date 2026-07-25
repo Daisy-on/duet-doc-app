@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
-import { db } from '../db';
+import { db, deleteDocumentsCascade } from '../db';
 import { useFavoritesStore } from './favoritesStore';
 
 export const MEMO_KB_ID = 'kb-memo-system';
@@ -410,13 +410,11 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   deleteKnowledgeBase: (id) => {
     const docIds = get().documents.filter((d) => d.kbId === id).map((d) => d.id);
-    docIds.forEach((docId) => {
-      useFavoritesStore.getState().removeFavorite(docId);
-    });
+    docIds.forEach((docId) => useFavoritesStore.getState().removeFavorite(docId));
+    deleteDocumentsCascade(docIds).catch((err) => console.error('Dexie cascade delete error:', err));
 
     db.knowledgeBases.delete(id).catch(err => console.error('Dexie error:', err));
     db.groups.where('kbId').equals(id).delete().catch(err => console.error('Dexie error:', err));
-    db.documents.where('kbId').equals(id).delete().catch(err => console.error('Dexie error:', err));
     set((state) => ({
       knowledgeBases: state.knowledgeBases.filter((kb) => kb.id !== id),
       groups: state.groups.filter((g) => g.kbId !== id),
@@ -471,12 +469,10 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     const deleteGroupIds = [id, ...descendantIds];
     
     const docIds = get().documents.filter((d) => d.groupId && deleteGroupIds.includes(d.groupId)).map((d) => d.id);
-    docIds.forEach((docId) => {
-      useFavoritesStore.getState().removeFavorite(docId);
-    });
+    docIds.forEach((docId) => useFavoritesStore.getState().removeFavorite(docId));
+    deleteDocumentsCascade(docIds).catch((err) => console.error('Dexie cascade delete error:', err));
 
     db.groups.bulkDelete(deleteGroupIds).catch(err => console.error('Dexie error:', err));
-    db.documents.where('groupId').anyOf(deleteGroupIds).delete().catch(err => console.error('Dexie error:', err));
     set((state) => ({
       groups: state.groups.filter((g) => !deleteGroupIds.includes(g.id)),
       // Cascade delete: Remove documents belonging to any of these groups
@@ -614,7 +610,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   deleteDocument: (id) => {
     useFavoritesStore.getState().removeFavorite(id);
-    db.documents.delete(id).catch(err => console.error('Dexie error:', err));
+    deleteDocumentsCascade([id]).catch((err) => console.error('Dexie cascade delete error:', err));
     set((state) => ({
       documents: state.documents.filter((doc) => doc.id !== id),
     }));
