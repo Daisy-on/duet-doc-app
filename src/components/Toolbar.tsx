@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import type { Editor } from '@tiptap/core'
+import { getMarkRange, type Editor } from '@tiptap/core'
 import { normalizeUrl } from '../utils/urlUtils'
 import {
   Undo2, Redo2, RemoveFormatting, PaintRoller,
@@ -298,14 +298,26 @@ function LinkPopover({ editor }: { editor: Editor }) {
   const handleOpen = () => {
     // 聚焦编辑器，确保我们能拿到正确的选区
     editor.commands.focus()
-    const { from } = editor.state.selection
-    const coords = editor.view.coordsAtPos(from)
     
     // 获取之前的链接（如果有的话）
     const previousUrl = editor.getAttributes('link').href || ''
     setUrl(previousUrl)
     
-    setPos({ top: coords.top + 20, left: coords.left }) // 在光标下方 20px
+    const { from } = editor.state.selection
+    const coords = editor.view.coordsAtPos(from)
+    
+    const popoverWidth = 288 // Tailwind w-72 = 18rem = 288px
+    
+    // 弹窗的左边界直接对齐 Prosemirror 内部计算的 DOM 光标位置
+    let leftPos = coords.left
+    
+    // 只要不溢出整个浏览器窗口即可
+    const minLeft = 16
+    const maxLeft = window.innerWidth - popoverWidth - 16
+    leftPos = Math.max(minLeft, Math.min(leftPos, maxLeft))
+    
+    // 悬浮在光标/链接上一行：减去弹窗的高度（约 56px）
+    setPos({ top: coords.top - 58, left: leftPos }) 
     setOpen(true)
     
     setTimeout(() => {
@@ -316,27 +328,77 @@ function LinkPopover({ editor }: { editor: Editor }) {
   const handleSubmit = () => {
     const normalized = normalizeUrl(url)
     if (normalized) {
-      const { from, to } = editor.state.selection
-      if (from === to) {
-        // 选区为空时：使用结构化内容插入带有 link mark 的文本
-        editor.chain().focus()
-          .insertContent({
-            type: 'text',
-            text: url.trim(),
-            marks: [
-              {
-                type: 'link',
-                attrs: { href: normalized },
-              },
-            ],
-          })
-          .run()
+      const isEditingLink = editor.isActive('link')
+      if (isEditingLink) {
+        // 使用 getMarkRange 精确获取旧链接的边界范围
+        const linkMarkType = editor.schema.marks.link
+        let from = editor.state.selection.from
+        let to = editor.state.selection.to
+        
+        if (linkMarkType) {
+          const range = getMarkRange(editor.state.selection.$from, linkMarkType) || 
+                        getMarkRange(editor.state.selection.$to, linkMarkType)
+          if (range) {
+            from = range.from
+            to = range.to
+          }
+        }
+        
+        const linkText = editor.state.doc.textBetween(from, to, ' ').trim()
+        const previousHref = editor.getAttributes('link').href || ''
+        
+        // 辅助对比函数：去除协议头 (http/https/www) 比较
+        const clean = (s: string) => s.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')
+        
+        const isUrlText = !linkText || 
+                          clean(linkText) === clean(previousHref) || 
+                          clean(linkText) === clean(url) || 
+                          /^https?:\/\//i.test(linkText)
+        
+        if (isUrlText) {
+          // 如果旧显示文本本来就是网址，强行删除旧范围，并在该位置插入新文本，防止发生重复追加 (prepend/append) 的 Bug
+          editor.chain().focus()
+            .deleteRange({ from, to })
+            .insertContentAt(from, {
+              type: 'text',
+              text: url.trim(),
+              marks: [
+                {
+                  type: 'link',
+                  attrs: { href: normalized },
+                },
+              ],
+            })
+            .run()
+        } else {
+          // 如果旧显示文本是自定义词条，仅更新其 href 属性
+          editor.chain().focus()
+            .setTextSelection({ from, to })
+            .setLink({ href: normalized })
+            .run()
+        }
       } else {
-        // 有选区时：对选中的文字应用链接
-        editor.chain().focus()
-          .extendMarkRange('link')
-          .setLink({ href: normalized })
-          .run()
+        const { from, to } = editor.state.selection
+        if (from === to) {
+          // 选区为空时：插入带有 link mark 的新文本
+          editor.chain().focus()
+            .insertContent({
+              type: 'text',
+              text: url.trim(),
+              marks: [
+                {
+                  type: 'link',
+                  attrs: { href: normalized },
+                },
+              ],
+            })
+            .run()
+        } else {
+          // 有选中文本时：对选中的文字应用链接属性
+          editor.chain().focus()
+            .setLink({ href: normalized })
+            .run()
+        }
       }
     } else {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
@@ -385,7 +447,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
       {open && (
         <div 
           ref={popoverRef}
-          className="fixed z-[100] bg-white border border-border-color rounded-lg shadow-xl p-3 flex gap-2 w-72 animate-pop-in"
+          className="fixed z-[100] bg-white border border-border-color rounded-xl shadow-xl p-2 flex gap-2 w-72 animate-dropdown-fade-in"
           style={{ top: pos.top, left: pos.left }}
         >
           <input
