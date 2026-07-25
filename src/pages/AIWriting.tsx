@@ -347,9 +347,9 @@ export default function AIWriting() {
             </span>
             <span className="font-medium">
               {backendStatus === 'connected'
-                ? '后端已连接'
+                ? '云端 AI 已接入'
                 : backendStatus === 'disconnected'
-                ? '后端已离线'
+                ? '云端 AI 已离线'
                 : '检测连接中...'}
             </span>
           </div>
@@ -375,7 +375,7 @@ export default function AIWriting() {
                 <div className="w-28 h-28 mb-3 flex items-center justify-center select-none">
                   <Lottie animationData={moonAnimation} loop={true} className="w-full h-full" />
                 </div>
-                <h1 className="text-xl font-bold text-text-primary mb-2">今天想写点什么？</h1>
+                <h1 className="text-xl font-bold text-text-primary mb-2">Hi，今天想写点什么？</h1>
                 <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
                   引用知识库文档，或是直接提问。Duet AI 具备端云协同的大模型推理能力，协助你快速撰写、精炼与重构文本。
                 </p>
@@ -633,10 +633,10 @@ export default function AIWriting() {
                           setAttachMenuAnchorEl(e.currentTarget);
                           setIsAttachMenuOpen(!isAttachMenuOpen);
                         }}
-                        className="w-8 h-8 rounded-full hover:bg-gray-100 text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
+                        className="w-8.5 h-8.5 rounded-full hover:bg-gray-100 text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
                         title="引用知识库文档"
                       >
-                        <Plus size={16} />
+                        <Plus size={18} />
                       </button>
                     </div>
 
@@ -661,7 +661,7 @@ export default function AIWriting() {
                     <button
                       type="button"
                       onClick={stopGeneration}
-                      className="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                      className="w-8.5 h-8.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
                       title="停止生成"
                     >
                       <Square size={12} className="fill-current" />
@@ -670,7 +670,7 @@ export default function AIWriting() {
                     <button
                       type="button"
                       onClick={handleSend}
-                      className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                      className="w-8.5 h-8.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
                       title="发送消息"
                     >
                       <Send size={14} />
