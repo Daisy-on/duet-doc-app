@@ -81,6 +81,10 @@ export function useAIChat(sessionId: string | null) {
 
       stopGeneration();
       setIsGenerating(true);
+      
+      // 清理上一次生成残留的 buffer，防止“重新生成”时文本追加拼接
+      textBufferRef.current = '';
+      reasoningBufferRef.current = '';
 
       // 1. 创建 User 消息并保存
       const userMsg: ChatMessage = {
