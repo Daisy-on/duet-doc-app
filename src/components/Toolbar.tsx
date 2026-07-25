@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getMarkRange, type Editor } from '@tiptap/core'
 import { normalizeUrl } from '../utils/urlUtils'
+import { useParams } from 'react-router-dom'
+import { assetRepository } from '../assets/assetRepository'
 import {
   Undo2, Redo2, RemoveFormatting, PaintRoller,
   Bold, Italic, Underline, Strikethrough,
   Superscript, Subscript, Code,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Link, CodeSquare, Table,
-  ChevronDown, Type, Trash2, Columns, Rows
+  ChevronDown, Type, Trash2, Columns, Rows, Image as ImageIcon
 } from 'lucide-react'
 
 // ─── 通用工具按钮 ─────────────────────────────────────────────
@@ -283,6 +285,71 @@ function TableActionsDropdown({ editor }: { editor: Editor }) {
           </div>
         )}
       </div>
+    </>
+  )
+}
+
+// ─── 插入图片按钮 ─────────────────────────────────────────────
+function ImageUploadBtn({ editor }: { editor: Editor }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>()
+  const currentDocId = docId || memoId
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    if (!currentDocId) {
+      alert('无法识别当前文档 ID，插入图片失败')
+      return
+    }
+
+    if (editor.state.selection.$from.parent.type.name === 'heading') {
+      alert('文档标题处无法插入图片')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    const file = files[0]
+    try {
+      const asset = await assetRepository.saveAsset(currentDocId, file)
+      editor.chain().focus().insertContent({
+        type: 'image',
+        attrs: {
+          assetId: asset.id,
+          alt: file.name,
+        },
+      }).run()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : '插入图片失败')
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  return (
+    <>
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <ToolBtn
+        title="插入图片"
+        onClick={() => {
+          if (editor.state.selection.$from.parent.type.name === 'heading') {
+            alert('文档标题处无法插入图片')
+            return
+          }
+          fileInputRef.current?.click()
+        }}
+      >
+        <ImageIcon size={15} />
+      </ToolBtn>
     </>
   )
 }
@@ -618,6 +685,7 @@ export default function Toolbar({ editor }: ToolbarProps) {
       <Sep />
 
       {/* 8. 插入类 */}
+      <ImageUploadBtn editor={editor} />
       <LinkPopover editor={editor} />
       
       <ToolBtn title="插入代码块" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>

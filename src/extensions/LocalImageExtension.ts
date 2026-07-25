@@ -82,6 +82,12 @@ export const LocalImageExtension = Node.create<LocalImageOptions>({
             const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
             if (imageFiles.length === 0) return false; // 没有图片时不拦截，交给普通粘贴流程
 
+            const { $from } = view.state.selection;
+            if ($from.parent.type.name === 'heading') {
+              alert('文档标题处无法插入图片');
+              return true;
+            }
+
             event.preventDefault();
 
             const docId = options.getDocId();
@@ -133,6 +139,11 @@ export const LocalImageExtension = Node.create<LocalImageOptions>({
             });
 
             const targetPos = coordinates ? coordinates.pos : view.state.selection.from;
+            const $pos = view.state.doc.resolve(targetPos);
+            if ($pos.parent.type.name === 'heading') {
+              alert('文档标题处无法插入图片');
+              return true;
+            }
 
             for (const file of imageFiles) {
               assetRepository
