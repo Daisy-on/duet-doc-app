@@ -72,7 +72,7 @@ export default function AIAttachMenu({
         <button
           type="button"
           onClick={triggerFileUpload}
-          className="w-full px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+          className="w-full px-6 py-3 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
         >
           <Upload size={14} className="text-indigo-500" />
           <span>上传本地文件</span>
@@ -84,7 +84,7 @@ export default function AIAttachMenu({
             onOpenDocSelector();
             onClose();
           }}
-          className="w-full px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+          className="w-full px-6 py-3 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
         >
           <FileText size={14} className="text-emerald-500" />
           <span>引用知识库文档</span>

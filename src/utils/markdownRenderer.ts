@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import { common, createLowlight } from 'lowlight';
+import { normalizeUrl } from './urlUtils';
 
 const lowlight = createLowlight(common);
 
@@ -71,6 +72,13 @@ renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
     </div>
     <pre class="p-4 text-xs md:text-[13px] font-mono text-gray-100 overflow-x-auto leading-relaxed"><code>${highlightedHtml}</code></pre>
   </div>`;
+};
+
+// Custom link renderer with URL normalization and target="_blank"
+renderer.link = function ({ href, title, text }: { href: string; title?: string | null; text: string }) {
+  const normalizedHref = normalizeUrl(href);
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+  return `<a href="${normalizedHref}" target="_blank" rel="noopener noreferrer"${titleAttr} class="text-accent underline hover:text-indigo-700 cursor-pointer">${text}</a>`;
 };
 
 // Custom inline code span renderer

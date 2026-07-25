@@ -26,6 +26,7 @@ import { buildGhostTextPrompt, cleanGhostText } from '../../ai/ghostText';
 import { AIDispatcher } from '../../ai/dispatcher';
 import type { CloudAITask } from '../../ai/types';
 import { AIAssistantPopover } from './AIAssistantPopover';
+import { normalizeUrl } from '../../utils/urlUtils';
 
 interface BubblePos {
   top: number
@@ -181,7 +182,15 @@ export default function Editor() {
       Underline,
       Superscript,
       Subscript,
-      Link.configure({ openOnClick: false, autolink: true }),
+      Link.configure({ 
+        openOnClick: false, 
+        autolink: true,
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'text-accent underline hover:text-indigo-700 cursor-pointer',
+        },
+      }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({ resizable: true }),
       TableRow,
@@ -437,6 +446,34 @@ export default function Editor() {
       }
     }
   }, [doc?.content, editor, syncHeadings])
+
+  // 拦截链接点击（包含 CTRL+点击 / CMD+点击），确保始终在外部新标签页中打开规范化外链
+  useEffect(() => {
+    const container = editorContainerRef.current;
+    if (!container) return;
+
+    const handleLinkClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor && container.contains(anchor)) {
+        // 如果是按住 Ctrl / Cmd 点击链接，或者目标为外链
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          const rawHref = anchor.getAttribute('href') || '';
+          const targetUrl = normalizeUrl(rawHref);
+          if (targetUrl) {
+            window.open(targetUrl, '_blank', 'noopener,noreferrer');
+          }
+        }
+      }
+    };
+
+    container.addEventListener('click', handleLinkClick, true);
+    return () => {
+      container.removeEventListener('click', handleLinkClick, true);
+    };
+  }, []);
 
   // 文档切换时清理 AI 润色的定时器和请求
   useEffect(() => {

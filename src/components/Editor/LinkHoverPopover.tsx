@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import type { Editor } from '@tiptap/core'
 import { ExternalLink, Edit2, Copy, Unlink } from 'lucide-react'
+import { normalizeUrl } from '../../utils/urlUtils'
 
 interface LinkHoverPopoverProps {
   editor: Editor | null
@@ -11,44 +12,91 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const [href, setHref] = useState('')
-  const hoverRef = useRef<{ anchor: HTMLAnchorElement | null; timeout: ReturnType<typeof setTimeout> | null }>({
+
+  const hoverRef = useRef<{
+    anchor: HTMLAnchorElement | null
+    timeout: ReturnType<typeof setTimeout> | null
+    isOverPopover: boolean
+  }>({
     anchor: null,
     timeout: null,
+    isOverPopover: false,
   })
+
+  const cancelClose = () => {
+    if (hoverRef.current.timeout) {
+      clearTimeout(hoverRef.current.timeout)
+      hoverRef.current.timeout = null
+    }
+  }
+
+  const scheduleClose = (delay = 300) => {
+    cancelClose()
+    hoverRef.current.timeout = setTimeout(() => {
+      if (!hoverRef.current.isOverPopover) {
+        if (hoverRef.current.anchor) {
+          hoverRef.current.anchor.style.backgroundColor = ''
+        }
+        setOpen(false)
+        hoverRef.current.anchor = null
+      }
+    }, delay)
+  }
 
   useEffect(() => {
     if (!editor || !containerRef.current) return
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      const anchor = target.closest('a')
 
+      // If mouse is moving over/into the popover itself
+      if (target.closest('.link-hover-popover')) {
+        cancelClose()
+        hoverRef.current.isOverPopover = true
+        return
+      }
+
+      const anchor = target.closest('a')
       if (anchor && containerRef.current?.contains(anchor)) {
-        if (hoverRef.current.timeout) clearTimeout(hoverRef.current.timeout)
+        cancelClose()
         
+        // Reset background on previous anchor if different
+        if (hoverRef.current.anchor && hoverRef.current.anchor !== anchor) {
+          hoverRef.current.anchor.style.backgroundColor = ''
+        }
+
+        const rawHref = anchor.getAttribute('href') || ''
+        const normalized = normalizeUrl(rawHref)
+        if (normalized && normalized !== rawHref) {
+          anchor.setAttribute('href', normalized)
+          anchor.setAttribute('target', '_blank')
+          anchor.setAttribute('rel', 'noopener noreferrer')
+        }
+
         hoverRef.current.anchor = anchor
-        anchor.style.backgroundColor = 'rgba(59, 130, 246, 0.1)' // Highlight light blue
+        anchor.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
         anchor.style.borderRadius = '2px'
 
         const rect = anchor.getBoundingClientRect()
-        setHref(anchor.getAttribute('href') || '')
-        setPos({ top: rect.bottom + 4, left: rect.left })
+        setHref(normalized || rawHref)
+        // 2px distance below anchor
+        setPos({ top: rect.bottom + 2, left: rect.left })
         setOpen(true)
       }
     }
 
     const handleMouseOut = (e: MouseEvent) => {
-      // If we are moving to the popover itself, don't close
       const related = e.relatedTarget as HTMLElement
-      if (related?.closest('.link-hover-popover')) return
+      if (related?.closest('.link-hover-popover')) {
+        cancelClose()
+        hoverRef.current.isOverPopover = true
+        return
+      }
 
-      if (hoverRef.current.anchor) {
-        const anchor = hoverRef.current.anchor
-        hoverRef.current.timeout = setTimeout(() => {
-          anchor.style.backgroundColor = ''
-          setOpen(false)
-          hoverRef.current.anchor = null
-        }, 150) // Small delay to allow moving mouse to popover
+      const target = e.target as HTMLElement
+      const anchor = target.closest('a')
+      if (anchor && anchor === hoverRef.current.anchor) {
+        scheduleClose(300)
       }
     }
 
@@ -67,32 +115,34 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
 
   return (
     <div 
-      className="link-hover-popover fixed z-[100] flex items-center gap-1 p-1 bg-[#252525] border border-[#333] rounded shadow-xl"
+      className="link-hover-popover fixed z-[100] flex items-center gap-1 p-1 bg-[#252525] border border-[#333] rounded-lg shadow-xl animate-dropdown-fade-in
+                 before:absolute before:-top-3 before:left-0 before:right-0 before:h-3 before:bg-transparent"
       style={{ top: pos.top, left: pos.left }}
       onMouseEnter={() => {
-        // 鼠标进入弹窗时，取消延时关闭
-        if (hoverRef.current.timeout) {
-          clearTimeout(hoverRef.current.timeout)
-          hoverRef.current.timeout = null
-        }
+        cancelClose()
+        hoverRef.current.isOverPopover = true
       }}
       onMouseLeave={() => {
-        if (hoverRef.current.anchor) hoverRef.current.anchor.style.backgroundColor = ''
-        setOpen(false)
-        hoverRef.current.anchor = null
+        hoverRef.current.isOverPopover = false
+        scheduleClose(250)
       }}
     >
       <button 
         tabIndex={-1}
-        className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors"
+        className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors cursor-pointer"
         title="打开链接"
-        onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}
+        onClick={() => {
+          const targetUrl = normalizeUrl(href)
+          if (targetUrl) {
+            window.open(targetUrl, '_blank', 'noopener,noreferrer')
+          }
+        }}
       >
         <ExternalLink size={14} />
       </button>
       <button 
         tabIndex={-1}
-        className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors"
+        className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors cursor-pointer"
         title="编辑链接"
         onClick={() => {
           if (editor && hoverRef.current.anchor) {
@@ -101,7 +151,9 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
               editor.commands.setTextSelection(pos)
             } catch(e) {}
           }
+          if (hoverRef.current.anchor) hoverRef.current.anchor.style.backgroundColor = ''
           setOpen(false)
+          hoverRef.current.anchor = null
           window.dispatchEvent(new CustomEvent('duet-edit-link'))
         }}
       >
@@ -109,18 +161,20 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
       </button>
       <button 
         tabIndex={-1}
-        className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors"
+        className="p-1.5 text-gray-300 hover:text-white hover:bg-[#333] rounded transition-colors cursor-pointer"
         title="复制链接"
         onClick={() => {
           navigator.clipboard.writeText(href)
+          if (hoverRef.current.anchor) hoverRef.current.anchor.style.backgroundColor = ''
           setOpen(false)
+          hoverRef.current.anchor = null
         }}
       >
         <Copy size={14} />
       </button>
       <button 
         tabIndex={-1}
-        className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-[#333] rounded transition-colors"
+        className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-[#333] rounded transition-colors cursor-pointer"
         title="取消链接"
         onClick={() => {
           if (editor && hoverRef.current.anchor) {

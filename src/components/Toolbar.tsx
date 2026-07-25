@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { Editor } from '@tiptap/core'
+import { normalizeUrl } from '../utils/urlUtils'
 import {
   Undo2, Redo2, RemoveFormatting, PaintRoller,
   Bold, Italic, Underline, Strikethrough,
@@ -313,18 +314,19 @@ function LinkPopover({ editor }: { editor: Editor }) {
   }
 
   const handleSubmit = () => {
-    if (url) {
+    const normalized = normalizeUrl(url)
+    if (normalized) {
       const { from, to } = editor.state.selection
       if (from === to) {
         // 选区为空时：使用结构化内容插入带有 link mark 的文本
         editor.chain().focus()
           .insertContent({
             type: 'text',
-            text: url,
+            text: url.trim(),
             marks: [
               {
                 type: 'link',
-                attrs: { href: url },
+                attrs: { href: normalized },
               },
             ],
           })
@@ -333,7 +335,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
         // 有选区时：对选中的文字应用链接
         editor.chain().focus()
           .extendMarkRange('link')
-          .setLink({ href: url })
+          .setLink({ href: normalized })
           .run()
       }
     } else {

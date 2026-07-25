@@ -69,7 +69,7 @@ export default function MemoActionMenu({
           top: `${coords.top}px`,
           left: `${coords.left}px`,
         }}
-        className="z-50 w-44 bg-white border border-border-color rounded-lg shadow-lg py-1.5 animate-dropdown-fade-in"
+        className="z-50 w-44 bg-white border border-border-color rounded-xl shadow-lg py-1.5 animate-dropdown-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         <button
