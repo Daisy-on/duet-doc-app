@@ -98,7 +98,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
 
       {/* 顶部工具栏 (展开状态显示) */}
       {!collapsed && (
-        <div className={`flex items-center justify-between px-4 py-2 border-b select-none rounded-t-xl ${
+        <div className={`flex items-center justify-between px-3.5 py-1.5 border-b select-none rounded-t-xl ${
           isDark ? 'bg-[#2D2D2D] border-[#444] text-[#A0A0A0]' : 'bg-[#EAECEF] border-gray-300 text-gray-600'
         }`}>
           <div className="flex items-center gap-3 flex-1">

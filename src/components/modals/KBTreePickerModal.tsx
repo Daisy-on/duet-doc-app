@@ -297,7 +297,7 @@ export default function KBTreePickerModal({
         {/* Title Input for create-doc mode */}
         {mode === 'create-doc' && (
           <div className="mb-3 shrink-0">
-            <label className="block text-[11px] font-bold text-text-secondary mb-1">
+            <label className="block text-[12px] font-bold text-text-secondary mb-1">
               文档标题
             </label>
             <input
@@ -305,7 +305,7 @@ export default function KBTreePickerModal({
               value={docTitle}
               onChange={(e) => setDocTitle(e.target.value)}
               placeholder="输入文档标题..."
-              className="w-full text-xs text-text-primary bg-bg-panel px-3 py-2 border border-border-color rounded-xl outline-none focus:border-accent focus:bg-white transition-colors font-medium"
+              className="w-full text-xs text-text-primary bg-bg-panel px-3 py-2 border border-border-color rounded-lg outline-none focus:border-accent focus:bg-white transition-colors font-medium"
             />
           </div>
         )}
@@ -319,7 +319,7 @@ export default function KBTreePickerModal({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={mode === 'document' ? '搜索文档标题...' : '搜索知识库或目录名称...'}
-              className="w-full text-xs text-text-primary bg-bg-panel pl-9 pr-4 py-2 border border-border-color rounded-xl outline-none focus:border-accent focus:bg-white transition-colors"
+              className="w-full text-xs text-text-primary bg-bg-panel pl-9 pr-4 py-2 border border-border-color rounded-lg outline-none focus:border-accent focus:bg-white transition-colors"
             />
           </div>
         )}
@@ -503,7 +503,7 @@ export default function KBTreePickerModal({
             <span>{validationError}</span>
           </div>
         ) : (
-          <div className="mt-3 px-3 py-2 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-text-secondary shrink-0">
+          <div className="mt-3 px-3 py-2 bg-indigo-50/60 border border-indigo-100 rounded-lg text-xs text-text-secondary shrink-0">
             {mode === 'document' ? (
               selectedDocId ? (
                 <>

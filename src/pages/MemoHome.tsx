@@ -40,16 +40,16 @@ export default function MemoHome() {
             </div>
             
             <h3 className="text-lg font-bold text-text-primary mb-2 flex items-center justify-center gap-1.5">
-              我的轻量小记
+              我的小记
             </h3>
             
             <p className="text-xs text-text-secondary mb-6 leading-relaxed">
-              小记是一个极简的速记本，适合用来放置代办清单、日常碎碎念和临时灵感。它不属于任何分组，并且可以随时一键打包移动 to 具体知识库中。
+              小记是一个极简的速记本，适合用来放置代办清单、日常碎碎念和临时灵感。它不属于任何分组，并且可以随时一键打包移动到具体知识库中。
             </p>
 
             <button
               onClick={handleCreateMemo}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md hover:shadow-indigo-500/10 transition-all cursor-pointer hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 px-3.5 py-3 bg-accent hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md hover:shadow-indigo-500/10 transition-all cursor-pointer hover:-translate-y-0.5"
             >
               <Plus size={14} />
               <span>新建一条小记</span>

@@ -670,7 +670,7 @@ export default function AIWriting() {
                     <button
                       type="button"
                       onClick={handleSend}
-                      className="w-8 h-8 rounded-full bg-accent hover:bg-indigo-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                      className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
                       title="发送消息"
                     >
                       <Send size={14} />
