@@ -15,7 +15,7 @@ import { common, createLowlight } from 'lowlight'
 import { useParams } from 'react-router-dom'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { Extension } from '@tiptap/core'
@@ -61,15 +61,7 @@ function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) 
   })
 }
 
-function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
-  let timer: number | null = null
-  return (...args: Parameters<T>) => {
-    if (timer) window.clearTimeout(timer)
-    timer = window.setTimeout(() => {
-      fn(...args)
-    }, delay)
-  }
-}
+
 
 export default function Editor() {
   const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>()
@@ -84,11 +76,9 @@ export default function Editor() {
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
   const timerRef = useRef<number | null>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
-  // AI 润色的定时器和当前文档 ID 的 ref，用于在选区更新时请求润色建议，并在文档切换时清理定时器
   const ghostTextTimerRef = useRef<number | null>(null);
   const currentDocIdRef = useRef<string | undefined>(currentDocId);
 
-  // AI 智能助手悬浮输入框状态
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantPos, setAssistantPos] = useState<BubblePos | null>(null);
   const [assistantInput, setAssistantInput] = useState('');
@@ -96,7 +86,6 @@ export default function Editor() {
   const [savedSelection, setSavedSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const assistantRef = useRef<HTMLDivElement>(null);
 
-  // 用 Ref 同步状态，以供 ProseMirror 插件访问，避免重建插件导致编辑器重新实例化
   const isAssistantOpenRef = useRef(isAssistantOpen);
   const savedSelectionRef = useRef(savedSelection);
 
@@ -107,13 +96,6 @@ export default function Editor() {
   useEffect(() => {
     savedSelectionRef.current = savedSelection;
   }, [savedSelection]);
-
-  // Debounced updateDocument
-  const debouncedUpdateDoc = useMemo(() => {
-    return debounce((id: string, updates: { content: string; title?: string }) => {
-      updateDocument(id, updates)
-    }, 800)
-  }, [updateDocument])
 
   // 解析并同步标题到 Zustand，然后给 DOM 打标记
   const syncHeadings = useCallback((editor: TiptapEditor) => {
@@ -244,7 +226,7 @@ export default function Editor() {
         if (firstH1Text && firstH1Text !== doc?.title) {
           updates.title = firstH1Text
         }
-        debouncedUpdateDoc(currentDocId, updates)
+        updateDocument(currentDocId, updates)
       }
       syncHeadings(editor);
       scheduleGhostText(editor);

@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { db, deleteDocumentsCascade } from '../db';
 import { useFavoritesStore } from './favoritesStore';
+import { saveCoordinator, type SaveUpdates } from '../utils/SaveCoordinator';
+import { extractAssetIds } from '../utils/assetUtils';
 
 export const MEMO_KB_ID = 'kb-memo-system';
 
@@ -55,6 +57,8 @@ interface KnowledgeBaseStore {
   // Document CRUD
   createDocument: (kbId: string, groupId?: string | null, title?: string) => string;
   updateDocument: (id: string, data: Partial<Document>) => void;
+  scheduleDocumentAutosave: (id: string, updates: SaveUpdates) => void;
+  persistDocumentNow: (id: string, updates: SaveUpdates) => Promise<void>;
   deleteDocument: (id: string) => void;
 
   // Query helpers
@@ -70,34 +74,33 @@ interface KnowledgeBaseStore {
   getGroupAncestors: (groupId: string) => Group[];  // Breadcrumb helper
   getDescendantGroupIds: (groupId: string) => string[];  // Cascade delete helper
 
-
-
   // Memo operations
   getMemos: () => Document[];
   createMemo: (title?: string) => string;
   moveDocument: (id: string, targetKbId: string, targetGroupId: string | null) => void;
   moveGroup: (id: string, targetKbId: string, targetParentGroupId: string | null) => { success: boolean; error?: string };
-  restoreVersion: (versionId: string) => Promise<void>;
+  restoreVersion: (versionId: string) => Promise<{ restored: boolean; missingAssetIds?: string[] }>;
 }
 
 const generateId = () => nanoid(12);
 
-const enforceVersionLimit = async (docId: string) => {
+const enforceVersionLimitInTx = async (tx: any, docId: string) => {
   try {
-    const versions = await db.documentVersions
-      .where('docId')
-      .equals(docId)
-      .toArray();
+    const versions = await tx.table('documentVersions').where('docId').equals(docId).toArray();
     const targetVersions = versions
-      .filter(v => v.saveType === 'auto' || v.saveType === 'manual')
-      .sort((a, b) => a.createdAt - b.createdAt);
+      .filter((v: any) => v.saveType === 'auto' || v.saveType === 'manual')
+      .sort((a: any, b: any) => a.createdAt - b.createdAt);
     if (targetVersions.length > 50) {
       const toDeleteCount = targetVersions.length - 50;
-      const toDeleteIds = targetVersions.slice(0, toDeleteCount).map(v => v.id);
-      await db.documentVersions.bulkDelete(toDeleteIds);
+      const autoVersions = targetVersions.filter((v: any) => v.saveType === 'auto');
+      const toDeleteIds = (autoVersions.length >= toDeleteCount ? autoVersions : targetVersions)
+        .slice(0, toDeleteCount)
+        .map((v: any) => v.id);
+      await tx.table('documentVersions').bulkDelete(toDeleteIds);
     }
   } catch (err) {
     console.error('Failed to enforce version limit:', err);
+    throw err;
   }
 };
 
@@ -350,6 +353,91 @@ let games = reactive([
   },
 ];
 
+const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
+  const now = Date.now();
+  await db.transaction('rw', [db.documents, db.documentVersions, db.assets], async (tx) => {
+    const docTable = tx.table('documents');
+    const verTable = tx.table('documentVersions');
+
+    const existingDoc = await docTable.get(id);
+    if (!existingDoc) return;
+
+    const oldContent = existingDoc.content || '';
+    const newContent = updates.content !== undefined ? updates.content : oldContent;
+    const newTitle = updates.title !== undefined ? updates.title : existingDoc.title;
+
+    await docTable.update(id, {
+      title: newTitle,
+      content: newContent,
+      updatedAt: now,
+    });
+
+    if (updates.content !== undefined) {
+      const oldAssets = extractAssetIds(oldContent);
+      const newAssets = extractAssetIds(newContent);
+
+      let isStructuralDelete = false;
+      for (const assetId of oldAssets) {
+        if (!newAssets.has(assetId)) {
+          isStructuralDelete = true;
+          break;
+        }
+      }
+
+      const versions = await verTable.where('docId').equals(id).toArray();
+      const autoVersions = versions
+        .filter((v: any) => v.saveType === 'auto')
+        .sort((a: any, b: any) => a.createdAt - b.createdAt);
+      const latestVersion = autoVersions[autoVersions.length - 1];
+      const FIVE_MINUTES = 5 * 60 * 1000;
+
+      if (!isStructuralDelete && latestVersion && (now - latestVersion.createdAt < FIVE_MINUTES)) {
+        await verTable.update(latestVersion.id, {
+          content: newContent,
+          title: newTitle,
+        });
+      } else {
+        if (isStructuralDelete) {
+          const checkpointId = `ver-${nanoid(12)}`;
+          await verTable.add({
+            id: checkpointId,
+            docId: id,
+            title: existingDoc.title,
+            content: oldContent,
+            createdAt: now - 1,
+            saveType: 'auto',
+          });
+        }
+
+        const versionId = `ver-${nanoid(12)}`;
+        await verTable.add({
+          id: versionId,
+          docId: id,
+          title: newTitle,
+          content: newContent,
+          createdAt: now,
+          saveType: 'auto',
+        });
+
+        await enforceVersionLimitInTx(tx, id);
+      }
+    }
+  });
+
+  useKnowledgeBaseStore.setState((state) => ({
+    documents: state.documents.map((doc) =>
+      doc.id === id
+        ? {
+            ...doc,
+            ...(updates.title !== undefined ? { title: updates.title } : {}),
+            ...(updates.content !== undefined ? { content: updates.content } : {}),
+            updatedAt: now,
+          }
+        : doc
+    ),
+  }));
+};
+
 export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   knowledgeBases: [],
   groups: [],
@@ -499,113 +587,100 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     return id;
   },
 
+  scheduleDocumentAutosave: (id, updates) => {
+    saveCoordinator.scheduleDocumentAutosave(id, updates, internalPersistDocument);
+  },
+
+  persistDocumentNow: async (id, updates) => {
+    await saveCoordinator.persistDocumentNow(id, updates, internalPersistDocument);
+  },
+
   updateDocument: (id, data) => {
-    const updatedAt = Date.now();
-    db.documents.update(id, { ...data, updatedAt }).catch(err => console.error('Dexie error:', err));
-    
-    // Save version snapshot if content is updated
+    const updates: SaveUpdates = {
+      content: data.content!,
+      title: data.title,
+    };
+
     if (data.content !== undefined) {
-      const contentStr = data.content;
-      (async () => {
-        try {
-          const doc = get().documents.find(d => d.id === id);
-          if (!doc) return;
-
-          // Find the latest auto-save version
-          const versions = await db.documentVersions
-            .where('docId')
-            .equals(id)
-            .toArray();
-          
-          // Sort by createdAt ascending
-          const autoVersions = versions
-            .filter(v => v.saveType === 'auto')
-            .sort((a, b) => a.createdAt - b.createdAt);
-            
-          const latestVersion = autoVersions[autoVersions.length - 1];
-          const now = Date.now();
-          const FIVE_MINUTES = 5 * 60 * 1000;
-
-          if (latestVersion && (now - latestVersion.createdAt < FIVE_MINUTES)) {
-            // Overwrite latest version if it is within 5 minutes
-            // We do NOT update the createdAt timestamp to avoid sliding window
-            await db.documentVersions.update(latestVersion.id, {
-              content: contentStr,
-              title: data.title ?? doc.title,
-            });
-          } else {
-            // Create a new version snapshot
-            const versionId = `ver-${nanoid(12)}`;
-            await db.documentVersions.add({
-              id: versionId,
-              docId: id,
-              title: data.title ?? doc.title,
-              content: contentStr,
-              createdAt: now,
-              saveType: 'auto',
-            });
-
-            // Enforce limit of 50 versions per document (auto + manual)
-            await enforceVersionLimit(id);
-          }
-        } catch (err) {
-          console.error('Failed to save document version:', err);
-        }
-      })();
+      saveCoordinator.scheduleDocumentAutosave(id, updates, internalPersistDocument);
+    } else if (data.title !== undefined) {
+      const doc = get().documents.find((d) => d.id === id);
+      if (doc) {
+        saveCoordinator.persistDocumentNow(id, { content: doc.content, title: data.title }, internalPersistDocument);
+      }
     }
-
-    set((state) => ({
-      documents: state.documents.map((doc) =>
-          doc.id === id ? { ...doc, ...data, updatedAt } : doc
-      ),
-    }));
   },
 
   restoreVersion: async (versionId) => {
-    try {
-      const version = await db.documentVersions.get(versionId);
-      if (!version) {
-        throw new Error('Version not found');
+    const version = await db.documentVersions.get(versionId);
+    if (!version) throw new Error('Version not found');
+
+    const docId = version.docId;
+
+    // 1. Pause and flush any pending autosaves for this docId
+    await saveCoordinator.pauseAndFlush(docId, internalPersistDocument);
+
+    // 2. Run inside exclusive lock for docId
+    return await saveCoordinator.runExclusive(docId, async () => {
+      try {
+        // 3. Pre-flight check: verify all assetIds in version content exist in IndexedDB
+        const requiredAssetIds = extractAssetIds(version.content);
+        const missingAssetIds: string[] = [];
+        for (const assetId of requiredAssetIds) {
+          const asset = await db.assets.get(assetId);
+          if (!asset || !asset.blob) {
+            missingAssetIds.push(assetId);
+          }
+        }
+
+        if (missingAssetIds.length > 0) {
+          saveCoordinator.resume(docId);
+          return { restored: false, missingAssetIds };
+        }
+
+        const now = Date.now();
+
+        // 4. Perform atomic restore transaction
+        await db.transaction('rw', [db.documents, db.documentVersions], async (tx) => {
+          const docTable = tx.table('documents');
+          const verTable = tx.table('documentVersions');
+
+          const latestDbDoc = await docTable.get(docId);
+          if (!latestDbDoc) throw new Error('Document not found in DB');
+
+          // Backup current document state into documentVersions table before restoring
+          const backupVersionId = `ver-${nanoid(12)}`;
+          await verTable.add({
+            id: backupVersionId,
+            docId: docId,
+            title: latestDbDoc.title,
+            content: latestDbDoc.content,
+            createdAt: now - 1,
+            saveType: 'auto',
+          });
+
+          await enforceVersionLimitInTx(tx, docId);
+
+          // Update document with target version content
+          await docTable.update(docId, {
+            title: version.title,
+            content: version.content,
+            updatedAt: now,
+          });
+        });
+
+        // 5. Update Zustand after transaction succeeds
+        useKnowledgeBaseStore.setState((state) => ({
+          documents: state.documents.map((d) =>
+            d.id === docId ? { ...d, title: version.title, content: version.content, updatedAt: now } : d
+          ),
+        }));
+
+        return { restored: true };
+      } finally {
+        saveCoordinator.resume(docId);
       }
-
-      const doc = get().documents.find(d => d.id === version.docId);
-      if (!doc) {
-        throw new Error('Document not found');
-      }
-
-      const now = Date.now();
-
-      // Create backup snapshot of current content before restoring
-      const backupVersionId = `ver-${nanoid(12)}`;
-      await db.documentVersions.add({
-        id: backupVersionId,
-        docId: doc.id,
-        title: doc.title,
-        content: doc.content,
-        createdAt: now - 1, // slightly earlier so sorting works correctly
-        saveType: 'auto',
-      });
-
-      // Enforce limit of 50 versions after adding backup
-      await enforceVersionLimit(doc.id);
-
-      const updatedDoc = {
-        title: version.title,
-        content: version.content,
-        updatedAt: now,
-      };
-
-      await db.documents.update(doc.id, updatedDoc);
-
-      set((state) => ({
-        documents: state.documents.map((d) =>
-          d.id === doc.id ? { ...d, ...updatedDoc } : d
-        ),
-      }));
-    } catch (err) {
-      console.error('Failed to restore document version:', err);
-      throw err;
-    }
+    });
   },
 
   deleteDocument: (id) => {

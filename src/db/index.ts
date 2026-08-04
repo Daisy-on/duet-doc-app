@@ -23,6 +23,7 @@ export interface DocumentAsset {
   width?: number;
   height?: number;
   createdAt: number;
+  orphanedAt?: number;
 }
 
 export class DuetDocDB extends Dexie {

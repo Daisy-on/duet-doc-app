@@ -66,6 +66,10 @@ function traverseNode(node: any, listPrefix: string = ''): string[] {
       const cellsText = (node.content || []).map((c: any) => getInlineText(c));
       return ['| ' + cellsText.join(' | ') + ' |'];
     }
+    case 'image': {
+      const altOrId = node.attrs?.alt || node.attrs?.title || node.attrs?.assetId || '无名图片';
+      return [`[图片: ${altOrId}]`];
+    }
     default:
       if (node.content && Array.isArray(node.content)) {
         return node.content.flatMap((c: any) => traverseNode(c));

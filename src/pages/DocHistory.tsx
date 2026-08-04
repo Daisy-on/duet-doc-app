@@ -5,10 +5,12 @@ import { db, type DocumentVersion } from '../db';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { diffLines, jsonToLines, type DiffResult } from '../utils/diff';
 
+import { saveCoordinator } from '../utils/SaveCoordinator';
+
 export default function DocHistory() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
-  const { documents, restoreVersion } = useKnowledgeBaseStore();
+  const { documents, restoreVersion, persistDocumentNow } = useKnowledgeBaseStore();
 
   const doc = documents.find((d) => d.id === docId);
 
@@ -40,6 +42,12 @@ export default function DocHistory() {
     async function fetchVersions() {
       try {
         setLoading(true);
+        if (docId && doc) {
+          await saveCoordinator.pauseAndFlush(docId, async (id, updates) => {
+            await persistDocumentNow(id, updates);
+          });
+          saveCoordinator.resume(docId);
+        }
         const dbVersions = await db.documentVersions
           .where('docId')
           .equals(docId as string)
@@ -145,7 +153,12 @@ export default function DocHistory() {
     
     try {
       setRestoring(true);
-      await restoreVersion(selectedId);
+      const res = await restoreVersion(selectedId);
+      if (res && res.restored === false) {
+        const count = res.missingAssetIds?.length || 0;
+        alert(`恢复版本失败：检测到该历史版本有 ${count} 张图片原始文件已被销毁，无法还原。`);
+        return;
+      }
       // Navigate back to the doc editor
       navigate(`/kb/${kbId}/doc/${docId}`);
     } catch (err) {
