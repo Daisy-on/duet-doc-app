@@ -3,13 +3,19 @@ export interface SaveUpdates {
   title?: string;
 }
 
-type SaveFn = (docId: string, updates: SaveUpdates) => Promise<void>;
+export type SaveFn = (docId: string, updates: SaveUpdates) => Promise<void>;
 
 interface DocumentState {
   timer: number | null;
   pendingUpdates: SaveUpdates | null;
   inFlightPromise: Promise<void> | null;
   isPaused: boolean;
+  isDeleting?: boolean;
+}
+
+export interface DeleteHandle {
+  commit: () => void;
+  rollback: (saveFn?: SaveFn) => void;
 }
 
 class SaveCoordinator {
@@ -23,6 +29,7 @@ class SaveCoordinator {
         pendingUpdates: null,
         inFlightPromise: null,
         isPaused: false,
+        isDeleting: false,
       };
       this.docStates.set(docId, state);
     }
@@ -31,17 +38,18 @@ class SaveCoordinator {
 
   scheduleDocumentAutosave(docId: string, updates: SaveUpdates, saveFn: SaveFn, delay = 800): void {
     const state = this.getOrCreateState(docId);
+
     state.pendingUpdates = {
       ...state.pendingUpdates,
       ...updates,
     };
 
+    if (state.isDeleting || state.isPaused) return;
+
     if (state.timer) {
       window.clearTimeout(state.timer);
       state.timer = null;
     }
-
-    if (state.isPaused) return;
 
     state.timer = window.setTimeout(() => {
       state.timer = null;
@@ -53,6 +61,9 @@ class SaveCoordinator {
 
   async persistDocumentNow(docId: string, updates: SaveUpdates, saveFn: SaveFn): Promise<void> {
     const state = this.getOrCreateState(docId);
+    if (state.isDeleting) {
+      throw new Error(`Document ${docId} is currently being deleted.`);
+    }
     if (state.timer) {
       window.clearTimeout(state.timer);
       state.timer = null;
@@ -66,6 +77,9 @@ class SaveCoordinator {
 
   private async flushPending(docId: string, saveFn: SaveFn): Promise<void> {
     const state = this.getOrCreateState(docId);
+    if (state.isDeleting) {
+      throw new Error(`Document ${docId} is currently being deleted.`);
+    }
     if (!state.pendingUpdates) {
       if (state.inFlightPromise) {
         await state.inFlightPromise;
@@ -108,6 +122,9 @@ class SaveCoordinator {
 
   async pauseAndFlush(docId: string, saveFn: SaveFn): Promise<void> {
     const state = this.getOrCreateState(docId);
+    if (state.isDeleting) {
+      throw new Error(`Document ${docId} is currently being deleted.`);
+    }
     state.isPaused = true;
 
     if (state.timer) {
@@ -129,6 +146,7 @@ class SaveCoordinator {
 
   resume(docId: string, saveFn?: SaveFn): void {
     const state = this.getOrCreateState(docId);
+    if (state.isDeleting) return;
     state.isPaused = false;
 
     if (state.pendingUpdates && saveFn) {
@@ -138,12 +156,18 @@ class SaveCoordinator {
 
   async runExclusive<T>(docId: string, task: () => Promise<T>): Promise<T> {
     const state = this.getOrCreateState(docId);
+    if (state.isDeleting) {
+      throw new Error(`Document ${docId} is currently being deleted.`);
+    }
     if (state.inFlightPromise) {
       try {
         await state.inFlightPromise;
       } catch {
         // ignore
       }
+    }
+    if (state.isDeleting) {
+      throw new Error(`Document ${docId} is currently being deleted.`);
     }
 
     let resolveLock!: () => void;
@@ -160,6 +184,52 @@ class SaveCoordinator {
         state.inFlightPromise = null;
       }
     }
+  }
+
+  async prepareDelete(docIds: string[]): Promise<DeleteHandle> {
+    const statesToRestore: Array<{ docId: string; wasPaused: boolean }> = [];
+
+    for (const docId of docIds) {
+      const state = this.getOrCreateState(docId);
+      const wasPaused = state.isPaused;
+
+      state.isDeleting = true;
+      state.isPaused = true;
+      if (state.timer) {
+        window.clearTimeout(state.timer);
+        state.timer = null;
+      }
+
+      if (state.inFlightPromise) {
+        try {
+          await state.inFlightPromise;
+        } catch {
+          // ignore in-flight error
+        }
+      }
+
+      statesToRestore.push({ docId, wasPaused });
+    }
+
+    return {
+      commit: () => {
+        for (const docId of docIds) {
+          this.docStates.delete(docId);
+        }
+      },
+      rollback: (saveFn?: SaveFn) => {
+        for (const { docId, wasPaused } of statesToRestore) {
+          const state = this.docStates.get(docId);
+          if (state) {
+            state.isDeleting = false;
+            state.isPaused = wasPaused;
+            if (!wasPaused && state.pendingUpdates && saveFn) {
+              this.scheduleDocumentAutosave(docId, {}, saveFn, 100);
+            }
+          }
+        }
+      },
+    };
   }
 }
 

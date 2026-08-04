@@ -58,14 +58,19 @@ export default function MemoCatalogPanel() {
     setRenamingMemoId(null);
   };
 
-  const handleConfirmDelete = () => {
-    if (selectedMemo) {
-      deleteDocument(selectedMemo.id);
-      setIsDeleteModalOpen(false);
-      if (memoId === selectedMemo.id) {
+  const handleConfirmDelete = async () => {
+    if (!selectedMemo) return;
+    try {
+      const wasActiveMemo = memoId === selectedMemo.id;
+      await deleteDocument(selectedMemo.id);
+      if (wasActiveMemo) {
         navigate('/memo');
       }
       setSelectedMemo(null);
+    } catch (err) {
+      console.error('Delete memo failed:', err);
+      alert('删除小记失败，请重试');
+      throw err;
     }
   };
 

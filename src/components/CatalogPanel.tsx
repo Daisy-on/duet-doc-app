@@ -584,21 +584,26 @@ export default function CatalogPanel() {
     setRenamingGroupId(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTargetGroup || !kbId) return;
-    const descendants = getDescendantGroupIds(deleteTargetGroup.id);
-    const deleteGroupIds = [deleteTargetGroup.id, ...descendants];
+    try {
+      const descendants = getDescendantGroupIds(deleteTargetGroup.id);
+      const deleteGroupIds = [deleteTargetGroup.id, ...descendants];
 
-    const isActiveDocDeleted = docId && documents.some(
-      (d) => d.id === docId && deleteGroupIds.includes(d.groupId || '')
-    );
+      const isActiveDocDeleted = docId && documents.some(
+        (d) => d.id === docId && deleteGroupIds.includes(d.groupId || '')
+      );
 
-    deleteGroup(deleteTargetGroup.id);
-    setDeleteTargetGroup(null);
-    setIsDeleteModalOpen(false);
+      await deleteGroup(deleteTargetGroup.id);
+      setDeleteTargetGroup(null);
 
-    if (isActiveDocDeleted) {
-      navigate(`/kb/${kbId}`);
+      if (isActiveDocDeleted) {
+        navigate(`/kb/${kbId}`);
+      }
+    } catch (err) {
+      console.error('Delete group failed:', err);
+      alert('删除分组失败，请重试');
+      throw err;
     }
   };
 
@@ -615,14 +620,19 @@ export default function CatalogPanel() {
     setRenamingDocId(null);
   };
 
-  const handleConfirmDeleteDoc = () => {
+  const handleConfirmDeleteDoc = async () => {
     if (!deleteTargetDoc || !kbId) return;
-    deleteDocument(deleteTargetDoc.id);
-    const wasActiveDoc = docId === deleteTargetDoc.id;
-    setDeleteTargetDoc(null);
-    setIsDeleteDocModalOpen(false);
-    if (wasActiveDoc) {
-      navigate(`/kb/${kbId}`);
+    try {
+      const wasActiveDoc = docId === deleteTargetDoc.id;
+      await deleteDocument(deleteTargetDoc.id);
+      setDeleteTargetDoc(null);
+      if (wasActiveDoc) {
+        navigate(`/kb/${kbId}`);
+      }
+    } catch (err) {
+      console.error('Delete document failed:', err);
+      alert('删除文档失败，请重试');
+      throw err;
     }
   };
 

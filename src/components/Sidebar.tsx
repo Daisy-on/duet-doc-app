@@ -47,14 +47,19 @@ export default function Sidebar() {
     setRenamingKbId(null);
   };
 
-  const handleConfirmDelete = () => {
-    if (deleteTargetKb) {
-      deleteKnowledgeBase(deleteTargetKb.id);
-      setIsDeleteOpen(false);
-      if (activeKbId === deleteTargetKb.id) {
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetKb) return;
+    try {
+      const targetId = deleteTargetKb.id;
+      await deleteKnowledgeBase(targetId);
+      if (activeKbId === targetId) {
         navigate('/');
       }
       setDeleteTargetKb(null);
+    } catch (err) {
+      console.error('Delete knowledge base failed:', err);
+      alert('删除知识库失败，请重试');
+      throw err;
     }
   };
 

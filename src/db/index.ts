@@ -1,4 +1,4 @@
-import Dexie, { type Table } from 'dexie';
+import Dexie, { type Table, type Transaction } from 'dexie';
 import type { KnowledgeBase, Group, Document } from '../store/knowledgeBaseStore';
 import type { FavoriteFolder, FavoriteItem } from '../store/favoritesStore';
 import type { ChatSession, ChatMessage } from '../store/aiWritingStore';
@@ -85,15 +85,23 @@ export class DuetDocDB extends Dexie {
 export const db = new DuetDocDB();
 
 /**
- * 级联删除指定文档列表对应的全套记录（文档主体、历史版本、关联图片资产、收藏项）
+ * 在给定 Dexie 事务内，级联删除指定文档列表对应的全套记录
+ */
+export async function deleteDocumentsCascadeInTx(tx: Transaction, docIds: string[]) {
+  if (!docIds || docIds.length === 0) return;
+  await tx.table('documents').bulkDelete(docIds);
+  await tx.table('documentVersions').where('docId').anyOf(docIds).delete();
+  await tx.table('assets').where('docId').anyOf(docIds).delete();
+  await tx.table('favoriteItems').where('docId').anyOf(docIds).delete();
+}
+
+/**
+ * 独立开启事务进行级联删除
  */
 export async function deleteDocumentsCascade(docIds: string[]) {
   if (!docIds || docIds.length === 0) return;
-  await db.transaction('rw', [db.documents, db.documentVersions, db.assets, db.favoriteItems], async () => {
-    await db.documents.bulkDelete(docIds);
-    await db.documentVersions.where('docId').anyOf(docIds).delete();
-    await db.assets.where('docId').anyOf(docIds).delete();
-    await db.favoriteItems.where('docId').anyOf(docIds).delete();
+  await db.transaction('rw', [db.documents, db.documentVersions, db.assets, db.favoriteItems], async (tx) => {
+    await deleteDocumentsCascadeInTx(tx, docIds);
   });
 }
 

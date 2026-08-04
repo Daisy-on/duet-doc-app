@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Loader2 } from 'lucide-react';
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void> | void;
   title: string;
   description: React.ReactNode;
 }
@@ -16,9 +16,11 @@ export default function ConfirmDeleteModal({
   title,
   description,
 }: ConfirmDeleteModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !isSubmitting) {
         onClose();
       }
     };
@@ -28,14 +30,27 @@ export default function ConfirmDeleteModal({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, isSubmitting, onClose]);
 
   if (!isOpen) return null;
+
+  const handleConfirmClick = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch {
+      // 错误抛出后保留弹窗，允许用户再次尝试
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
-      onClick={onClose}
+      onClick={isSubmitting ? undefined : onClose}
     >
       <div
         className="bg-white rounded-2xl shadow-xl w-[420px] max-w-[90vw] p-5 animate-modal-scale-in border border-gray-100 flex flex-col gap-4"
@@ -51,8 +66,9 @@ export default function ConfirmDeleteModal({
           </h3>
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100 shrink-0"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <X size={16} />
           </button>
@@ -67,20 +83,20 @@ export default function ConfirmDeleteModal({
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onClose}
-            className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             取消
           </button>
           <button
             type="button"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 shadow-sm transition-all cursor-pointer"
+            disabled={isSubmitting}
+            onClick={handleConfirmClick}
+            className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 shadow-sm transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            确认删除
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+            <span>{isSubmitting ? '删除中...' : '确认删除'}</span>
           </button>
         </div>
       </div>

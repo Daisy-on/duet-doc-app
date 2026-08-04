@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
-import { db, deleteDocumentsCascade } from '../db';
+import { db, deleteDocumentsCascadeInTx } from '../db';
 import { useFavoritesStore } from './favoritesStore';
-import { saveCoordinator, type SaveUpdates } from '../utils/SaveCoordinator';
+import { saveCoordinator, type SaveUpdates, type DeleteHandle } from '../utils/SaveCoordinator';
 import { extractAssetIds } from '../utils/assetUtils';
 import { runAssetGC } from '../assets/runAssetGC';
 
@@ -48,12 +48,12 @@ interface KnowledgeBaseStore {
   // Knowledge Base CRUD
   createKnowledgeBase: (name: string, description: string, icon?: string) => string;
   updateKnowledgeBase: (id: string, data: Partial<KnowledgeBase>) => void;
-  deleteKnowledgeBase: (id: string) => void;
+  deleteKnowledgeBase: (id: string) => Promise<void>;
 
   // Group CRUD
   createGroup: (kbId: string, parentGroupId: string | null, name?: string) => string;
   updateGroup: (id: string, data: Partial<Group>) => void;
-  deleteGroup: (id: string) => void;
+  deleteGroup: (id: string) => Promise<void>;
 
   // Document CRUD
   createDocument: (kbId: string, groupId?: string | null, title?: string) => string;
@@ -62,7 +62,7 @@ interface KnowledgeBaseStore {
   persistDocumentNow: (id: string, updates: SaveUpdates) => Promise<void>;
   flushDocumentAutosave: (id: string) => Promise<void>;
   createManualVersion: (docId: string) => Promise<void>;
-  deleteDocument: (id: string) => void;
+  deleteDocument: (id: string) => Promise<void>;
 
   // Query helpers
   getKnowledgeBase: (id: string) => KnowledgeBase | undefined;
@@ -503,18 +503,66 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     }));
   },
 
-  deleteKnowledgeBase: (id) => {
-    const docIds = get().documents.filter((d) => d.kbId === id).map((d) => d.id);
-    docIds.forEach((docId) => useFavoritesStore.getState().removeFavorite(docId));
-    deleteDocumentsCascade(docIds).catch((err) => console.error('Dexie cascade delete error:', err));
+  deleteKnowledgeBase: async (id) => {
+    let docIds: string[] = [];
+    let handle: DeleteHandle | null = null;
 
-    db.knowledgeBases.delete(id).catch(err => console.error('Dexie error:', err));
-    db.groups.where('kbId').equals(id).delete().catch(err => console.error('Dexie error:', err));
-    set((state) => ({
-      knowledgeBases: state.knowledgeBases.filter((kb) => kb.id !== id),
-      groups: state.groups.filter((g) => g.kbId !== id),
-      documents: state.documents.filter((d) => d.kbId !== id),
-    }));
+    try {
+      // 1. 在开启写事务前预先从 DB 识别并建立保存屏障（切勿在 Dexie 事务回调内 await 非 IDB 的外部 Promise）
+      const initialDocs = await db.documents.where('kbId').equals(id).toArray();
+      docIds = initialDocs.map((d) => d.id);
+      handle = await saveCoordinator.prepareDelete(docIds);
+
+      // 2. 开启原子写事务
+      await db.transaction(
+        'rw',
+        [db.knowledgeBases, db.groups, db.documents, db.documentVersions, db.assets, db.favoriteItems],
+        async (tx) => {
+          const dbDocs = await tx.table('documents').where('kbId').equals(id).toArray();
+          const dbGroups = await tx.table('groups').where('kbId').equals(id).toArray();
+          docIds = dbDocs.map((d) => d.id);
+          const groupIds = dbGroups.map((g) => g.id);
+
+          await tx.table('knowledgeBases').delete(id);
+          if (groupIds.length > 0) {
+            await tx.table('groups').bulkDelete(groupIds);
+          }
+          if (docIds.length > 0) {
+            await deleteDocumentsCascadeInTx(tx, docIds);
+          }
+        }
+      );
+    } catch (err) {
+      const h = handle as DeleteHandle | null;
+      if (h) h.rollback(internalPersistDocument);
+      console.error(`Failed to delete knowledge base ${id} in Dexie transaction:`, err);
+      throw err;
+    }
+
+    // 数据库物理删除成功后，提交屏障并更新内存状态
+    const h = handle as DeleteHandle | null;
+    if (h) h.commit();
+
+    try {
+      if (docIds.length > 0) {
+        const docIdSet = new Set(docIds);
+        useFavoritesStore.setState((state) => ({
+          items: state.items.filter((item) => !docIdSet.has(item.docId)),
+        }));
+      }
+
+      set((state) => ({
+        knowledgeBases: state.knowledgeBases.filter((kb) => kb.id !== id),
+        groups: state.groups.filter((g) => g.kbId !== id),
+        documents: state.documents.filter((d) => d.kbId !== id),
+      }));
+    } catch (postCommitErr) {
+      console.error('Post-commit state sync failed, re-initializing stores from DB:', postCommitErr);
+      await Promise.all([
+        get().initStore(),
+        useFavoritesStore.getState().initStore(),
+      ]);
+    }
   },
 
   // Group CRUD
@@ -559,20 +607,87 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     }));
   },
 
-  deleteGroup: (id) => {
-    const descendantIds = get().getDescendantGroupIds(id);
-    const deleteGroupIds = [id, ...descendantIds];
-    
-    const docIds = get().documents.filter((d) => d.groupId && deleteGroupIds.includes(d.groupId)).map((d) => d.id);
-    docIds.forEach((docId) => useFavoritesStore.getState().removeFavorite(docId));
-    deleteDocumentsCascade(docIds).catch((err) => console.error('Dexie cascade delete error:', err));
+  deleteGroup: async (id) => {
+    let docIds: string[] = [];
+    let deleteGroupIdsSet = new Set<string>([id]);
+    let handle: DeleteHandle | null = null;
 
-    db.groups.bulkDelete(deleteGroupIds).catch(err => console.error('Dexie error:', err));
-    set((state) => ({
-      groups: state.groups.filter((g) => !deleteGroupIds.includes(g.id)),
-      // Cascade delete: Remove documents belonging to any of these groups
-      documents: state.documents.filter((doc) => !deleteGroupIds.includes(doc.groupId || '')),
-    }));
+    try {
+      // 1. 事务前收集分组与文档并建立屏障
+      const allGroupsInit = await db.groups.toArray();
+      deleteGroupIdsSet = new Set<string>([id]);
+      let addedInit = true;
+      while (addedInit) {
+        addedInit = false;
+        for (const g of allGroupsInit) {
+          if (g.parentGroupId && deleteGroupIdsSet.has(g.parentGroupId) && !deleteGroupIdsSet.has(g.id)) {
+            deleteGroupIdsSet.add(g.id);
+            addedInit = true;
+          }
+        }
+      }
+      const initialDocs = await db.documents.toArray();
+      docIds = initialDocs.filter((d) => d.groupId && deleteGroupIdsSet.has(d.groupId)).map((d) => d.id);
+      handle = await saveCoordinator.prepareDelete(docIds);
+
+      // 2. 开启原子写事务
+      await db.transaction(
+        'rw',
+        [db.groups, db.documents, db.documentVersions, db.assets, db.favoriteItems],
+        async (tx) => {
+          const allGroups = await tx.table('groups').toArray();
+          deleteGroupIdsSet = new Set<string>([id]);
+          
+          let added = true;
+          while (added) {
+            added = false;
+            for (const g of allGroups) {
+              if (g.parentGroupId && deleteGroupIdsSet.has(g.parentGroupId) && !deleteGroupIdsSet.has(g.id)) {
+                deleteGroupIdsSet.add(g.id);
+                added = true;
+              }
+            }
+          }
+
+          const deleteGroupIds = Array.from(deleteGroupIdsSet);
+          const dbDocs = await tx.table('documents').toArray();
+          docIds = dbDocs.filter((d) => d.groupId && deleteGroupIdsSet.has(d.groupId)).map((d) => d.id);
+
+          await tx.table('groups').bulkDelete(deleteGroupIds);
+          if (docIds.length > 0) {
+            await deleteDocumentsCascadeInTx(tx, docIds);
+          }
+        }
+      );
+    } catch (err) {
+      const h = handle as DeleteHandle | null;
+      if (h) h.rollback(internalPersistDocument);
+      console.error(`Failed to delete group ${id} in Dexie transaction:`, err);
+      throw err;
+    }
+
+    const h = handle as DeleteHandle | null;
+    if (h) h.commit();
+
+    try {
+      if (docIds.length > 0) {
+        const docIdSet = new Set(docIds);
+        useFavoritesStore.setState((state) => ({
+          items: state.items.filter((item) => !docIdSet.has(item.docId)),
+        }));
+      }
+
+      set((state) => ({
+        groups: state.groups.filter((g) => !deleteGroupIdsSet.has(g.id)),
+        documents: state.documents.filter((doc) => !deleteGroupIdsSet.has(doc.groupId || '')),
+      }));
+    } catch (postCommitErr) {
+      console.error('Post-commit state sync failed, re-initializing stores from DB:', postCommitErr);
+      await Promise.all([
+        get().initStore(),
+        useFavoritesStore.getState().initStore(),
+      ]);
+    }
   },
 
   // Document CRUD
@@ -745,12 +860,44 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     });
   },
 
-  deleteDocument: (id) => {
-    useFavoritesStore.getState().removeFavorite(id);
-    deleteDocumentsCascade([id]).catch((err) => console.error('Dexie cascade delete error:', err));
-    set((state) => ({
-      documents: state.documents.filter((doc) => doc.id !== id),
-    }));
+  deleteDocument: async (id) => {
+    let handle: DeleteHandle | null = null;
+
+    try {
+      handle = await saveCoordinator.prepareDelete([id]);
+
+      await db.transaction(
+        'rw',
+        [db.documents, db.documentVersions, db.assets, db.favoriteItems],
+        async (tx) => {
+          await deleteDocumentsCascadeInTx(tx, [id]);
+        }
+      );
+    } catch (err) {
+      const h = handle as DeleteHandle | null;
+      if (h) h.rollback(internalPersistDocument);
+      console.error(`Failed to delete document ${id} in Dexie transaction:`, err);
+      throw err;
+    }
+
+    const h = handle as DeleteHandle | null;
+    if (h) h.commit();
+
+    try {
+      useFavoritesStore.setState((state) => ({
+        items: state.items.filter((item) => item.docId !== id),
+      }));
+
+      set((state) => ({
+        documents: state.documents.filter((doc) => doc.id !== id),
+      }));
+    } catch (postCommitErr) {
+      console.error('Post-commit state sync failed, re-initializing stores from DB:', postCommitErr);
+      await Promise.all([
+        get().initStore(),
+        useFavoritesStore.getState().initStore(),
+      ]);
+    }
   },
 
   // Query helpers
