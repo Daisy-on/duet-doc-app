@@ -427,19 +427,6 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
     }
   });
 
-  useKnowledgeBaseStore.setState((state) => ({
-    documents: state.documents.map((doc) =>
-      doc.id === id
-        ? {
-            ...doc,
-            ...(updates.title !== undefined ? { title: updates.title } : {}),
-            ...(updates.content !== undefined ? { content: updates.content } : {}),
-            updatedAt: now,
-          }
-        : doc
-    ),
-  }));
-
   if (updates.content !== undefined) {
     runAssetGC(id).catch((err) => console.error('Asset GC error:', err));
   }
