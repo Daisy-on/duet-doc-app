@@ -9,29 +9,130 @@ import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARS = 30000;
 
+interface StreamRun {
+  token: symbol;
+  controller: AbortController;
+  assistantMsgId: string;
+  targetSessionId: string;
+
+  textBuffer: string;
+  reasoningBuffer: string;
+  rafId: number | null;
+  thinkingStartTime: number;
+  thinkingDurationMs: number;
+  currentResponseMetadata: AIResponseMetadata;
+
+  stopRequested: boolean;
+  finalized: boolean;
+  finalizationPromise: Promise<void> | null;
+}
+
 export function useAIChat(sessionId: string | null) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeStreamRef = useRef<StreamRun | null>(null);
   const activeSessionIdRef = useRef<string | null>(sessionId);
 
   useEffect(() => {
     activeSessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  const reasoningBufferRef = useRef('');
-  const textBufferRef = useRef('');
-  const rafIdRef = useRef<number | null>(null);
-
   const { isThinkingEnabled, addMessage, updateMessageStream, commitMessage, removeMessage } =
     useAIWritingStore();
 
   const stopGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsGenerating(false);
+    const run = activeStreamRef.current;
+    if (!run || run.finalized) return;
+    run.stopRequested = true;
+    run.controller.abort();
   }, []);
+
+  const finalizeStream = useCallback(
+    async (
+      run: StreamRun,
+      status: 'complete' | 'stopped' | 'error',
+      eventMetadata?: Partial<AIResponseMetadata>
+    ): Promise<void> => {
+      if (run.finalizationPromise) {
+        return run.finalizationPromise;
+      }
+
+      const promise = (async () => {
+        run.finalized = true;
+
+        if (run.rafId !== null) {
+          cancelAnimationFrame(run.rafId);
+          run.rafId = null;
+        }
+
+        if (run.thinkingStartTime && !run.thinkingDurationMs) {
+          run.thinkingDurationMs = Date.now() - run.thinkingStartTime;
+        }
+
+        if (eventMetadata) {
+          Object.assign(run.currentResponseMetadata, eventMetadata);
+        }
+
+        // 如果用户曾请求过停止，且状态为 complete，修正终态为 stopped
+        const finalStatus = run.stopRequested && status === 'complete' ? 'stopped' : status;
+        const hasContent = Boolean(run.textBuffer.trim() || run.reasoningBuffer.trim());
+
+        // 1. 同步更新 Zustand 内存状态，确保即使 IndexedDB 写库失败，UI 也不会卡在 streaming 状态
+        useAIWritingStore.setState((state) => ({
+          messages: state.messages
+            .filter((m) => (finalStatus === 'error' && !hasContent ? m.id !== run.assistantMsgId : true))
+            .map((m) =>
+              m.id === run.assistantMsgId
+                ? {
+                    ...m,
+                    thinkingContent: run.reasoningBuffer,
+                    thinkingDurationMs: run.thinkingDurationMs || undefined,
+                    content: run.textBuffer,
+                    status: finalStatus,
+                    aiMetadata:
+                      Object.keys(run.currentResponseMetadata).length > 0
+                        ? { ...run.currentResponseMetadata }
+                        : undefined,
+                  }
+                : m
+            ),
+        }));
+
+        // 2. 异步持久化到 IndexedDB
+        try {
+          if (!hasContent) {
+            await removeMessage(run.assistantMsgId);
+          } else {
+            const finalMessage: ChatMessage = {
+              id: run.assistantMsgId,
+              sessionId: run.targetSessionId,
+              role: 'assistant',
+              thinkingContent: run.reasoningBuffer,
+              thinkingDurationMs: run.thinkingDurationMs || undefined,
+              content: run.textBuffer,
+              status: finalStatus,
+              aiMetadata:
+                Object.keys(run.currentResponseMetadata).length > 0
+                  ? { ...run.currentResponseMetadata }
+                  : undefined,
+              createdAt: Date.now(),
+            };
+            await commitMessage(finalMessage);
+          }
+        } catch (err) {
+          console.error('Failed to commit message in finalizeStream (IndexedDB error):', err);
+        } finally {
+          if (activeStreamRef.current === run) {
+            activeStreamRef.current = null;
+            setIsGenerating(false);
+          }
+        }
+      })();
+
+      run.finalizationPromise = promise;
+      return promise;
+    },
+    [commitMessage, removeMessage]
+  );
 
   // 异步给新 Session 自动生成简短优雅标题
   const summarizeAndSetTitle = useCallback(async (targetSessionId: string, userPrompt: string) => {
@@ -81,243 +182,221 @@ export function useAIChat(sessionId: string | null) {
 
       stopGeneration();
       setIsGenerating(true);
-      
-      // 清理上一次生成残留的 buffer，防止“重新生成”时文本追加拼接
-      textBufferRef.current = '';
-      reasoningBufferRef.current = '';
-
-      // 1. 创建 User 消息并保存
-      const userMsg: ChatMessage = {
-        id: `msg-${nanoid(12)}`,
-        sessionId: targetSessionId,
-        role: 'user',
-        content: userContent.trim(),
-        referencedDocs,
-        createdAt: Date.now(),
-      };
-      await addMessage(userMsg);
-
-      // 如果当前 Session 标题还是默认的 "新对话"，触发后台智能摘要标题
-      const targetSession = useAIWritingStore.getState().sessions.find((s) => s.id === targetSessionId);
-      if (targetSession && (targetSession.title === '新对话' || !targetSession.title)) {
-        summarizeAndSetTitle(targetSessionId, userContent.trim());
-      }
-
-      // 2. 创建 Assistant 内存草稿
-      const assistantMsgId = `msg-${nanoid(12)}`;
-      const assistantDraft: ChatMessage = {
-        id: assistantMsgId,
-        sessionId: targetSessionId,
-        role: 'assistant',
-        content: '',
-        thinkingContent: '',
-        status: 'streaming',
-        createdAt: Date.now(),
-      };
-
-      useAIWritingStore.setState((state) => ({
-        messages: [...state.messages, assistantDraft],
-      }));
-
-      // 3. 准备历史消息
-      const currentMessages = useAIWritingStore.getState().messages;
-      const historyMsgList = currentMessages
-        .filter(
-          (m) =>
-            m.sessionId === targetSessionId &&
-            m.id !== assistantMsgId &&
-            m.id !== userMsg.id &&
-            (m.status === undefined || m.status === 'complete' || m.status === 'stopped') &&
-            m.content.trim().length > 0
-        )
-        .sort((a, b) => a.createdAt - b.createdAt);
-
-      const slicedHistory = historyMsgList.slice(-MAX_HISTORY_MESSAGES);
-
-      let totalChars = 0;
-      const payloadMessages: AIMessage[] = [];
-
-      for (let i = slicedHistory.length - 1; i >= 0; i--) {
-        const m = slicedHistory[i];
-        if (totalChars + m.content.length > MAX_HISTORY_CHARS) break;
-        totalChars += m.content.length;
-        payloadMessages.unshift({
-          role: m.role,
-          content: m.content,
-        });
-      }
-
-      payloadMessages.push({
-        role: 'user',
-        content: userContent.trim(),
-      });
-
-      // 4. 处理知识库引用上下文
-      const contexts: AIContext[] = [];
-      if (referencedDocs.length > 0) {
-        for (const docRef of referencedDocs) {
-          try {
-            const fullDoc = await db.documents.get(docRef.id);
-            if (fullDoc) {
-              contexts.push({
-                sourceId: fullDoc.id,
-                title: fullDoc.title,
-                content: extractPlainTextFromTiptap(fullDoc.content),
-                sourceType: 'document',
-              });
-            }
-          } catch {
-            // Ignore missing doc
-          }
-        }
-      }
-
-      // 5. 准备请求
-      const request: AIRequest = {
-        task: 'chat',
-        messages: payloadMessages,
-        contexts: contexts.length > 0 ? contexts : undefined,
-        options: {
-          thinking: isThinkingEnabled,
-          maxTokens: 4096,
-          temperature: 0.5,
-        },
-        metadata: {
-          sessionId: targetSessionId,
-        },
-      };
 
       const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      let thinkingStartTime = 0;
-      let thinkingDurationMs = 0;
-
-      const scheduleRAFUpdate = () => {
-        if (rafIdRef.current !== null) return;
-        rafIdRef.current = requestAnimationFrame(() => {
-          rafIdRef.current = null;
-          updateMessageStream(assistantMsgId, {
-            thinkingContent: reasoningBufferRef.current,
-            content: textBufferRef.current,
-          });
-        });
+      const assistantMsgId = `msg-${nanoid(12)}`;
+      const run: StreamRun = {
+        token: Symbol('StreamRun'),
+        controller,
+        assistantMsgId,
+        targetSessionId,
+        textBuffer: '',
+        reasoningBuffer: '',
+        rafId: null,
+        thinkingStartTime: 0,
+        thinkingDurationMs: 0,
+        currentResponseMetadata: {},
+        stopRequested: false,
+        finalized: false,
+        finalizationPromise: null,
       };
 
-      const currentResponseMetadata: AIResponseMetadata = {};
+      // 早期登记：在任何异步准备逻辑执行前，立即注册当前 activeStream
+      activeStreamRef.current = run;
 
       try {
+        // 1. 创建 User 消息并保存
+        const userMsg: ChatMessage = {
+          id: `msg-${nanoid(12)}`,
+          sessionId: targetSessionId,
+          role: 'user',
+          content: userContent.trim(),
+          referencedDocs,
+          createdAt: Date.now(),
+        };
+        await addMessage(userMsg);
+
+        if (run.stopRequested || run.controller.signal.aborted) {
+          await finalizeStream(run, 'stopped');
+          return;
+        }
+
+        // 如果当前 Session 标题还是默认的 "新对话"，触发后台智能摘要标题
+        const targetSession = useAIWritingStore.getState().sessions.find((s) => s.id === targetSessionId);
+        if (targetSession && (targetSession.title === '新对话' || !targetSession.title)) {
+          summarizeAndSetTitle(targetSessionId, userContent.trim());
+        }
+
+        // 2. 创建 Assistant 内存草稿
+        const assistantDraft: ChatMessage = {
+          id: assistantMsgId,
+          sessionId: targetSessionId,
+          role: 'assistant',
+          content: '',
+          thinkingContent: '',
+          status: 'streaming',
+          createdAt: Date.now(),
+        };
+
+        useAIWritingStore.setState((state) => ({
+          messages: [...state.messages, assistantDraft],
+        }));
+
+        if (run.stopRequested || run.controller.signal.aborted) {
+          await finalizeStream(run, 'stopped');
+          return;
+        }
+
+        // 3. 准备历史消息
+        const currentMessages = useAIWritingStore.getState().messages;
+        const historyMsgList = currentMessages
+          .filter(
+            (m) =>
+              m.sessionId === targetSessionId &&
+              m.id !== assistantMsgId &&
+              m.id !== userMsg.id &&
+              (m.status === undefined || m.status === 'complete' || m.status === 'stopped') &&
+              m.content.trim().length > 0
+          )
+          .sort((a, b) => a.createdAt - b.createdAt);
+
+        const slicedHistory = historyMsgList.slice(-MAX_HISTORY_MESSAGES);
+
+        let totalChars = 0;
+        const payloadMessages: AIMessage[] = [];
+
+        for (let i = slicedHistory.length - 1; i >= 0; i--) {
+          const m = slicedHistory[i];
+          if (totalChars + m.content.length > MAX_HISTORY_CHARS) break;
+          totalChars += m.content.length;
+          payloadMessages.unshift({
+            role: m.role,
+            content: m.content,
+          });
+        }
+
+        payloadMessages.push({
+          role: 'user',
+          content: userContent.trim(),
+        });
+
+        // 4. 处理知识库引用上下文
+        const contexts: AIContext[] = [];
+        if (referencedDocs.length > 0) {
+          for (const docRef of referencedDocs) {
+            try {
+              const fullDoc = await db.documents.get(docRef.id);
+              if (fullDoc) {
+                contexts.push({
+                  sourceId: fullDoc.id,
+                  title: fullDoc.title,
+                  content: extractPlainTextFromTiptap(fullDoc.content),
+                  sourceType: 'document',
+                });
+              }
+            } catch {
+              // Ignore missing doc
+            }
+          }
+        }
+
+        if (run.stopRequested || run.controller.signal.aborted) {
+          await finalizeStream(run, 'stopped');
+          return;
+        }
+
+        // 5. 准备请求
+        const request: AIRequest = {
+          task: 'chat',
+          messages: payloadMessages,
+          contexts: contexts.length > 0 ? contexts : undefined,
+          options: {
+            thinking: isThinkingEnabled,
+            maxTokens: 4096,
+            temperature: 0.5,
+          },
+          metadata: {
+            sessionId: targetSessionId,
+          },
+        };
+
+        const scheduleRAFUpdate = () => {
+          if (run.finalized || run.rafId !== null) return;
+          run.rafId = requestAnimationFrame(() => {
+            run.rafId = null;
+            if (run.finalized) return;
+            updateMessageStream(run.assistantMsgId, {
+              thinkingContent: run.reasoningBuffer,
+              content: run.textBuffer,
+            });
+          });
+        };
+
         await AIDispatcher.streamCloudTask(
           request,
           {
             onStart: (event) => {
+              if (run.finalized) return;
               if (event) {
-                if (event.requestId) currentResponseMetadata.requestId = event.requestId;
-                if (event.provider) currentResponseMetadata.provider = event.provider;
-                if (event.model) currentResponseMetadata.model = event.model;
-                if (event.routeReason) currentResponseMetadata.routeReason = event.routeReason;
+                if (event.requestId) run.currentResponseMetadata.requestId = event.requestId;
+                if (event.provider) run.currentResponseMetadata.provider = event.provider;
+                if (event.model) run.currentResponseMetadata.model = event.model;
+                if (event.routeReason) run.currentResponseMetadata.routeReason = event.routeReason;
               }
             },
             onReasoningDelta: (delta) => {
-              if (!thinkingStartTime) {
-                thinkingStartTime = Date.now();
+              if (run.finalized) return;
+              if (!run.thinkingStartTime) {
+                run.thinkingStartTime = Date.now();
               }
-              reasoningBufferRef.current += delta;
+              run.reasoningBuffer += delta;
               scheduleRAFUpdate();
             },
             onTextDelta: (delta) => {
-              if (thinkingStartTime && !thinkingDurationMs) {
-                thinkingDurationMs = Date.now() - thinkingStartTime;
+              if (run.finalized) return;
+              if (run.thinkingStartTime && !run.thinkingDurationMs) {
+                run.thinkingDurationMs = Date.now() - run.thinkingStartTime;
               }
-              textBufferRef.current += delta;
+              run.textBuffer += delta;
               scheduleRAFUpdate();
             },
             onUsage: (event) => {
-              if (event.usage) currentResponseMetadata.usage = event.usage;
-              if (event.routeReason) currentResponseMetadata.routeReason = event.routeReason;
+              if (run.finalized) return;
+              if (event.usage) run.currentResponseMetadata.usage = event.usage;
+              if (event.routeReason) run.currentResponseMetadata.routeReason = event.routeReason;
             },
-            onFinish: async (event) => {
-              if (rafIdRef.current) {
-                cancelAnimationFrame(rafIdRef.current);
-                rafIdRef.current = null;
-              }
-
-              if (thinkingStartTime && !thinkingDurationMs) {
-                thinkingDurationMs = Date.now() - thinkingStartTime;
-              }
-
+            onFinish: (event) => {
+              const meta: Partial<AIResponseMetadata> = {};
               if (event) {
-                if (event.finishReason) currentResponseMetadata.finishReason = event.finishReason;
-                if (event.ttftMs) currentResponseMetadata.ttftMs = event.ttftMs;
-                if (event.totalLatencyMs) currentResponseMetadata.totalLatencyMs = event.totalLatencyMs;
-                if (event.routeReason) currentResponseMetadata.routeReason = event.routeReason;
+                if (event.finishReason) meta.finishReason = event.finishReason;
+                if (event.ttftMs) meta.ttftMs = event.ttftMs;
+                if (event.totalLatencyMs) meta.totalLatencyMs = event.totalLatencyMs;
+                if (event.routeReason) meta.routeReason = event.routeReason;
               }
-
-              const finalMessage: ChatMessage = {
-                ...assistantDraft,
-                thinkingContent: reasoningBufferRef.current,
-                thinkingDurationMs: thinkingDurationMs || undefined,
-                content: textBufferRef.current,
-                status: 'complete',
-                aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
-              };
-
-              await commitMessage(finalMessage);
-              if (abortControllerRef.current === controller) {
-                setIsGenerating(false);
-                abortControllerRef.current = null;
-              }
+              const targetStatus = run.stopRequested ? 'stopped' : 'complete';
+              run.finalizationPromise = finalizeStream(run, targetStatus, meta);
             },
-            onError: async () => {
-              if (rafIdRef.current) {
-                cancelAnimationFrame(rafIdRef.current);
-                rafIdRef.current = null;
-              }
-
-              if (textBufferRef.current || reasoningBufferRef.current) {
-                const finalMessage: ChatMessage = {
-                  ...assistantDraft,
-                  thinkingContent: reasoningBufferRef.current,
-                  thinkingDurationMs: thinkingDurationMs || undefined,
-                  content: textBufferRef.current,
-                  status: 'error',
-                  aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
-                };
-                await commitMessage(finalMessage);
-              } else {
-                await removeMessage(assistantMsgId);
-              }
-              if (abortControllerRef.current === controller) {
-                setIsGenerating(false);
-                abortControllerRef.current = null;
-              }
+            onError: () => {
+              run.finalizationPromise = finalizeStream(run, 'error');
             },
           },
-          controller.signal
+          run.controller.signal
         );
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
-          if (textBufferRef.current || reasoningBufferRef.current) {
-            const stoppedMessage: ChatMessage = {
-              ...assistantDraft,
-              thinkingContent: reasoningBufferRef.current,
-              thinkingDurationMs: thinkingDurationMs || undefined,
-              content: textBufferRef.current,
-              status: 'stopped',
-              aiMetadata: Object.keys(currentResponseMetadata).length > 0 ? { ...currentResponseMetadata } : undefined,
-            };
-            await commitMessage(stoppedMessage);
-          } else {
-            await removeMessage(assistantMsgId);
-          }
-        }
-        if (abortControllerRef.current === controller) {
-          setIsGenerating(false);
-          abortControllerRef.current = null;
+          run.finalizationPromise = finalizeStream(run, 'stopped');
+        } else {
+          run.finalizationPromise = finalizeStream(run, 'error');
         }
       }
+
+      if (!run.finalized) {
+        await finalizeStream(run, run.stopRequested ? 'stopped' : 'error', { routeReason: 'unexpected_eof' });
+      } else if (run.finalizationPromise) {
+        await run.finalizationPromise;
+      }
     },
-    [sessionId, isGenerating, isThinkingEnabled, addMessage, updateMessageStream, commitMessage, removeMessage, stopGeneration, summarizeAndSetTitle]
+    [sessionId, isGenerating, isThinkingEnabled, addMessage, updateMessageStream, finalizeStream, stopGeneration, summarizeAndSetTitle]
   );
 
   // 重新生成当前 Assistant 回答
@@ -348,8 +427,6 @@ export function useAIChat(sessionId: string | null) {
         await removeMessage(m.id);
       }
 
-      // 注意：上一条 User 消息也在之前的删除列表中被保留了，我们需要重新触发回答。
-      // 为了让 sendChatMessage 能直接针对那条 User 消息生成回复，先把那条 User 消息也移除，然后用其 prompt 重新 call sendChatMessage
       await removeMessage(prevUserMsg.id);
 
       await sendChatMessage(prevUserMsg.content, prevUserMsg.referencedDocs || []);
