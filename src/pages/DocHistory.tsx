@@ -5,12 +5,11 @@ import { db, type DocumentVersion } from '../db';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { diffLines, jsonToLines, type DiffResult } from '../utils/diff';
 
-import { saveCoordinator } from '../utils/SaveCoordinator';
 
 export default function DocHistory() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
-  const { documents, restoreVersion, persistDocumentNow } = useKnowledgeBaseStore();
+  const { documents, restoreVersion, flushDocumentAutosave } = useKnowledgeBaseStore();
 
   const doc = documents.find((d) => d.id === docId);
 
@@ -43,10 +42,7 @@ export default function DocHistory() {
       try {
         setLoading(true);
         if (docId && doc) {
-          await saveCoordinator.pauseAndFlush(docId, async (id, updates) => {
-            await persistDocumentNow(id, updates);
-          });
-          saveCoordinator.resume(docId);
+          await flushDocumentAutosave(docId);
         }
         const dbVersions = await db.documentVersions
           .where('docId')

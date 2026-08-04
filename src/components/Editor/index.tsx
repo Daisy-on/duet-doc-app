@@ -28,6 +28,7 @@ import type { CloudAITask } from '../../ai/types';
 import { AIAssistantPopover } from './AIAssistantPopover';
 import { normalizeUrl } from '../../utils/urlUtils';
 import LocalImageExtension from '../../extensions/LocalImageExtension';
+import { runAssetGC } from '../../assets/runAssetGC';
 
 interface BubblePos {
   top: number
@@ -158,6 +159,8 @@ export default function Editor() {
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        link: false,
+        underline: false,
       }),
       CustomCodeBlock.configure({
         lowlight: createLowlight(common),
@@ -350,7 +353,7 @@ export default function Editor() {
     }
   }, [editor, setEditorInstance])
 
-  // 组件卸载时清理定时器
+  // 组件卸载时清理定时器并异步拉起 GC
   useEffect(() => {
     return () => {
       if (timerRef.current) {
@@ -360,6 +363,9 @@ export default function Editor() {
         clearTimeout(ghostTextTimerRef.current);
       }
       AIDispatcher.clearGhostTextRequest();
+      if (currentDocIdRef.current) {
+        runAssetGC(currentDocIdRef.current).catch((err) => console.error('Asset GC error on unmount:', err));
+      }
     }
   }, [])
 

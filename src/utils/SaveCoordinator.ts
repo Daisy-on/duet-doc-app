@@ -1,5 +1,5 @@
 export interface SaveUpdates {
-  content: string;
+  content?: string;
   title?: string;
 }
 
@@ -31,7 +31,10 @@ class SaveCoordinator {
 
   scheduleDocumentAutosave(docId: string, updates: SaveUpdates, saveFn: SaveFn, delay = 800): void {
     const state = this.getOrCreateState(docId);
-    state.pendingUpdates = updates;
+    state.pendingUpdates = {
+      ...state.pendingUpdates,
+      ...updates,
+    };
 
     if (state.timer) {
       window.clearTimeout(state.timer);
@@ -42,7 +45,9 @@ class SaveCoordinator {
 
     state.timer = window.setTimeout(() => {
       state.timer = null;
-      this.flushPending(docId, saveFn);
+      this.flushPending(docId, saveFn).catch((err) => {
+        console.error(`[SaveCoordinator] Background autosave failed for doc ${docId}:`, err);
+      });
     }, delay);
   }
 
@@ -52,7 +57,10 @@ class SaveCoordinator {
       window.clearTimeout(state.timer);
       state.timer = null;
     }
-    state.pendingUpdates = updates;
+    state.pendingUpdates = {
+      ...state.pendingUpdates,
+      ...updates,
+    };
     return this.flushPending(docId, saveFn);
   }
 
@@ -65,7 +73,7 @@ class SaveCoordinator {
       return;
     }
 
-    const updatesToSave = state.pendingUpdates;
+    const updatesToSave = { ...state.pendingUpdates };
     state.pendingUpdates = null;
 
     const previousPromise = state.inFlightPromise || Promise.resolve();
@@ -75,7 +83,16 @@ class SaveCoordinator {
       } catch {
         // ignore error from previous save
       }
-      await saveFn(docId, updatesToSave);
+      try {
+        await saveFn(docId, updatesToSave);
+      } catch (err) {
+        // Restore failed updates back into pendingUpdates if not replaced by newer ones
+        state.pendingUpdates = {
+          ...updatesToSave,
+          ...state.pendingUpdates,
+        };
+        throw err;
+      }
     })();
 
     state.inFlightPromise = currentPromise;
@@ -98,16 +115,25 @@ class SaveCoordinator {
       state.timer = null;
     }
 
-    if (state.pendingUpdates) {
-      await this.flushPending(docId, saveFn);
-    } else if (state.inFlightPromise) {
-      await state.inFlightPromise;
+    try {
+      if (state.pendingUpdates) {
+        await this.flushPending(docId, saveFn);
+      } else if (state.inFlightPromise) {
+        await state.inFlightPromise;
+      }
+    } catch (err) {
+      state.isPaused = false;
+      throw err;
     }
   }
 
-  resume(docId: string): void {
+  resume(docId: string, saveFn?: SaveFn): void {
     const state = this.getOrCreateState(docId);
     state.isPaused = false;
+
+    if (state.pendingUpdates && saveFn) {
+      this.scheduleDocumentAutosave(docId, {}, saveFn, 100);
+    }
   }
 
   async runExclusive<T>(docId: string, task: () => Promise<T>): Promise<T> {

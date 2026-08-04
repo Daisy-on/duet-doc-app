@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MemoCatalogPanel from '../components/MemoCatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
@@ -69,12 +69,13 @@ export default function MemoEdit() {
   const { memoId } = useParams<{ memoId: string }>();
   const navigate = useNavigate();
   
-  const { documents, updateDocument } = useKnowledgeBaseStore();
+  const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
   (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
   const memo = documents.find((d) => d.id === memoId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
+  const [toastText, setToastText] = useState<string | null>(null);
 
   // Sync first <h1> inside the content when memoId changes
   useEffect(() => {
@@ -85,6 +86,30 @@ export default function MemoEdit() {
       }
     }
   }, [memoId]);
+
+  // CTRL+S / CMD+S 手动保存版本快捷键拦截
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (memoId) {
+          createManualVersion(memoId)
+            .then(() => {
+              setToastText('已手动保存版本快照');
+              setTimeout(() => setToastText(null), 2500);
+            })
+            .catch((err) => {
+              console.error('Failed to create manual version:', err);
+              setToastText('手动保存版本失败');
+              setTimeout(() => setToastText(null), 2500);
+            });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [memoId, createManualVersion]);
 
   if (!memo || !memoId) {
     return (
@@ -172,6 +197,14 @@ export default function MemoEdit() {
 
       {/* Right Outline panel */}
       <OutlinePanel />
+
+      {/* 手动保存版本 Toast 提示 */}
+      {toastText && (
+        <div className="fixed top-16 left-1/2 z-50 bg-gray-900/90 text-white text-xs px-4 py-2.5 rounded-lg shadow-xl border border-gray-700/50 animate-toast-in flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span>{toastText}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -105,6 +105,22 @@ body {
   animation: dropdownFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Toast 顶部居中淡入动画 */
+@keyframes toastFadeIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toastFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* --- TipTap 节点还原样式 (对抗 Tailwind Preflight) --- */
 
 /* 列表 */

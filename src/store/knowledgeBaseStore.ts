@@ -4,6 +4,7 @@ import { db, deleteDocumentsCascade } from '../db';
 import { useFavoritesStore } from './favoritesStore';
 import { saveCoordinator, type SaveUpdates } from '../utils/SaveCoordinator';
 import { extractAssetIds } from '../utils/assetUtils';
+import { runAssetGC } from '../assets/runAssetGC';
 
 export const MEMO_KB_ID = 'kb-memo-system';
 
@@ -59,6 +60,8 @@ interface KnowledgeBaseStore {
   updateDocument: (id: string, data: Partial<Document>) => void;
   scheduleDocumentAutosave: (id: string, updates: SaveUpdates) => void;
   persistDocumentNow: (id: string, updates: SaveUpdates) => Promise<void>;
+  flushDocumentAutosave: (id: string) => Promise<void>;
+  createManualVersion: (docId: string) => Promise<void>;
   deleteDocument: (id: string) => void;
 
   // Query helpers
@@ -436,6 +439,10 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
         : doc
     ),
   }));
+
+  if (updates.content !== undefined) {
+    runAssetGC(id).catch((err) => console.error('Asset GC error:', err));
+  }
 };
 
 export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
@@ -595,19 +602,60 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     await saveCoordinator.persistDocumentNow(id, updates, internalPersistDocument);
   },
 
+  flushDocumentAutosave: async (id) => {
+    await saveCoordinator.pauseAndFlush(id, internalPersistDocument);
+    saveCoordinator.resume(id, internalPersistDocument);
+  },
+
+  createManualVersion: async (docId) => {
+    await saveCoordinator.pauseAndFlush(docId, internalPersistDocument);
+    return await saveCoordinator.runExclusive(docId, async () => {
+      try {
+        const now = Date.now();
+        await db.transaction('rw', [db.documents, db.documentVersions], async (tx) => {
+          const docTable = tx.table('documents');
+          const verTable = tx.table('documentVersions');
+
+          const latestDbDoc = await docTable.get(docId);
+          if (!latestDbDoc) return;
+
+          const versionId = `ver-${nanoid(12)}`;
+          await verTable.add({
+            id: versionId,
+            docId,
+            title: latestDbDoc.title,
+            content: latestDbDoc.content,
+            createdAt: now,
+            saveType: 'manual',
+          });
+
+          await enforceVersionLimitInTx(tx, docId);
+        });
+      } finally {
+        saveCoordinator.resume(docId, internalPersistDocument);
+      }
+    });
+  },
+
   updateDocument: (id, data) => {
+    const updatedAt = Date.now();
+    // 1. Synchronously update Zustand memory state for immediate UI feedback (optimistic update)
+    set((state) => ({
+      documents: state.documents.map((doc) =>
+        doc.id === id ? { ...doc, ...data, updatedAt } : doc
+      ),
+    }));
+
+    // 2. Schedule or persist updates
     const updates: SaveUpdates = {
-      content: data.content!,
+      content: data.content,
       title: data.title,
     };
 
     if (data.content !== undefined) {
       saveCoordinator.scheduleDocumentAutosave(id, updates, internalPersistDocument);
     } else if (data.title !== undefined) {
-      const doc = get().documents.find((d) => d.id === id);
-      if (doc) {
-        saveCoordinator.persistDocumentNow(id, { content: doc.content, title: data.title }, internalPersistDocument);
-      }
+      saveCoordinator.persistDocumentNow(id, updates, internalPersistDocument);
     }
   },
 
@@ -617,36 +665,39 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
     const docId = version.docId;
 
-    // 1. Pause and flush any pending autosaves for this docId
+    // 1. Safely pause and flush any pending autosaves for this docId
     await saveCoordinator.pauseAndFlush(docId, internalPersistDocument);
 
     // 2. Run inside exclusive lock for docId
     return await saveCoordinator.runExclusive(docId, async () => {
       try {
-        // 3. Pre-flight check: verify all assetIds in version content exist in IndexedDB
-        const requiredAssetIds = extractAssetIds(version.content);
-        const missingAssetIds: string[] = [];
-        for (const assetId of requiredAssetIds) {
-          const asset = await db.assets.get(assetId);
-          if (!asset || !asset.blob) {
-            missingAssetIds.push(assetId);
-          }
-        }
-
-        if (missingAssetIds.length > 0) {
-          saveCoordinator.resume(docId);
-          return { restored: false, missingAssetIds };
-        }
-
-        const now = Date.now();
-
-        // 4. Perform atomic restore transaction
-        await db.transaction('rw', [db.documents, db.documentVersions], async (tx) => {
+        // 3. Perform ALL operations inside a single atomic Dexie transaction!
+        const result = await db.transaction('rw', [db.documents, db.documentVersions, db.assets], async (tx) => {
           const docTable = tx.table('documents');
           const verTable = tx.table('documentVersions');
+          const assetTable = tx.table('assets');
+
+          const targetVer = await verTable.get(versionId);
+          if (!targetVer) throw new Error('Target version not found');
 
           const latestDbDoc = await docTable.get(docId);
           if (!latestDbDoc) throw new Error('Document not found in DB');
+
+          // Pre-flight check: verify all assetIds in targetVer content exist in IndexedDB and asset.docId === docId
+          const requiredAssetIds = extractAssetIds(targetVer.content);
+          const missingAssetIds: string[] = [];
+          for (const assetId of requiredAssetIds) {
+            const asset = await assetTable.get(assetId);
+            if (!asset || !asset.blob || asset.docId !== docId) {
+              missingAssetIds.push(assetId);
+            }
+          }
+
+          if (missingAssetIds.length > 0) {
+            return { restored: false, missingAssetIds };
+          }
+
+          const now = Date.now();
 
           // Backup current document state into documentVersions table before restoring
           const backupVersionId = `ver-${nanoid(12)}`;
@@ -663,22 +714,33 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
           // Update document with target version content
           await docTable.update(docId, {
-            title: version.title,
-            content: version.content,
+            title: targetVer.title,
+            content: targetVer.content,
             updatedAt: now,
           });
+
+          return { restored: true, title: targetVer.title, content: targetVer.content, updatedAt: now };
         });
 
-        // 5. Update Zustand after transaction succeeds
+        if (!result.restored || !result.title || !result.content || !result.updatedAt) {
+          return { restored: false, missingAssetIds: result.missingAssetIds };
+        }
+
+        const { title: restoredTitle, content: restoredContent, updatedAt: restoredUpdatedAt } = result;
+
+        // 4. Update Zustand after transaction succeeds
         useKnowledgeBaseStore.setState((state) => ({
           documents: state.documents.map((d) =>
-            d.id === docId ? { ...d, title: version.title, content: version.content, updatedAt: now } : d
+            d.id === docId ? { ...d, title: restoredTitle, content: restoredContent, updatedAt: restoredUpdatedAt } : d
           ),
         }));
 
+        // Run Asset GC after restoring
+        runAssetGC(docId).catch((err) => console.error('Asset GC error after restore:', err));
+
         return { restored: true };
       } finally {
-        saveCoordinator.resume(docId);
+        saveCoordinator.resume(docId, internalPersistDocument);
       }
     });
   },

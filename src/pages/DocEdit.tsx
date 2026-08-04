@@ -71,7 +71,7 @@ export default function DocEdit() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
   
-  const { documents, updateDocument } = useKnowledgeBaseStore();
+  const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
   (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
   (window as any).useEditorStore = useEditorStore;
@@ -81,6 +81,7 @@ export default function DocEdit() {
   const { isFavorited } = useFavoritesStore();
   const [isFavOpen, setIsFavOpen] = useState(false);
   const favBtnRef = useRef<HTMLButtonElement>(null);
+  const [toastText, setToastText] = useState<string | null>(null);
 
   // 1. When switching documents (docId changes), ensure the first <h1> inside the content matches the document's external title
   useEffect(() => {
@@ -94,6 +95,30 @@ export default function DocEdit() {
       }
     }
   }, [docId]);
+
+  // 2. CTRL+S / CMD+S 手动保存版本快捷键拦截
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (docId) {
+          createManualVersion(docId)
+            .then(() => {
+              setToastText('已手动保存版本快照');
+              setTimeout(() => setToastText(null), 2500);
+            })
+            .catch((err) => {
+              console.error('Failed to create manual version:', err);
+              setToastText('手动保存版本失败');
+              setTimeout(() => setToastText(null), 2500);
+            });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [docId, createManualVersion]);
 
   // If document doesn't exist, show error and option to redirect
   if (!doc || !docId || !kbId) {
@@ -207,6 +232,14 @@ export default function DocEdit() {
           onClose={() => setIsFavOpen(false)}
           anchorEl={favBtnRef.current}
         />
+      )}
+
+      {/* 手动保存版本 Toast 提示 */}
+      {toastText && (
+        <div className="fixed top-16 left-1/2 z-50 bg-gray-900/90 text-white text-xs px-4 py-2.5 rounded-lg shadow-xl border border-gray-700/50 animate-toast-in flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span>{toastText}</span>
+        </div>
       )}
     </div>
   );
