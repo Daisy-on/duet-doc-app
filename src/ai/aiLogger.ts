@@ -3,6 +3,8 @@ export type AIRuntime = 'local' | 'cloud';
 export type AITraceStatus =
   | 'started'
   | 'completed'
+  | 'rendered'
+  | 'discarded'
   | 'aborted'
   | 'stale'
   | 'dropped'
@@ -29,6 +31,17 @@ export interface AITrace {
   clientFirstTextMs?: number;
   clientTotalLatencyMs?: number;
   totalLatencyMs?: number;
+  modelLoadMs?: number;
+
+  outputChars?: number;
+  discardReason?:
+    | 'empty_result'
+    | 'document_changed'
+    | 'editor_destroyed'
+    | 'selection_changed'
+    | 'cursor_changed'
+    | 'empty_after_clean'
+    | 'command_rejected';
 
   usage?: {
     inputTokens?: number;
@@ -39,8 +52,6 @@ export interface AITrace {
   finishReason?: string;
   errorCode?: string;
   errorMessage?: string;
-  
-  progress?: number;
 }
 
 export function logAITrace(trace: AITrace): void {

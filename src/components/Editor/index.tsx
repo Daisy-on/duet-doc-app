@@ -29,10 +29,28 @@ import { AIAssistantPopover } from './AIAssistantPopover';
 import { normalizeUrl } from '../../utils/urlUtils';
 import LocalImageExtension from '../../extensions/LocalImageExtension';
 import { runAssetGC } from '../../assets/runAssetGC';
+import { logAITrace, type AITrace } from '../../ai/aiLogger';
 
 interface BubblePos {
   top: number
   left: number
+}
+
+type GhostTextDiscardReason = NonNullable<AITrace['discardReason']>;
+
+function logGhostTextUIOutcome(
+  requestId: string,
+  status: 'rendered' | 'discarded',
+  options?: { discardReason?: GhostTextDiscardReason; outputChars?: number }
+): void {
+  logAITrace({
+    requestId,
+    runtime: 'local',
+    kind: 'generation',
+    task: 'ghost-text-ui',
+    status,
+    ...options,
+  });
 }
 
 // 从 ProseMirror 文档树中提取标题列表
@@ -134,21 +152,61 @@ export default function Editor() {
         maxNewTokens: 16,
       });
 
-      if (!result?.text) return;
-      if (requestDocId !== currentDocIdRef.current) return;
-      if (editor.isDestroyed) return;
+      if (!result) return;
+      if (!result.text) {
+        logGhostTextUIOutcome(result.requestId, 'discarded', {
+          discardReason: 'empty_result',
+        });
+        return;
+      }
+      if (requestDocId !== currentDocIdRef.current) {
+        logGhostTextUIOutcome(result.requestId, 'discarded', {
+          discardReason: 'document_changed',
+          outputChars: result.text.length,
+        });
+        return;
+      }
+      if (editor.isDestroyed) {
+        logGhostTextUIOutcome(result.requestId, 'discarded', {
+          discardReason: 'editor_destroyed',
+          outputChars: result.text.length,
+        });
+        return;
+      }
 
       const { from, to } = editor.state.selection;
-      if (from !== to) return;
-      if (from !== requestCursorPos) return;
+      if (from !== to) {
+        logGhostTextUIOutcome(result.requestId, 'discarded', {
+          discardReason: 'selection_changed',
+          outputChars: result.text.length,
+        });
+        return;
+      }
+      if (from !== requestCursorPos) {
+        logGhostTextUIOutcome(result.requestId, 'discarded', {
+          discardReason: 'cursor_changed',
+          outputChars: result.text.length,
+        });
+        return;
+      }
 
       const text = cleanGhostText(result.text, promptInput.contextText);
-      if (!text) return;
+      if (!text) {
+        logGhostTextUIOutcome(result.requestId, 'discarded', {
+          discardReason: 'empty_after_clean',
+          outputChars: 0,
+        });
+        return;
+      }
 
-      editor.commands.setGhostText({
+      const wasSet = editor.commands.setGhostText({
         text,
         pos: requestCursorPos,
         requestId: result.requestId,
+      });
+      logGhostTextUIOutcome(result.requestId, wasSet ? 'rendered' : 'discarded', {
+        discardReason: wasSet ? undefined : 'command_rejected',
+        outputChars: text.length,
       });
     }, 500);
   }, [currentDocId]);

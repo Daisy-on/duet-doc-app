@@ -35,7 +35,13 @@ let inFlightStartedAt = 0;
 
 let hasDroppedRequest = false;
 let cooldownTimer: number | null = null;
-let lastLoggedProgressPercent = -1;
+let modelLoadStartedAt: number | null = null;
+
+function getModelLoadElapsedMs(): number | undefined {
+  return modelLoadStartedAt === null
+    ? undefined
+    : performance.now() - modelLoadStartedAt;
+}
 
 function getWorker() {
   if (worker) return worker;
@@ -48,25 +54,6 @@ function getWorker() {
     const message = event.data;
 
     if (message.type === 'load-progress') {
-      const payload = message.payload as { progress?: number; status?: string } | undefined;
-      const progress = typeof payload?.progress === 'number' ? Math.round(payload.progress) : undefined;
-
-      if (progress !== undefined) {
-        // 阀化日志输出：25%, 50%, 75%, 100%
-        if (progress % 25 === 0 && progress !== lastLoggedProgressPercent) {
-          lastLoggedProgressPercent = progress;
-          logAITrace({
-            requestId: 'model-init',
-            runtime: 'local',
-            kind: 'model-load',
-            task: 'ghost-text-load',
-            status: 'started',
-            progress,
-            device: detectedGpuDevice,
-            dtype: 'q4f16',
-          });
-        }
-      }
       return;
     }
 
@@ -75,13 +62,16 @@ function getWorker() {
       if (message.payload?.deviceName) {
         detectedGpuDevice = message.payload.deviceName;
       }
+      const modelLoadMs = getModelLoadElapsedMs();
+      modelLoadStartedAt = null;
       logAITrace({
         requestId: 'model-init',
         runtime: 'local',
         kind: 'model-load',
         task: 'ghost-text-load',
         status: 'completed',
-        progress: 100,
+        model: 'qwen3.5-0.8b-opt',
+        modelLoadMs,
         device: detectedGpuDevice,
         dtype: 'q4f16',
       });
@@ -89,7 +79,25 @@ function getWorker() {
     }
 
     if (message.type === 'error') {
-      status = status === 'loading' ? 'error' : status;
+      const failedDuringModelLoad = status === 'loading';
+      if (failedDuringModelLoad) {
+        status = 'error';
+        const modelLoadMs = getModelLoadElapsedMs();
+        modelLoadStartedAt = null;
+        logAITrace({
+          requestId: 'model-init',
+          runtime: 'local',
+          kind: 'model-load',
+          task: 'ghost-text-load',
+          status: 'failed',
+          model: 'qwen3.5-0.8b-opt',
+          modelLoadMs,
+          device: detectedGpuDevice,
+          dtype: 'q4f16',
+          errorCode: 'MODEL_LOAD_ERROR',
+          errorMessage: message.payload.message,
+        });
+      }
 
       // 当前 in-flight 请求出错
       if (message.requestId && message.requestId === inFlightRequestId) {
@@ -175,15 +183,47 @@ export function loadGhostTextModel() {
   if (status === 'loading' || status === 'ready') return;
 
   status = 'loading';
+  modelLoadStartedAt = performance.now();
 
-  getWorker().postMessage({
-    type: 'load',
-    payload: {
-      modelPath: GHOST_TEXT_MODEL_PATH,
-      dtype: 'q4f16',
-      device: 'webgpu',
-    },
+  logAITrace({
+    requestId: 'model-init',
+    runtime: 'local',
+    kind: 'model-load',
+    task: 'ghost-text-load',
+    status: 'started',
+    model: 'qwen3.5-0.8b-opt',
+    device: detectedGpuDevice,
+    dtype: 'q4f16',
   });
+
+  try {
+    getWorker().postMessage({
+      type: 'load',
+      payload: {
+        modelPath: GHOST_TEXT_MODEL_PATH,
+        dtype: 'q4f16',
+        device: 'webgpu',
+      },
+    });
+  } catch (error) {
+    status = 'error';
+    const modelLoadMs = getModelLoadElapsedMs();
+    modelLoadStartedAt = null;
+    logAITrace({
+      requestId: 'model-init',
+      runtime: 'local',
+      kind: 'model-load',
+      task: 'ghost-text-load',
+      status: 'failed',
+      model: 'qwen3.5-0.8b-opt',
+      modelLoadMs,
+      device: detectedGpuDevice,
+      dtype: 'q4f16',
+      errorCode: 'MODEL_LOAD_START_ERROR',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 export function getGhostTextStatus() {
