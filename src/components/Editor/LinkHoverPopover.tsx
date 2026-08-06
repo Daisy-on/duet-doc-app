@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import type { Editor } from '@tiptap/core'
 import { ExternalLink, Edit2, Copy, Unlink } from 'lucide-react'
 import { normalizeUrl } from '../../utils/urlUtils'
@@ -23,14 +23,14 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
     isOverPopover: false,
   })
 
-  const cancelClose = () => {
+  const cancelClose = useCallback(() => {
     if (hoverRef.current.timeout) {
       clearTimeout(hoverRef.current.timeout)
       hoverRef.current.timeout = null
     }
-  }
+  }, [])
 
-  const scheduleClose = (delay = 300) => {
+  const scheduleClose = useCallback((delay = 300) => {
     cancelClose()
     hoverRef.current.timeout = setTimeout(() => {
       if (!hoverRef.current.isOverPopover) {
@@ -41,10 +41,12 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
         hoverRef.current.anchor = null
       }
     }, delay)
-  }
+  }, [cancelClose])
 
   useEffect(() => {
-    if (!editor || !containerRef.current) return
+    const container = containerRef.current
+    const hoverState = hoverRef.current
+    if (!editor || !container) return
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement
@@ -52,17 +54,17 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
       // If mouse is moving over/into the popover itself
       if (target.closest('.link-hover-popover')) {
         cancelClose()
-        hoverRef.current.isOverPopover = true
+        hoverState.isOverPopover = true
         return
       }
 
       const anchor = target.closest('a')
-      if (anchor && containerRef.current?.contains(anchor)) {
+      if (anchor && container.contains(anchor)) {
         cancelClose()
         
         // Reset background on previous anchor if different
-        if (hoverRef.current.anchor && hoverRef.current.anchor !== anchor) {
-          hoverRef.current.anchor.style.backgroundColor = ''
+        if (hoverState.anchor && hoverState.anchor !== anchor) {
+          hoverState.anchor.style.backgroundColor = ''
         }
 
         const rawHref = anchor.getAttribute('href') || ''
@@ -73,7 +75,7 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
           anchor.setAttribute('rel', 'noopener noreferrer')
         }
 
-        hoverRef.current.anchor = anchor
+        hoverState.anchor = anchor
         anchor.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
         anchor.style.borderRadius = '2px'
 
@@ -89,27 +91,34 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
       const related = e.relatedTarget as HTMLElement
       if (related?.closest('.link-hover-popover')) {
         cancelClose()
-        hoverRef.current.isOverPopover = true
+        hoverState.isOverPopover = true
         return
       }
 
       const target = e.target as HTMLElement
       const anchor = target.closest('a')
-      if (anchor && anchor === hoverRef.current.anchor) {
+      if (anchor && anchor === hoverState.anchor) {
         scheduleClose(300)
       }
     }
 
-    const container = containerRef.current
     container.addEventListener('mouseover', handleMouseOver)
     container.addEventListener('mouseout', handleMouseOut)
 
     return () => {
       container.removeEventListener('mouseover', handleMouseOver)
       container.removeEventListener('mouseout', handleMouseOut)
-      if (hoverRef.current.timeout) clearTimeout(hoverRef.current.timeout)
+      if (hoverState.timeout) {
+        clearTimeout(hoverState.timeout)
+        hoverState.timeout = null
+      }
+      if (hoverState.anchor) {
+        hoverState.anchor.style.backgroundColor = ''
+        hoverState.anchor = null
+      }
+      hoverState.isOverPopover = false
     }
-  }, [editor, containerRef])
+  }, [editor, containerRef, cancelClose, scheduleClose])
 
   if (!open) return null
 
@@ -149,7 +158,9 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
             try {
               const pos = editor.view.posAtDOM(hoverRef.current.anchor, 0)
               editor.commands.setTextSelection(pos)
-            } catch(e) {}
+            } catch {
+              // DOM node rebuild fallback
+            }
           }
           if (hoverRef.current.anchor) hoverRef.current.anchor.style.backgroundColor = ''
           setOpen(false)
@@ -182,7 +193,7 @@ export default function LinkHoverPopover({ editor, containerRef }: LinkHoverPopo
               const pos = editor.view.posAtDOM(hoverRef.current.anchor, 0)
               editor.commands.setTextSelection(pos)
               editor.chain().focus().extendMarkRange('link').unsetLink().run()
-            } catch(e) {
+            } catch {
               editor.chain().focus().unsetLink().run()
             }
           }

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import type { JSONContent } from '@tiptap/core';
 import CatalogPanel from '../components/CatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
 import Editor from '../components/Editor';
@@ -27,9 +28,12 @@ function replaceFirstH1(content: string, newTitle: string): string {
   const isJson = content.trim().startsWith('{');
   if (isJson) {
     try {
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as JSONContent;
+      if (!parsed || typeof parsed !== 'object') {
+        return content;
+      }
       let found = false;
-      const traverse = (node: any) => {
+      const traverse = (node: JSONContent) => {
         if (found) return;
         if (node.type === 'heading' && node.attrs?.level === 1) {
           node.content = [{ type: 'text', text: newTitle }];
@@ -44,7 +48,7 @@ function replaceFirstH1(content: string, newTitle: string): string {
       };
       traverse(parsed);
       if (!found) {
-        const h1Node = {
+        const h1Node: JSONContent = {
           type: 'heading',
           attrs: { level: 1 },
           content: [{ type: 'text', text: newTitle }]
@@ -73,28 +77,34 @@ export default function DocEdit() {
   
   const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
-  (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
-  (window as any).useEditorStore = useEditorStore;
   const doc = documents.find((d) => d.id === docId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
   const { isFavorited } = useFavoritesStore();
   const [isFavOpen, setIsFavOpen] = useState(false);
-  const favBtnRef = useRef<HTMLButtonElement>(null);
+  const [favBtnEl, setFavBtnEl] = useState<HTMLButtonElement | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    window.useKnowledgeBaseStore = useKnowledgeBaseStore;
+    window.useEditorStore = useEditorStore;
+    return () => {
+      delete window.useKnowledgeBaseStore;
+      delete window.useEditorStore;
+    };
+  }, []);
 
   // 1. When switching documents (docId changes), ensure the first <h1> inside the content matches the document's external title
   useEffect(() => {
-    console.log('[DocEdit] docId changed:', docId, 'doc:', doc);
-    if (doc) {
-      const updatedContent = replaceFirstH1(doc.content, doc.title);
-      console.log('[DocEdit] updatedContent on load:', updatedContent);
-      if (updatedContent !== doc.content) {
-        console.log('[DocEdit] Mismatch found on load, updating doc store');
-        updateDocument(doc.id, { content: updatedContent });
-      }
+    if (!docId) return;
+    const currentDoc = useKnowledgeBaseStore.getState().documents.find((item) => item.id === docId);
+    if (!currentDoc) return;
+    const updatedContent = replaceFirstH1(currentDoc.content, currentDoc.title);
+    if (updatedContent !== currentDoc.content) {
+      updateDocument(currentDoc.id, { content: updatedContent });
     }
-  }, [docId]);
+  }, [docId, updateDocument]);
 
   // 2. CTRL+S / CMD+S 手动保存版本快捷键拦截
   useEffect(() => {
@@ -190,9 +200,11 @@ export default function DocEdit() {
           </div>
           <div className="flex items-center gap-4 text-text-secondary">
             <button
-              ref={favBtnRef}
               title="收藏"
-              onClick={() => setIsFavOpen((prev) => !prev)}
+              onClick={(e) => {
+                setFavBtnEl(e.currentTarget);
+                setIsFavOpen((prev) => !prev);
+              }}
               className={`cursor-pointer transition-colors flex hover:text-text-primary ${
                 isFavorited(docId ?? '') ? 'text-yellow-400' : ''
               }`}
@@ -229,8 +241,11 @@ export default function DocEdit() {
         <FavoritePopover
           docId={docId}
           isOpen={isFavOpen}
-          onClose={() => setIsFavOpen(false)}
-          anchorEl={favBtnRef.current}
+          onClose={() => {
+            setIsFavOpen(false);
+            setFavBtnEl(null);
+          }}
+          anchorEl={favBtnEl}
         />
       )}
 

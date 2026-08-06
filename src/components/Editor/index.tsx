@@ -402,12 +402,14 @@ export default function Editor() {
   // 同步 editor 实例到全局 store
   useEffect(() => {
     setEditorInstance(editor)
-    if (editor) {
-      (window as any).editor = editor
+    if (import.meta.env.DEV && editor) {
+      window.editor = editor
     }
     return () => {
       setEditorInstance(null)
-      delete (window as any).editor
+      if (import.meta.env.DEV) {
+        delete window.editor
+      }
     }
   }, [editor, setEditorInstance])
 

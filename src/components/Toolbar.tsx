@@ -362,7 +362,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
-  const handleOpen = () => {
+  const handleOpen = useCallback(() => {
     // 聚焦编辑器，确保我们能拿到正确的选区
     editor.commands.focus()
     
@@ -390,7 +390,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
     setTimeout(() => {
       inputRef.current?.focus()
     }, 50)
-  }
+  }, [editor])
 
   const handleSubmit = () => {
     const normalized = normalizeUrl(url)
@@ -492,7 +492,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
     }
     window.addEventListener('duet-edit-link', onCustomEdit)
     return () => window.removeEventListener('duet-edit-link', onCustomEdit)
-  }, [editor])
+  }, [handleOpen])
 
   // 按下 Esc 或 Enter
   const handleKeyDown = (e: React.KeyboardEvent) => {

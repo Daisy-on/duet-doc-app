@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Search, Folder, ChevronDown, ChevronRight, FileText, Check, AlertCircle } from 'lucide-react';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../../store/knowledgeBaseStore';
 import type { Group, Document, KnowledgeBase } from '../../store/knowledgeBaseStore';
@@ -54,14 +54,26 @@ export default function KBTreePickerModal({
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
   // Filter out system memo KB
-  const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
+  const visibleKBs = useMemo(
+    () => knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID),
+    [knowledgeBases]
+  );
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  const prevIsOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
       // Auto-expand all KBs by default
       const defaultExpanded: Record<string, boolean> = {};
       visibleKBs.forEach((kb) => {
@@ -77,10 +89,8 @@ export default function KBTreePickerModal({
       setSelectedGroupId(null);
       setSearchQuery('');
     }
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, defaultTitle]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, defaultTitle, visibleKBs]);
 
   if (!isOpen) return null;
 

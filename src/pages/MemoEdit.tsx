@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import type { JSONContent } from '@tiptap/core';
 import MemoCatalogPanel from '../components/MemoCatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
 import Editor from '../components/Editor';
@@ -25,9 +26,12 @@ function replaceFirstH1(content: string, newTitle: string): string {
   const isJson = content.trim().startsWith('{');
   if (isJson) {
     try {
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as JSONContent;
+      if (!parsed || typeof parsed !== 'object') {
+        return content;
+      }
       let found = false;
-      const traverse = (node: any) => {
+      const traverse = (node: JSONContent) => {
         if (found) return;
         if (node.type === 'heading' && node.attrs?.level === 1) {
           node.content = [{ type: 'text', text: newTitle }];
@@ -42,7 +46,7 @@ function replaceFirstH1(content: string, newTitle: string): string {
       };
       traverse(parsed);
       if (!found) {
-        const h1Node = {
+        const h1Node: JSONContent = {
           type: 'heading',
           attrs: { level: 1 },
           content: [{ type: 'text', text: newTitle }]
@@ -71,21 +75,29 @@ export default function MemoEdit() {
   
   const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
-  (window as any).useKnowledgeBaseStore = useKnowledgeBaseStore;
   const memo = documents.find((d) => d.id === memoId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
   const [toastText, setToastText] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    window.useKnowledgeBaseStore = useKnowledgeBaseStore;
+    return () => {
+      delete window.useKnowledgeBaseStore;
+    };
+  }, []);
+
   // Sync first <h1> inside the content when memoId changes
   useEffect(() => {
-    if (memo) {
-      const updatedContent = replaceFirstH1(memo.content, memo.title);
-      if (updatedContent !== memo.content) {
-        updateDocument(memo.id, { content: updatedContent });
-      }
+    if (!memoId) return;
+    const currentMemo = useKnowledgeBaseStore.getState().documents.find((item) => item.id === memoId);
+    if (!currentMemo) return;
+    const updatedContent = replaceFirstH1(currentMemo.content, currentMemo.title);
+    if (updatedContent !== currentMemo.content) {
+      updateDocument(currentMemo.id, { content: updatedContent });
     }
-  }, [memoId]);
+  }, [memoId, updateDocument]);
 
   // CTRL+S / CMD+S 手动保存版本快捷键拦截
   useEffect(() => {
