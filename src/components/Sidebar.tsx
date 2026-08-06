@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Home, Sparkles, StickyNote, Star, Folder, Search, Plus, MoreHorizontal } from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
-import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
+import { useKnowledgeBaseStore, MEMO_KB_ID, type KnowledgeBase } from '../store/knowledgeBaseStore';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import { useLayoutStore } from '../store';
 import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
@@ -24,7 +24,7 @@ export default function Sidebar() {
   // Modal & Menu states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deleteTargetKb, setDeleteTargetKb] = useState<any | null>(null);
+  const [deleteTargetKb, setDeleteTargetKb] = useState<KnowledgeBase | null>(null);
 
   // Rename states
   const [renamingKbId, setRenamingKbId] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export default function Sidebar() {
   // Dropdown states
   const [activeMenuKbId, setActiveMenuKbId] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
-  const [selectedKb, setSelectedKb] = useState<any | null>(null);
+  const [selectedKb, setSelectedKb] = useState<KnowledgeBase | null>(null);
 
   const handleStartRename = (id: string, name: string) => {
     setRenamingKbId(id);

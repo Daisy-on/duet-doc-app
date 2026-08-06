@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
-import { db, deleteDocumentsCascadeInTx } from '../db';
+import type { Transaction } from 'dexie';
+import { db, deleteDocumentsCascadeInTx, type DocumentVersion } from '../db';
 import { useFavoritesStore } from './favoritesStore';
 import { saveCoordinator, type SaveUpdates, type DeleteHandle } from '../utils/SaveCoordinator';
 import { extractAssetIds } from '../utils/assetUtils';
@@ -87,18 +88,18 @@ interface KnowledgeBaseStore {
 
 const generateId = () => nanoid(12);
 
-const enforceVersionLimitInTx = async (tx: any, docId: string) => {
+const enforceVersionLimitInTx = async (tx: Transaction, docId: string) => {
   try {
-    const versions = await tx.table('documentVersions').where('docId').equals(docId).toArray();
+    const versions = await tx.table<DocumentVersion, string>('documentVersions').where('docId').equals(docId).toArray();
     const targetVersions = versions
-      .filter((v: any) => v.saveType === 'auto' || v.saveType === 'manual')
-      .sort((a: any, b: any) => a.createdAt - b.createdAt);
+      .filter((v) => v.saveType === 'auto' || v.saveType === 'manual')
+      .sort((a, b) => a.createdAt - b.createdAt);
     if (targetVersions.length > 50) {
       const toDeleteCount = targetVersions.length - 50;
-      const autoVersions = targetVersions.filter((v: any) => v.saveType === 'auto');
+      const autoVersions = targetVersions.filter((v) => v.saveType === 'auto');
       const toDeleteIds = (autoVersions.length >= toDeleteCount ? autoVersions : targetVersions)
         .slice(0, toDeleteCount)
-        .map((v: any) => v.id);
+        .map((v) => v.id);
       await tx.table('documentVersions').bulkDelete(toDeleteIds);
     }
   } catch (err) {
@@ -359,8 +360,8 @@ let games = reactive([
 const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
   const now = Date.now();
   await db.transaction('rw', [db.documents, db.documentVersions, db.assets], async (tx) => {
-    const docTable = tx.table('documents');
-    const verTable = tx.table('documentVersions');
+    const docTable = tx.table<Document, string>('documents');
+    const verTable = tx.table<DocumentVersion, string>('documentVersions');
 
     const existingDoc = await docTable.get(id);
     if (!existingDoc) return;
@@ -389,8 +390,8 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
 
       const versions = await verTable.where('docId').equals(id).toArray();
       const autoVersions = versions
-        .filter((v: any) => v.saveType === 'auto')
-        .sort((a: any, b: any) => a.createdAt - b.createdAt);
+        .filter((v) => v.saveType === 'auto')
+        .sort((a, b) => a.createdAt - b.createdAt);
       const latestVersion = autoVersions[autoVersions.length - 1];
       const FIVE_MINUTES = 5 * 60 * 1000;
 

@@ -1,4 +1,4 @@
-import { pipeline, env, type TextGenerationOutput } from '@huggingface/transformers';
+import { pipeline, env, type TextGenerationOutput, type ProgressInfo } from '@huggingface/transformers';
 
 // 告诉 Transformers.js 不要尝试从 HuggingFace Hub 下载模型，而是从本地加载
 // 注意：如果你放在 public/ 下，Vite dev server 会自动提供静态文件服务
@@ -17,7 +17,7 @@ async function testTextGeneration() {
     {
       dtype: 'q4f16',             // 使用 q4f16 量化
       device: 'webgpu',           // 优先 WebGPU；如果不支持会自动降级到 wasm
-      progress_callback: (progress: any) => {
+      progress_callback: (progress: ProgressInfo) => {
         // 模型加载进度回调
         if (progress.status === 'progress') {
           console.log(`📦 加载中: ${progress.file} - ${Math.round(progress.progress)}%`);

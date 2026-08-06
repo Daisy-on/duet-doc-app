@@ -41,7 +41,7 @@ export const assetRepository = {
       return asset;
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'QuotaExceededError') {
-        throw new Error('本地存储空间不足，无法保存图片');
+        throw new Error('本地存储空间不足，无法保存图片', { cause: err });
       }
       throw err;
     }

@@ -1,8 +1,8 @@
-import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
+import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from '@tiptap/react'
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react'
 
-export default function CodeBlockNodeView({ node, updateAttributes }: any) {
+export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [copied, setCopied] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
@@ -224,7 +224,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: any) {
       {/* 代码编辑区始终可见，通过 data-theme 设置主题让 CSS 进行高亮渲染 */}
       <div data-theme={theme} className="rounded-b-xl">
         <pre className={`!m-0 !bg-transparent !p-4 !border-none ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
-          <NodeViewContent as={"code" as any} className={`language-${language}`} />
+          <NodeViewContent<'code'> as="code" className={`language-${language}`} />
         </pre>
       </div>
     </NodeViewWrapper>

@@ -45,7 +45,7 @@ const renderer = new marked.Renderer();
 // Custom code block renderer with lowlight syntax highlighting
 renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
   const validLang = lang && lowlight.registered(lang) ? lang : null;
-  let highlightedHtml = '';
+  let highlightedHtml: string;
 
   if (validLang) {
     try {

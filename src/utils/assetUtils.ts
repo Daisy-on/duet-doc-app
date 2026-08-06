@@ -1,3 +1,5 @@
+import type { JSONContent } from '@tiptap/core';
+
 /**
  * 从 JSON 或 HTML 文档正文中提取所有引用的 assetId 集合
  */
@@ -8,11 +10,12 @@ export function extractAssetIds(content: string): Set<string> {
   const trimmed = content.trim();
   if (trimmed.startsWith('{')) {
     try {
-      const jsonDoc = JSON.parse(trimmed);
-      const traverse = (node: any) => {
+      const jsonDoc = JSON.parse(trimmed) as JSONContent;
+      const traverse = (node: JSONContent) => {
         if (!node) return;
-        if (node.type === 'image' && node.attrs?.assetId) {
-          assetIds.add(node.attrs.assetId);
+        const assetId = node.attrs?.assetId;
+        if (node.type === 'image' && typeof assetId === 'string') {
+          assetIds.add(assetId);
         }
         if (Array.isArray(node.content)) {
           node.content.forEach(traverse);

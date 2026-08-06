@@ -1,3 +1,5 @@
+import type { JSONContent } from '@tiptap/core';
+
 export interface DiffLine {
   text: string;
   type: 'added' | 'deleted' | 'normal' | 'empty';
@@ -9,22 +11,22 @@ export interface DiffResult {
   right: DiffLine;
 }
 
-function getInlineText(node: any): string {
+function getInlineText(node: JSONContent): string {
   if (!node.content) return '';
   return node.content
-    .map((c: any) => {
+    .map((c) => {
       if (c.type === 'text') return c.text || '';
       return getInlineText(c);
     })
     .join('');
 }
 
-function traverseNode(node: any, listPrefix: string = ''): string[] {
+function traverseNode(node: JSONContent, listPrefix = ''): string[] {
   if (!node) return [];
 
   switch (node.type) {
     case 'doc':
-      return (node.content || []).flatMap((c: any) => traverseNode(c));
+      return (node.content || []).flatMap((c) => traverseNode(c));
     case 'heading': {
       const level = node.attrs?.level || 1;
       const hash = '#'.repeat(level);
@@ -36,15 +38,15 @@ function traverseNode(node: any, listPrefix: string = ''): string[] {
       return [text];
     }
     case 'blockquote': {
-      const children = (node.content || []).flatMap((c: any) => traverseNode(c));
+      const children = (node.content || []).flatMap((c) => traverseNode(c));
       return children.map((line: string) => `> ${line}`);
     }
     case 'bulletList':
-      return (node.content || []).flatMap((c: any) => traverseNode(c, '- '));
+      return (node.content || []).flatMap((c) => traverseNode(c, '- '));
     case 'orderedList':
-      return (node.content || []).flatMap((c: any, index: number) => traverseNode(c, `${index + 1}. `));
+      return (node.content || []).flatMap((c, index: number) => traverseNode(c, `${index + 1}. `));
     case 'listItem': {
-      const children = (node.content || []).flatMap((c: any) => traverseNode(c));
+      const children = (node.content || []).flatMap((c) => traverseNode(c));
       if (children.length > 0) {
         const result = [...children];
         result[0] = listPrefix + result[0];
@@ -60,10 +62,10 @@ function traverseNode(node: any, listPrefix: string = ''): string[] {
       return codeText.split('\n');
     }
     case 'table': {
-      return (node.content || []).flatMap((c: any) => traverseNode(c));
+      return (node.content || []).flatMap((c) => traverseNode(c));
     }
     case 'tableRow': {
-      const cellsText = (node.content || []).map((c: any) => getInlineText(c));
+      const cellsText = (node.content || []).map((c) => getInlineText(c));
       return ['| ' + cellsText.join(' | ') + ' |'];
     }
     case 'image': {
@@ -72,7 +74,7 @@ function traverseNode(node: any, listPrefix: string = ''): string[] {
     }
     default:
       if (node.content && Array.isArray(node.content)) {
-        return node.content.flatMap((c: any) => traverseNode(c));
+        return node.content.flatMap((c) => traverseNode(c));
       }
       return [];
   }
@@ -83,9 +85,9 @@ export function jsonToLines(content: string): string[] {
   const trimmed = content.trim();
   if (trimmed.startsWith('{')) {
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = JSON.parse(trimmed) as JSONContent;
       return traverseNode(parsed);
-    } catch (e) {
+    } catch {
       // Fallback below
     }
   }
@@ -104,7 +106,7 @@ export function diffLines(oldLines: string[], newLines: string[]): DiffResult[] 
   const n = oldLines.length;
   const m = newLines.length;
 
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Float64Array(m + 1) as any);
+  const dp: Float64Array[] = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
 
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {

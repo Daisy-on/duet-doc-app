@@ -1,9 +1,9 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockNodeView from './CodeBlockNodeView'
-import { TextSelection, Plugin, PluginKey } from 'prosemirror-state'
-import { DOMSerializer } from 'prosemirror-model'
-import { Decoration, DecorationSet } from 'prosemirror-view'
+import { TextSelection, Plugin, PluginKey } from '@tiptap/pm/state'
+import { DOMSerializer, type Node as ProseMirrorNode, type ResolvedPos } from '@tiptap/pm/model'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
 
 const INDENT = '  '
@@ -92,7 +92,7 @@ function calculateNewOffsets(
   const d_from = changesMap.get(fromLineStart) || 0
   const C_from = cumulativeChanges.get(fromLineStart) || 0
 
-  let newFromOffset = fromOffset
+  let newFromOffset: number
   if (d_from > 0) {
     if (fromOffset === fromLineStart) {
       newFromOffset = fromLineStart + C_from
@@ -116,7 +116,7 @@ function calculateNewOffsets(
   const d_to = changesMap.get(toLineStart) || 0
   const C_to = cumulativeChanges.get(toLineStart) || 0
 
-  let newToOffset = toOffset
+  let newToOffset: number
   if (d_to > 0) {
     if (toOffset === toLineStart) {
       newToOffset = toLineStart + C_to
@@ -143,7 +143,7 @@ function calculateNewOffsets(
 
 export const CustomCodeBlock = CodeBlockLowlight.extend({
   addAttributes() {
-    const parentAttrs = (this.parent?.() || {}) as Record<string, any>
+    const parentAttrs = (this.parent?.() || {}) as Record<string, Record<string, unknown>>
     return {
       ...parentAttrs,
       language: {
@@ -321,7 +321,7 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
             return null
           }
 
-          const getCodeBlockInfo = ($pos: any) => {
+          const getCodeBlockInfo = ($pos: ResolvedPos) => {
             for (let d = $pos.depth; d > 0; d--) {
               if ($pos.node(d).type.name === 'codeBlock') {
                 return {
@@ -425,7 +425,7 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
                   const lang = node.attrs.language || ''
                   plainText += `\`\`\`${lang}\n${node.textContent}\n\`\`\`\n`
                 } else {
-                  const serializeNode = (n: any): string => {
+                  const serializeNode = (n: ProseMirrorNode): string => {
                     if (n.type.name === 'codeBlock') {
                       const lang = n.attrs.language || ''
                       return `\`\`\`${lang}\n${n.textContent}\n\`\`\`\n`
@@ -434,7 +434,7 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
                       return n.text || ''
                     }
                     let text = ''
-                    n.content.forEach((child: any) => {
+                    n.content.forEach((child: ProseMirrorNode) => {
                       text += serializeNode(child)
                     })
                     if (n.isBlock) {
