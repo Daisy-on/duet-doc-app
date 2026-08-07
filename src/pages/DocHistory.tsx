@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, History, Check } from 'lucide-react';
 import { db, type DocumentVersion } from '../db';
@@ -17,7 +17,6 @@ export default function DocHistory() {
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [selectedId, setSelectedId] = useState<string>(''); // Left panel (selected from list)
   const [compareId, setCompareId] = useState<string>('');     // Right panel (selected from dropdown)
-  const [diffResults, setDiffResults] = useState<DiffResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState(false);
 
@@ -79,13 +78,11 @@ export default function DocHistory() {
   };
 
   // Run diffing when comparison targets change
-  useEffect(() => {
-    if (leftVer && rightVer) {
-      const leftLines = jsonToLines(leftVer.content);
-      const rightLines = jsonToLines(rightVer.content);
-      const results = diffLines(leftLines, rightLines);
-      setDiffResults(results);
-    }
+  const diffResults = useMemo(() => {
+    if (!leftVer || !rightVer) return [];
+    const leftLines = jsonToLines(leftVer.content);
+    const rightLines = jsonToLines(rightVer.content);
+    return diffLines(leftLines, rightLines);
   }, [leftVer, rightVer]);
 
   // Dragging handlers for Resizer
@@ -206,7 +203,7 @@ export default function DocHistory() {
   };
 
   // Determine if content is identical
-  const isIdentical = diffResults.every((item) => item.left.type === 'normal' && item.right.type === 'normal');
+  const isIdentical = diffResults.every((item: DiffResult) => item.left.type === 'normal' && item.right.type === 'normal');
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-gray-800 select-none">
@@ -356,7 +353,7 @@ export default function DocHistory() {
 
                 {/* Lines Content */}
                 <div className="py-4 flex-1">
-                  {diffResults.map((line, idx) => {
+                  {diffResults.map((line: DiffResult, idx: number) => {
                     const type = line.left.type;
                     let bgClass = 'hover:bg-gray-100/60';
                     let lineNumClass = 'text-gray-400';
@@ -410,7 +407,7 @@ export default function DocHistory() {
 
                 {/* Lines Content */}
                 <div className="py-4 flex-1">
-                  {diffResults.map((line, idx) => {
+                  {diffResults.map((line: DiffResult, idx: number) => {
                     const type = line.right.type;
                     let bgClass = 'hover:bg-gray-55';
                     let lineNumClass = 'text-gray-400';

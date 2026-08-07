@@ -4,10 +4,14 @@ import {
   Send, BrainCircuit, Plus, X, ChevronRight, Loader2, FileText, FileUp, Sparkles, Square,
   RotateCcw, Copy, FilePlus, StickyNote, Check
 } from 'lucide-react';
-import LottieRaw from 'lottie-react';
+import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
 
-const Lottie = (LottieRaw as any)?.default || LottieRaw;
+const Lottie = (
+  typeof LottieComponent === 'function'
+    ? LottieComponent
+    : (LottieComponent as unknown as { default: React.ComponentType<LottieComponentProps> }).default
+) as React.ComponentType<LottieComponentProps>;
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBTreePickerModal from '../components/modals/KBTreePickerModal';
@@ -150,10 +154,7 @@ export default function AIWriting() {
   const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
 
   useEffect(() => {
-    if (!isGenerating) {
-      setLiveThinkingSeconds(0);
-      return;
-    }
+    if (!isGenerating) return;
     const timer = setInterval(() => {
       setLiveThinkingSeconds((prev) => prev + 1);
     }, 1000);
@@ -228,6 +229,7 @@ export default function AIWriting() {
     setInputText('');
     setReferencedDocs([]);
     setAttachedFiles([]);
+    setLiveThinkingSeconds(0);
 
     await sendChatMessage(textToSend, payloadDocs, targetSessionId);
   };
@@ -500,7 +502,10 @@ export default function AIWriting() {
                         }`}>
                           {/* 重新生成 (仅最新一条 AI 回答可用) */}
                           <button
-                            onClick={() => regenerateResponse(msg.id)}
+                            onClick={() => {
+                              setLiveThinkingSeconds(0);
+                              regenerateResponse(msg.id);
+                            }}
                             disabled={isGenerating || !isLastAssistant}
                             className={`p-1 rounded-lg transition-colors ${
                               isGenerating || !isLastAssistant

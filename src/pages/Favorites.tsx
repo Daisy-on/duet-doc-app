@@ -133,6 +133,7 @@ export default function Favorites() {
   } = useFavoritesStore();
   const { documents, knowledgeBases, groups } = useKnowledgeBaseStore();
 
+  const [now] = useState(() => Date.now());
   const [selectedFolderId, setSelectedFolderId] = useState<string>(FOLDER_ALL_ID);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -168,8 +169,7 @@ export default function Favorites() {
     }
   };
 
-  const formatTime = (ts: number) => {
-    const now = Date.now();
+  const formatTime = (ts: number, now: number) => {
     const diff = now - ts;
     if (diff < 1000 * 60 * 60 * 24) {
       return '今天 ' + new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -381,7 +381,7 @@ export default function Favorites() {
                         文档已删除
                       </span>
                       <span>—</span>
-                      <span>{formatTime(item.favoritedAt)}</span>
+                      <span>{formatTime(item.favoritedAt, now)}</span>
                       <div className="flex justify-end">
                         <button
                           onClick={(e) => {
@@ -429,7 +429,7 @@ export default function Favorites() {
 
                     {/* Favorited time */}
                     <span className="text-xs text-text-secondary">
-                      {formatTime(item.favoritedAt)}
+                      {formatTime(item.favoritedAt, now)}
                     </span>
 
                     {/* Action dropdown trigger */}
