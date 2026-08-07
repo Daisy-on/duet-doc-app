@@ -23,7 +23,7 @@ export default function DocHistory() {
   // Split Panel Resize States
   const containerRef = useRef<HTMLDivElement>(null);
   const [splitPercent, setSplitPercent] = useState(50);
-  const isDragging = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Scroll Sync Refs
   const leftScrollRef = useRef<HTMLDivElement>(null);
@@ -36,17 +36,23 @@ export default function DocHistory() {
   // Load versions
   useEffect(() => {
     if (!docId) return;
+    let cancelled = false;
 
     async function fetchVersions() {
       try {
         setLoading(true);
-        if (docId && doc) {
+        const currentDoc = useKnowledgeBaseStore.getState().documents.find((d) => d.id === docId);
+        if (docId && currentDoc) {
           await flushDocumentAutosave(docId);
         }
+        if (cancelled) return;
+
         const dbVersions = await db.documentVersions
           .where('docId')
           .equals(docId as string)
           .toArray();
+
+        if (cancelled) return;
 
         // Sort descending (newest first)
         const sorted = dbVersions.sort((a, b) => b.createdAt - a.createdAt);
@@ -63,14 +69,18 @@ export default function DocHistory() {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch versions:', err);
+        if (!cancelled) console.error('Failed to fetch versions:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchVersions();
-  }, [docId, doc]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docId, flushDocumentAutosave]);
 
   // Handle sidebar selection click
   const handleSelect = (vId: string) => {
@@ -88,36 +98,37 @@ export default function DocHistory() {
   // Dragging handlers for Resizer
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    isDragging.current = true;
-    document.body.style.cursor = 'col-resize';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging.current || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const percent = (offsetX / rect.width) * 100;
-    // Boundary check, ensure neither column disappears (15% to 85%)
-    if (percent >= 15 && percent <= 85) {
-      setSplitPercent(percent);
-    }
-  };
-
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    document.body.style.cursor = '';
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+    setIsDragging(true);
   };
 
   useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    if (!isDragging) return;
+
+    document.body.style.cursor = 'col-resize';
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const percent = (offsetX / rect.width) * 100;
+      if (percent >= 15 && percent <= 85) {
+        setSplitPercent(percent);
+      }
     };
-  }, []);
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   // Synchronized scrolling (Vertical only, no horizontal scroll sync)
   const handleScroll = (source: 'left' | 'right') => {

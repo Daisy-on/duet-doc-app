@@ -395,7 +395,11 @@ export default function Editor() {
   // 当助手打开状态改变时，强制 ProseMirror 重绘以更新高亮 Decoration
   useEffect(() => {
     if (editor && !editor.isDestroyed) {
-      editor.view.dispatch(editor.view.state.tr);
+      queueMicrotask(() => {
+        if (!editor.isDestroyed) {
+          editor.view.dispatch(editor.view.state.tr);
+        }
+      });
     }
   }, [isAssistantOpen, editor]);
 
@@ -487,14 +491,18 @@ export default function Editor() {
 
   // 同步外部 content 状态
   useEffect(() => {
-    if (editor && doc) {
+    if (editor && doc && !editor.isDestroyed) {
       const isJson = doc.content.trim().startsWith('{')
       const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML()
       if (doc.content !== currentContent) {
-        editor.commands.clearGhostText();
-        AIDispatcher.clearGhostTextRequest();
-        editor.commands.setContent(isJson ? JSON.parse(doc.content) : doc.content, { emitUpdate: false })
-        syncHeadings(editor)
+        queueMicrotask(() => {
+          if (!editor.isDestroyed) {
+            editor.commands.clearGhostText();
+            AIDispatcher.clearGhostTextRequest();
+            editor.commands.setContent(isJson ? JSON.parse(doc.content) : doc.content, { emitUpdate: false });
+            syncHeadings(editor);
+          }
+        });
       }
     }
   }, [doc?.content, editor, syncHeadings])

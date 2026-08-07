@@ -102,7 +102,9 @@ export default function DocEdit() {
     if (!currentDoc) return;
     const updatedContent = replaceFirstH1(currentDoc.content, currentDoc.title);
     if (updatedContent !== currentDoc.content) {
-      updateDocument(currentDoc.id, { content: updatedContent });
+      queueMicrotask(() => {
+        updateDocument(currentDoc.id, { content: updatedContent });
+      });
     }
   }, [docId, updateDocument]);
 

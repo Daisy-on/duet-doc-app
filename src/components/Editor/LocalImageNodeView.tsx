@@ -3,61 +3,93 @@ import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
 import { Loader2, ImageOff } from 'lucide-react';
 import { assetRepository } from '../../assets/assetRepository';
 
+interface AsyncAssetState {
+  loadedAssetId: string | null;
+  objectUrl: string | null;
+  status: 'loading' | 'loaded' | 'error';
+  errorText: string;
+}
+
 export default function LocalImageNodeView(props: NodeViewProps) {
   const { node, selected } = props;
   const { assetId, src, alt, title } = node.attrs;
 
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const [errorText, setErrorText] = useState('图片无法载入');
+  const [asyncState, setAsyncState] = useState<AsyncAssetState>({
+    loadedAssetId: null,
+    objectUrl: null,
+    status: 'loading',
+    errorText: '图片无法载入',
+  });
+
+  // 1. 直连网络图片/Base64 或 缺少标识的派生计算
+  const isDirectSrc = !assetId && Boolean(src);
+  const isMissingAssetId = !assetId && !src;
 
   useEffect(() => {
+    if (!assetId) return;
+
     let active = true;
     let createdObjectUrl: string | null = null;
 
-    // 1. 如果有直连网络图片或 Base64 (兼容外部链接)
-    if (!assetId && src) {
-      setImageUrl(src);
-      setStatus('loaded');
-      return;
-    }
-
-    // 2. 没有 assetId 也没有 src
-    if (!assetId) {
-      setStatus('error');
-      setErrorText('缺少的图片资源标识');
-      return;
-    }
-
-    // 3. 从 IndexedDB 异步读取 Blob 并生成对象内存 URL
-    setStatus('loading');
+    // 2. 从 IndexedDB 异步读取 Blob 并生成内存 URL
     assetRepository
       .getAsset(assetId)
       .then((asset) => {
         if (!active) return;
         if (asset && asset.blob) {
           createdObjectUrl = URL.createObjectURL(asset.blob);
-          setImageUrl(createdObjectUrl);
-          setStatus('loaded');
+          setAsyncState({
+            loadedAssetId: assetId,
+            objectUrl: createdObjectUrl,
+            status: 'loaded',
+            errorText: '',
+          });
         } else {
-          setStatus('error');
-          setErrorText('图片资源不存在或已被清除');
+          setAsyncState({
+            loadedAssetId: assetId,
+            objectUrl: null,
+            status: 'error',
+            errorText: '图片资源不存在或已被清除',
+          });
         }
       })
       .catch((err: unknown) => {
         if (!active) return;
-        setStatus('error');
-        setErrorText(err instanceof Error ? err.message : '加载图片失败');
+        setAsyncState({
+          loadedAssetId: assetId,
+          objectUrl: null,
+          status: 'error',
+          errorText: err instanceof Error ? err.message : '加载图片失败',
+        });
       });
 
-    // 4. 卸载或 assetId 变化时必须调用 revokeObjectURL 释放内存，防止内存泄漏！
+    // 3. 卸载或 assetId 变化时释放 ObjectURL，防止内存泄漏
     return () => {
       active = false;
       if (createdObjectUrl) {
         URL.revokeObjectURL(createdObjectUrl);
       }
     };
-  }, [assetId, src]);
+  }, [assetId]);
+
+  // 4. 派生当前视图渲染状态 (防止切图时旧图闪烁)
+  let status: 'loading' | 'loaded' | 'error';
+  let imageUrl: string | null = null;
+  let errorText = '图片无法载入';
+
+  if (isDirectSrc) {
+    status = 'loaded';
+    imageUrl = src;
+  } else if (isMissingAssetId) {
+    status = 'error';
+    errorText = '缺少的图片资源标识';
+  } else if (asyncState.loadedAssetId === assetId) {
+    status = asyncState.status;
+    imageUrl = asyncState.objectUrl;
+    errorText = asyncState.errorText;
+  } else {
+    status = 'loading';
+  }
 
   return (
     <NodeViewWrapper className="my-3 flex justify-start group select-none">
