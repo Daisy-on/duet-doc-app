@@ -1,6 +1,14 @@
 import { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Search, ChevronDown, ChevronRight, FileText, MoreHorizontal } from 'lucide-react';
+import {
+  ChevronLeft,
+  Plus,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  MoreHorizontal,
+} from 'lucide-react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import type { Group, Document } from '../store/knowledgeBaseStore';
@@ -16,17 +24,17 @@ interface DocTreeItemProps {
   kbId: string;
   docId: string | undefined;
   paddingLeft: number;
-  
+
   renamingDocId: string | null;
   renamingDocTitle: string;
   setRenamingDocTitle: (title: string) => void;
   handleFinishRenameDoc: () => void;
   handleCancelRenameDoc: () => void;
-  
+
   activeDocActionMenuId: string | null;
   setActiveDocActionMenuId: (id: string | null) => void;
   setDocActionMenuAnchorEl: (el: HTMLElement | null) => void;
-  
+
   // Clear any group menu states
   clearGroupMenus: () => void;
 }
@@ -62,13 +70,14 @@ function DocTreeItem({
         isDocActive
           ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none'
           : 'text-text-secondary'
-      } ${
-        activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''
-      }`}
+      } ${activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''}`}
       style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
     >
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <FileText size={14} className={`shrink-0 ${isDocActive ? 'text-accent' : 'text-text-secondary'}`} />
+        <FileText
+          size={14}
+          className={`shrink-0 ${isDocActive ? 'text-accent' : 'text-text-secondary'}`}
+        />
         {isRenamingDoc ? (
           <input
             type="text"
@@ -134,7 +143,7 @@ interface GroupTreeNodeProps {
   setRenamingName: (name: string) => void;
   handleFinishRename: () => void;
   handleCancelRename: () => void;
-  
+
   // Set Menu Active and Anchors
   activeAddMenuId: string | null;
   setActiveAddMenuId: (id: string | null) => void;
@@ -142,13 +151,13 @@ interface GroupTreeNodeProps {
   activeActionMenuId: string | null;
   setActiveActionMenuId: (id: string | null) => void;
   setActionMenuAnchorEl: (el: HTMLElement | null) => void;
-  
+
   // Delete Modal state
   setDeleteTargetGroup: (group: Group) => void;
   setDeleteDescendantsCount: (count: number) => void;
   setDeleteDocsCount: (count: number) => void;
   setIsDeleteModalOpen: (open: boolean) => void;
-  
+
   // Document actions props
   renamingDocId: string | null;
   renamingDocTitle: string;
@@ -158,7 +167,7 @@ interface GroupTreeNodeProps {
   activeDocActionMenuId: string | null;
   setActiveDocActionMenuId: (id: string | null) => void;
   setDocActionMenuAnchorEl: (el: HTMLElement | null) => void;
-  
+
   clearGroupMenus: () => void;
 }
 
@@ -191,7 +200,7 @@ function GroupTreeNode({
   setDeleteDescendantsCount,
   setDeleteDocsCount,
   setIsDeleteModalOpen,
-  
+
   renamingDocId,
   renamingDocTitle,
   setRenamingDocTitle,
@@ -331,7 +340,7 @@ function GroupTreeNode({
               setDeleteDescendantsCount={setDeleteDescendantsCount}
               setDeleteDocsCount={setDeleteDocsCount}
               setIsDeleteModalOpen={setIsDeleteModalOpen}
-              
+
               renamingDocId={renamingDocId}
               renamingDocTitle={renamingDocTitle}
               setRenamingDocTitle={setRenamingDocTitle}
@@ -422,12 +431,8 @@ export default function CatalogPanel() {
     groups,
   } = useKnowledgeBaseStore();
 
-  const {
-    catalogWidth,
-    isCatalogCollapsed,
-    setCatalogWidth,
-    setIsCatalogCollapsed,
-  } = useLayoutStore();
+  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } =
+    useLayoutStore();
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
   const rootGroups = kbId ? getChildGroups(null, kbId) : [];
@@ -464,9 +469,7 @@ export default function CatalogPanel() {
     if (!selectedGroupForMove) return 0;
     const G = selectedGroupForMove;
     const descendantIds = getDescendantGroupIds(G.id);
-    const descendants = descendantIds
-      .map((id) => groups.find((g) => g.id === id)!)
-      .filter(Boolean);
+    const descendants = descendantIds.map((id) => groups.find((g) => g.id === id)!).filter(Boolean);
 
     return descendants.reduce((max, d) => Math.max(max, d.depth - G.depth), 0);
   }, [selectedGroupForMove, getDescendantGroupIds, groups]);
@@ -475,7 +478,13 @@ export default function CatalogPanel() {
   const validateMoveGroupSelection = (targetKbId: string, targetGroupId: string | null) => {
     if (!selectedGroupForMove) return null;
     const targetParentGroup = groups.find((g) => g.id === targetGroupId);
-    const newDepthOfG = targetKbId ? (targetGroupId ? (targetParentGroup ? targetParentGroup.depth + 1 : 0) : 0) : 0;
+    const newDepthOfG = targetKbId
+      ? targetGroupId
+        ? targetParentGroup
+          ? targetParentGroup.depth + 1
+          : 0
+        : 0
+      : 0;
     if (newDepthOfG + moveGroupMaxRelativeDepth > 5) {
       return '目标位置层级过深，移动后将超出系统最大 6 层层级限制。';
     }
@@ -590,9 +599,8 @@ export default function CatalogPanel() {
       const descendants = getDescendantGroupIds(deleteTargetGroup.id);
       const deleteGroupIds = [deleteTargetGroup.id, ...descendants];
 
-      const isActiveDocDeleted = docId && documents.some(
-        (d) => d.id === docId && deleteGroupIds.includes(d.groupId || '')
-      );
+      const isActiveDocDeleted =
+        docId && documents.some((d) => d.id === docId && deleteGroupIds.includes(d.groupId || ''));
 
       await deleteGroup(deleteTargetGroup.id);
       setDeleteTargetGroup(null);
@@ -785,7 +793,7 @@ export default function CatalogPanel() {
                   setDeleteDescendantsCount={setDeleteDescendantsCount}
                   setDeleteDocsCount={setDeleteDocsCount}
                   setIsDeleteModalOpen={setIsDeleteModalOpen}
-                  
+
                   renamingDocId={renamingDocId}
                   renamingDocTitle={renamingDocTitle}
                   setRenamingDocTitle={setRenamingDocTitle}
@@ -800,7 +808,10 @@ export default function CatalogPanel() {
 
               {/* Inline edit container for creating a new root group */}
               {creatingParentId === null && (
-                <div className="py-1.5 px-2 mt-1 flex items-center gap-1.5 rounded-md" style={{ paddingLeft: '6px' }}>
+                <div
+                  className="py-1.5 px-2 mt-1 flex items-center gap-1.5 rounded-md"
+                  style={{ paddingLeft: '6px' }}
+                >
                   <ChevronDown size={14} className="text-text-secondary shrink-0" />
                   <input
                     type="text"
@@ -861,7 +872,7 @@ export default function CatalogPanel() {
 
       {/* Floating Menus (Landed outside aside with overflow-hidden to prevent container clipping) */}
       {/* 1. Group Add Menu */}
-      {activeAddMenuId && (
+      {activeAddMenuId &&
         (() => {
           const group = groups.find((g) => g.id === activeAddMenuId);
           if (!group) return null;
@@ -881,11 +892,10 @@ export default function CatalogPanel() {
               anchorEl={addMenuAnchorEl}
             />
           );
-        })()
-      )}
+        })()}
 
       {/* 2. Group Action Menu */}
-      {activeActionMenuId && (
+      {activeActionMenuId &&
         (() => {
           const group = groups.find((g) => g.id === activeActionMenuId);
           if (!group) return null;
@@ -900,7 +910,9 @@ export default function CatalogPanel() {
               onDelete={() => {
                 const descendants = getDescendantGroupIds(group.id);
                 const allGroupIds = [group.id, ...descendants];
-                const docCount = documents.filter((d) => allGroupIds.includes(d.groupId || '')).length;
+                const docCount = documents.filter((d) =>
+                  allGroupIds.includes(d.groupId || ''),
+                ).length;
 
                 setDeleteTargetGroup(group);
                 setDeleteDescendantsCount(descendants.length);
@@ -914,11 +926,10 @@ export default function CatalogPanel() {
               anchorEl={actionMenuAnchorEl}
             />
           );
-        })()
-      )}
+        })()}
 
       {/* 3. Doc Action Menu */}
-      {activeDocActionMenuId && (
+      {activeDocActionMenuId &&
         (() => {
           const doc = documents.find((d) => d.id === activeDocActionMenuId);
           if (!doc) return null;
@@ -941,8 +952,7 @@ export default function CatalogPanel() {
               anchorEl={docActionMenuAnchorEl}
             />
           );
-        })()
-      )}
+        })()}
 
       {/* Cascading Group Delete Confirmation Modal */}
       <ConfirmDeleteModal
@@ -961,7 +971,9 @@ export default function CatalogPanel() {
               以及该分组下的
               {deleteDescendantsCount > 0 && (
                 <>
-                  <strong className="text-text-primary mx-1">{deleteDescendantsCount} 个子分组</strong>
+                  <strong className="text-text-primary mx-1">
+                    {deleteDescendantsCount} 个子分组
+                  </strong>
                   和
                 </>
               )}
@@ -1008,7 +1020,8 @@ export default function CatalogPanel() {
           mode="folder"
           subtitle={
             <span>
-              文档：<span className="font-semibold text-text-primary">“{selectedDocForMove.title}”</span>
+              文档：
+              <span className="font-semibold text-text-primary">“{selectedDocForMove.title}”</span>
             </span>
           }
           onSelectFolder={handleConfirmMove}
@@ -1026,7 +1039,8 @@ export default function CatalogPanel() {
           title="移动分组层级"
           subtitle={
             <span>
-              分组：<span className="font-semibold text-text-primary">“{selectedGroupForMove.name}”</span>
+              分组：
+              <span className="font-semibold text-text-primary">“{selectedGroupForMove.name}”</span>
             </span>
           }
           mode="folder"

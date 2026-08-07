@@ -31,7 +31,7 @@ export default function AIAttachMenu({
   if (!isOpen || !anchorEl) return null;
 
   const rect = anchorEl.getBoundingClientRect();
-  
+
   // Position menu above the button since the button is at the bottom of the viewport
   const style: React.CSSProperties = {
     position: 'fixed',
@@ -57,12 +57,7 @@ export default function AIAttachMenu({
       <div className="fixed inset-0 z-[110] bg-transparent" onClick={onClose} />
 
       {/* Hidden file input */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-      />
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
 
       {/* Dropdown container */}
       <div

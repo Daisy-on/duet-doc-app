@@ -34,8 +34,6 @@ export default function FavoritePopover({
   const favorited = isFavorited(docId);
   const activeFolderIds = getFolderIds(docId);
 
-
-
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
@@ -108,8 +106,6 @@ export default function FavoritePopover({
       style={{ position: 'fixed', top: posTop, right: posRight, zIndex: 9999, width: 232 }}
       className="bg-white border border-border-color rounded-xl shadow-2xl py-3 animate-dropdown-fade-in"
     >
-
-
       {/* Header row */}
       <div className="px-3 mb-2 flex items-center justify-between">
         <span className="text-xs font-bold text-text-primary">

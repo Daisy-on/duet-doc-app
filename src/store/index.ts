@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import type { Editor } from '@tiptap/core';
 
 export interface HeadingItem {
-  level: number;   // 1 | 2 | 3 | 4 | 5 | 6
+  level: number; // 1 | 2 | 3 | 4 | 5 | 6
   text: string;
-  id: string;      // 用于滚动锚点
+  id: string; // 用于滚动锚点
 }
 
 interface EditorState {
@@ -27,5 +27,3 @@ export const useEditorStore = create<EditorState>((set) => ({
 }));
 
 export * from './layoutStore';
-
-

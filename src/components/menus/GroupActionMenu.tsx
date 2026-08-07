@@ -40,20 +40,20 @@ export default function GroupActionMenu({
       const rect = anchorEl.getBoundingClientRect();
       const menuHeight = menuRef.current?.offsetHeight || 120;
       const menuWidth = menuRef.current?.offsetWidth || 176; // w-44 is 11rem = 176px
-      
+
       let top = rect.bottom + 4; // 4px margin
       let left = rect.left;
-      
+
       // If bottom of menu goes offscreen
       if (rect.bottom + menuHeight > window.innerHeight) {
         top = rect.top - menuHeight - 4;
       }
-      
+
       // If right of menu goes offscreen
       if (rect.left + menuWidth > window.innerWidth) {
         left = rect.right - menuWidth;
       }
-      
+
       setCoords({ top, left });
     }
   }, [isOpen, anchorEl]);

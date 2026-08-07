@@ -108,7 +108,7 @@ export const useFavoritesStore = create<FavoritesStore>((set, get) => ({
   createFolder: (name) => {
     const id = `folder-${generateId()}`;
     const newFolder: FavoriteFolder = { id, name, createdAt: Date.now(), updatedAt: Date.now() };
-    db.favoriteFolders.add(newFolder).catch(err => console.error('Dexie error:', err));
+    db.favoriteFolders.add(newFolder).catch((err) => console.error('Dexie error:', err));
     set((state) => ({ folders: [...state.folders, newFolder] }));
     return id;
   },
@@ -116,7 +116,9 @@ export const useFavoritesStore = create<FavoritesStore>((set, get) => ({
   renameFolder: (id, name) => {
     if (id === FOLDER_ALL_ID) return; // system folder – immutable
     const updatedAt = Date.now();
-    db.favoriteFolders.update(id, { name, updatedAt }).catch(err => console.error('Dexie error:', err));
+    db.favoriteFolders
+      .update(id, { name, updatedAt })
+      .catch((err) => console.error('Dexie error:', err));
     set((state) => ({
       folders: state.folders.map((f) => (f.id === id ? { ...f, name, updatedAt } : f)),
     }));
@@ -124,11 +126,14 @@ export const useFavoritesStore = create<FavoritesStore>((set, get) => ({
 
   deleteFolder: (id) => {
     if (id === FOLDER_ALL_ID) return; // cannot delete system folder
-    db.favoriteFolders.delete(id).catch(err => console.error('Dexie error:', err));
-    db.favoriteItems.toCollection().modify((item) => {
-      item.folderIds = item.folderIds.filter((fid) => fid !== id);
-      item.updatedAt = Date.now();
-    }).catch(err => console.error('Dexie error:', err));
+    db.favoriteFolders.delete(id).catch((err) => console.error('Dexie error:', err));
+    db.favoriteItems
+      .toCollection()
+      .modify((item) => {
+        item.folderIds = item.folderIds.filter((fid) => fid !== id);
+        item.updatedAt = Date.now();
+      })
+      .catch((err) => console.error('Dexie error:', err));
 
     set((state) => ({
       folders: state.folders.filter((f) => f.id !== id),
@@ -153,57 +158,71 @@ export const useFavoritesStore = create<FavoritesStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    db.favoriteItems.add(newItem).catch(err => console.error('Dexie error:', err));
+    db.favoriteItems.add(newItem).catch((err) => console.error('Dexie error:', err));
     set((state) => ({ items: [...state.items, newItem] }));
   },
 
   removeFavorite: (docId) => {
-    db.favoriteItems.where('docId').equals(docId).delete().catch(err => console.error('Dexie error:', err));
+    db.favoriteItems
+      .where('docId')
+      .equals(docId)
+      .delete()
+      .catch((err) => console.error('Dexie error:', err));
     set((state) => ({
       items: state.items.filter((item) => item.docId !== docId),
     }));
   },
 
   addToFolder: (docId, folderId) => {
-    db.favoriteItems.where('docId').equals(docId).modify((item) => {
-      if (!item.folderIds.includes(folderId)) {
-        item.folderIds.push(folderId);
-        item.updatedAt = Date.now();
-      }
-    }).catch(err => console.error('Dexie error:', err));
+    db.favoriteItems
+      .where('docId')
+      .equals(docId)
+      .modify((item) => {
+        if (!item.folderIds.includes(folderId)) {
+          item.folderIds.push(folderId);
+          item.updatedAt = Date.now();
+        }
+      })
+      .catch((err) => console.error('Dexie error:', err));
 
     set((state) => ({
       items: state.items.map((item) =>
         item.docId === docId && !item.folderIds.includes(folderId)
           ? { ...item, folderIds: [...item.folderIds, folderId], updatedAt: Date.now() }
-          : item
+          : item,
       ),
     }));
   },
 
   removeFromFolder: (docId, folderId) => {
     if (folderId === FOLDER_ALL_ID) return; // cannot remove from "all"
-    db.favoriteItems.where('docId').equals(docId).modify((item) => {
-      item.folderIds = item.folderIds.filter((fid) => fid !== folderId);
-      item.updatedAt = Date.now();
-    }).catch(err => console.error('Dexie error:', err));
+    db.favoriteItems
+      .where('docId')
+      .equals(docId)
+      .modify((item) => {
+        item.folderIds = item.folderIds.filter((fid) => fid !== folderId);
+        item.updatedAt = Date.now();
+      })
+      .catch((err) => console.error('Dexie error:', err));
 
     set((state) => ({
       items: state.items.map((item) =>
         item.docId === docId
-          ? { ...item, folderIds: item.folderIds.filter((fid) => fid !== folderId), updatedAt: Date.now() }
-          : item
+          ? {
+              ...item,
+              folderIds: item.folderIds.filter((fid) => fid !== folderId),
+              updatedAt: Date.now(),
+            }
+          : item,
       ),
     }));
   },
-
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
   isFavorited: (docId) => get().items.some((item) => item.docId === docId),
 
-  getFolderIds: (docId) =>
-    get().items.find((item) => item.docId === docId)?.folderIds ?? [],
+  getFolderIds: (docId) => get().items.find((item) => item.docId === docId)?.folderIds ?? [],
 
   getItemsByFolder: (folderId) =>
     get()

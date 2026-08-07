@@ -1,8 +1,21 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Send, BrainCircuit, Plus, X, ChevronRight, Loader2, FileText, FileUp, Sparkles, Square,
-  RotateCcw, Copy, FilePlus, StickyNote, Check
+import {
+  Send,
+  BrainCircuit,
+  Plus,
+  X,
+  ChevronRight,
+  Loader2,
+  FileText,
+  FileUp,
+  Sparkles,
+  Square,
+  RotateCcw,
+  Copy,
+  FilePlus,
+  StickyNote,
+  Check,
 } from 'lucide-react';
 import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
@@ -43,11 +56,14 @@ export default function AIWriting() {
   const params = useParams<{ '*': string }>();
   const sessionId = params['*'] || undefined;
   const navigate = useNavigate();
-  
-  const { 
-    sessions, messages, createSession, 
+
+  const {
+    sessions,
+    messages,
+    createSession,
     isThinkingEnabled,
-    setIsThinkingEnabled, setActiveSessionId
+    setIsThinkingEnabled,
+    setActiveSessionId,
   } = useAIWritingStore();
 
   const { createDocument, createMemo, updateDocument } = useKnowledgeBaseStore();
@@ -56,11 +72,13 @@ export default function AIWriting() {
   const currentSessionId = sessionId;
   const sessionMessages = useMemo(
     () => messages.filter((m) => m.sessionId === currentSessionId),
-    [messages, currentSessionId]
+    [messages, currentSessionId],
   );
   const currentSession = sessions.find((s) => s.id === currentSessionId);
 
-  const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(currentSessionId || null);
+  const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(
+    currentSessionId || null,
+  );
 
   // Local state
   const [inputText, setInputText] = useState('');
@@ -91,7 +109,9 @@ export default function AIWriting() {
   const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
 
   // Backend health status state
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>(
+    'checking',
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -222,7 +242,7 @@ export default function AIWriting() {
     }
 
     if (!inputText.trim() && referencedDocs.length === 0) return;
-    
+
     let targetSessionId = currentSessionId;
     if (!targetSessionId) {
       targetSessionId = await createSession('新对话');
@@ -271,9 +291,10 @@ export default function AIWriting() {
 
   // 一键保存到小记
   const handleSaveToMemo = (content: string) => {
-    const rawTitle = currentSession?.title && currentSession.title !== '新对话' 
-      ? `AI 小记: ${currentSession.title}` 
-      : undefined;
+    const rawTitle =
+      currentSession?.title && currentSession.title !== '新对话'
+        ? `AI 小记: ${currentSession.title}`
+        : undefined;
     const memoTitle = getSmartTitle(content, rawTitle || 'AI 对话摘录');
     const memoId = createMemo(memoTitle);
     const htmlContent = markdownToHtml(content);
@@ -300,10 +321,10 @@ export default function AIWriting() {
   const starterPrompts = [
     { title: '分析竞品优势', desc: '基于引用的知识库文章撰写竞品优势分析报告' },
     { title: '总结文档核心', desc: '提取这篇文章的几个核心结论和未来规划建议' },
-    { title: '打磨技术文档', desc: '润色这篇技术架构文档，使其逻辑更清晰、专业术语更准确' }
+    { title: '打磨技术文档', desc: '润色这篇技术架构文档，使其逻辑更清晰、专业术语更准确' },
   ];
 
-  const selectPrompt = (prompt: typeof starterPrompts[0]) => {
+  const selectPrompt = (prompt: (typeof starterPrompts)[0]) => {
     setInputText(prompt.title + '：' + prompt.desc);
   };
 
@@ -324,12 +345,14 @@ export default function AIWriting() {
             <button
               onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
               className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title={isCatalogCollapsed ? "展开" : "折叠"}
+              title={isCatalogCollapsed ? '展开' : '折叠'}
             >
               <Sparkles size={14} className="text-indigo-500" />
             </button>
             <div className="flex items-center gap-3 ml-1 min-w-0">
-              <h2 className="text-[15px] font-bold text-text-primary truncate">和 Duet AI 一起写作</h2>
+              <h2 className="text-[15px] font-bold text-text-primary truncate">
+                和 Duet AI 一起写作
+              </h2>
               <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
                 {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
               </span>
@@ -348,8 +371,8 @@ export default function AIWriting() {
                   backendStatus === 'connected'
                     ? 'bg-emerald-500'
                     : backendStatus === 'disconnected'
-                    ? 'bg-red-500'
-                    : 'bg-gray-400'
+                      ? 'bg-red-500'
+                      : 'bg-gray-400'
                 }`}
               />
             </span>
@@ -357,8 +380,8 @@ export default function AIWriting() {
               {backendStatus === 'connected'
                 ? '云端 AI 已接入'
                 : backendStatus === 'disconnected'
-                ? '云端 AI 已离线'
-                : '检测连接中...'}
+                  ? '云端 AI 已离线'
+                  : '检测连接中...'}
             </span>
           </div>
         </header>
@@ -372,10 +395,7 @@ export default function AIWriting() {
         )}
 
         {/* Main Scrollable Viewport (holds both messages AND sticky bottom input like DeepSeek) */}
-        <div 
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col"
-        >
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col">
           {/* Messages Stream */}
           <div className="flex-1 py-6">
             {sessionMessages.length === 0 ? (
@@ -385,7 +405,8 @@ export default function AIWriting() {
                 </div>
                 <h1 className="text-xl font-bold text-text-primary mb-2">Hi，今天想写点什么？</h1>
                 <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
-                  引用知识库文档，或是直接提问。Duet AI 具备端云协同的大模型推理能力，协助你快速撰写、精炼与重构文本。
+                  引用知识库文档，或是直接提问。Duet AI
+                  具备端云协同的大模型推理能力，协助你快速撰写、精炼与重构文本。
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
@@ -397,7 +418,10 @@ export default function AIWriting() {
                     >
                       <div className="text-xs font-bold text-text-primary group-hover:text-accent mb-1 flex items-center justify-between">
                         {p.title}
-                        <Sparkles size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <Sparkles
+                          size={12}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
                       </div>
                       <div className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
                         {p.desc}
@@ -435,7 +459,7 @@ export default function AIWriting() {
                         {isUser && msg.referencedDocs && msg.referencedDocs.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 pb-2">
                             {msg.referencedDocs.map((doc, idx) => (
-                              <span 
+                              <span
                                 key={idx}
                                 className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-semibold"
                               >
@@ -454,7 +478,9 @@ export default function AIWriting() {
                               onClick={() => toggleThinkingNode(msg.id)}
                               className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors py-1 cursor-pointer font-sans select-none"
                             >
-                              <span className="font-medium">{getThinkingLabel(msg, liveThinkingSeconds)}</span>
+                              <span className="font-medium">
+                                {getThinkingLabel(msg, liveThinkingSeconds)}
+                              </span>
                               <ChevronRight
                                 size={14}
                                 className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-text-primary' : 'text-text-secondary'}`}
@@ -474,12 +500,16 @@ export default function AIWriting() {
                         {/* 消息正文 */}
                         <div className="space-y-1.5">
                           {isUser ? (
-                            <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                            <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+                              {msg.content}
+                            </p>
                           ) : (
                             <div className="relative">
                               <div
                                 className="markdown-body text-sm text-text-primary leading-relaxed"
-                                dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }}
+                                dangerouslySetInnerHTML={{
+                                  __html: renderMarkdownToHtml(msg.content),
+                                }}
                               />
                               {msg.status === 'streaming' && msg.content && (
                                 <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
@@ -503,9 +533,11 @@ export default function AIWriting() {
 
                       {/* AI 消息底部操作工具栏 (仅非 streaming 状态展示) */}
                       {!isUser && msg.status !== 'streaming' && msg.content && (
-                        <div className={`flex items-center gap-1.5 mt-1.5 px-1 transition-all duration-200 ${
-                          isLastAssistant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                        }`}>
+                        <div
+                          className={`flex items-center gap-1.5 mt-1.5 px-1 transition-all duration-200 ${
+                            isLastAssistant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          }`}
+                        >
                           {/* 重新生成 (仅最新一条 AI 回答可用) */}
                           <button
                             onClick={() => {
@@ -518,7 +550,7 @@ export default function AIWriting() {
                                 ? 'text-gray-300 cursor-not-allowed'
                                 : 'text-text-secondary hover:text-indigo-600 hover:bg-gray-100 cursor-pointer'
                             }`}
-                            title={isLastAssistant ? "重新生成回答" : "仅最新一条回答可重新生成"}
+                            title={isLastAssistant ? '重新生成回答' : '仅最新一条回答可重新生成'}
                           >
                             <RotateCcw size={12} />
                           </button>
@@ -560,24 +592,29 @@ export default function AIWriting() {
 
                       {/* Timestamp */}
                       <div className="text-[12px] text-text-secondary mt-1 px-1">
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(msg.createdAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </div>
                     </div>
                   );
                 })}
 
                 {/* 仅在初始化等待连接时展示动画 */}
-                {isGenerating && sessionMessages.length > 0 && sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
-                  <div className="flex flex-col items-start animate-pulse">
-                    <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
-                      Duet AI
+                {isGenerating &&
+                  sessionMessages.length > 0 &&
+                  sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
+                    <div className="flex flex-col items-start animate-pulse">
+                      <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
+                        Duet AI
+                      </div>
+                      <div className="bg-white border border-border-color rounded-2xl rounded-tl-none px-4 py-3 text-xs text-text-secondary flex items-center gap-2 shadow-sm">
+                        <Loader2 size={14} className="animate-spin text-accent" />
+                        <span>AI 正在思考并撰写内容...</span>
+                      </div>
                     </div>
-                    <div className="bg-white border border-border-color rounded-2xl rounded-tl-none px-4 py-3 text-xs text-text-secondary flex items-center gap-2 shadow-sm">
-                      <Loader2 size={14} className="animate-spin text-accent" />
-                      <span>AI 正在思考并撰写内容...</span>
-                    </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
           </div>
@@ -585,7 +622,6 @@ export default function AIWriting() {
           {/* Bottom Input Area (Sticky at bottom of scroll container) */}
           <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
             <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
-              
               {/* Attachment badges above input */}
               {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
                 <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
@@ -629,7 +665,9 @@ export default function AIWriting() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={currentSessionId ? "与 Duet AI 对话，输入并发送..." : "与 Duet AI 开启新对话..."}
+                  placeholder={
+                    currentSessionId ? '与 Duet AI 对话，输入并发送...' : '与 Duet AI 开启新对话...'
+                  }
                   className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
                   style={{ minHeight: '52px' }}
                 />
@@ -662,7 +700,10 @@ export default function AIWriting() {
                       }`}
                       title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
                     >
-                      <BrainCircuit size={13} className={isThinkingEnabled ? 'animate-pulse' : ''} />
+                      <BrainCircuit
+                        size={13}
+                        className={isThinkingEnabled ? 'animate-pulse' : ''}
+                      />
                       <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
                     </button>
                   </div>
@@ -710,7 +751,7 @@ export default function AIWriting() {
         title="选择知识库文档"
         mode="document"
         onSelectDoc={(doc) => {
-          if (!referencedDocs.some(d => d.id === doc.id)) {
+          if (!referencedDocs.some((d) => d.id === doc.id)) {
             setReferencedDocs((prev) => [...prev, doc]);
           }
         }}

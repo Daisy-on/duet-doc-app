@@ -36,7 +36,7 @@ export const AIDispatcher = {
   streamCloudTask(
     request: AIRequest,
     callbacks: StreamCallbacks,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     return streamCloudAI(request, callbacks, signal);
   },

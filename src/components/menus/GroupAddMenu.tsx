@@ -40,20 +40,20 @@ export default function GroupAddMenu({
       const rect = anchorEl.getBoundingClientRect();
       const menuHeight = menuRef.current?.offsetHeight || 120;
       const menuWidth = menuRef.current?.offsetWidth || 192;
-      
+
       let top = rect.bottom + 4; // 4px margin
       let left = rect.left;
-      
+
       // If bottom of menu goes offscreen
       if (rect.bottom + menuHeight > window.innerHeight) {
         top = rect.top - menuHeight - 4;
       }
-      
+
       // If right of menu goes offscreen
       if (rect.left + menuWidth > window.innerWidth) {
         left = rect.right - menuWidth;
       }
-      
+
       setCoords({ top, left });
     }
   }, [isOpen, anchorEl]);
@@ -117,9 +117,7 @@ export default function GroupAddMenu({
         {showWarning && !isDisable && (
           <div className="px-3.5 py-1.5 mt-1 border-t border-border-color bg-amber-50/50 flex gap-1.5 items-start">
             <AlertCircle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <span className="text-[10px] text-amber-600 leading-tight">
-              层级较深，建议整理结构
-            </span>
+            <span className="text-[10px] text-amber-600 leading-tight">层级较深，建议整理结构</span>
           </div>
         )}
       </div>

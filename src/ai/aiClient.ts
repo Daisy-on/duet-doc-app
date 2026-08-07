@@ -38,9 +38,7 @@ let cooldownTimer: number | null = null;
 let modelLoadStartedAt: number | null = null;
 
 function getModelLoadElapsedMs(): number | undefined {
-  return modelLoadStartedAt === null
-    ? undefined
-    : performance.now() - modelLoadStartedAt;
+  return modelLoadStartedAt === null ? undefined : performance.now() - modelLoadStartedAt;
 }
 
 function getWorker() {

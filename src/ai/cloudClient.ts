@@ -1,16 +1,11 @@
-import type {
-  AIRequest,
-  StreamCallbacks,
-  AIStreamEventData,
-  AIStreamError,
-} from './types';
+import type { AIRequest, StreamCallbacks, AIStreamEventData, AIStreamError } from './types';
 import { buildApiUrl } from '../utils/apiUtils';
 import { logAITrace, type AITrace, type AITraceStatus } from './aiLogger';
 
 export async function streamCloudAI(
   request: AIRequest,
   callbacks: StreamCallbacks,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<void> {
   const url = buildApiUrl('/api/v1/ai/stream');
   const requestId = request.requestId ?? crypto.randomUUID();
@@ -168,7 +163,7 @@ function parseAndEmitEvent(
     onDeltaReceived: () => void;
     onTextReceived: () => void;
     finalizeTrace: (status: AITraceStatus, extra?: Partial<AITrace>) => void;
-  }
+  },
 ) {
   const lines = rawBlock.split(/\r?\n/);
   let dataStr = '';

@@ -1,5 +1,5 @@
-import { useEditorStore } from '../store'
-import type { HeadingItem } from '../store'
+import { useEditorStore } from '../store';
+import type { HeadingItem } from '../store';
 
 // h1 -> 无缩进；h2 -> 缩进 1 级；h3+ -> 缩进 2 级
 const indentClass: Record<number, string> = {
@@ -9,27 +9,25 @@ const indentClass: Record<number, string> = {
   4: 'pl-6',
   5: 'pl-6',
   6: 'pl-6',
-}
+};
 
 const textClass: Record<number, string> = {
   1: 'font-semibold text-text-primary text-[13px]',
   2: 'text-[12px] text-text-secondary',
   3: 'text-[11px] text-text-secondary',
-}
+};
 
 function scrollToHeading(item: HeadingItem) {
-  const el = document.querySelector(`[data-heading-id="${item.id}"]`)
-  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const el = document.querySelector(`[data-heading-id="${item.id}"]`);
+  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 export default function OutlinePanel() {
-  const headings = useEditorStore((state) => state.headings)
+  const headings = useEditorStore((state) => state.headings);
 
   return (
     <aside className="w-[200px] min-w-[200px] border-l border-border-color p-5 bg-bg-panel">
-      <div className="text-[13px] font-semibold text-text-primary mb-4">
-        大纲
-      </div>
+      <div className="text-[13px] font-semibold text-text-primary mb-4">大纲</div>
 
       {headings.length === 0 ? (
         <p className="text-[12px] text-text-secondary leading-relaxed">
@@ -55,5 +53,5 @@ export default function OutlinePanel() {
         </ul>
       )}
     </aside>
-  )
+  );
 }

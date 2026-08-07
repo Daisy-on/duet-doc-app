@@ -61,9 +61,7 @@ export default function ConfirmDeleteModal({
           <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-sm">
             !
           </div>
-          <h3 className="text-base font-bold text-gray-900 tracking-tight flex-1">
-            {title}
-          </h3>
+          <h3 className="text-base font-bold text-gray-900 tracking-tight flex-1">{title}</h3>
           <button
             type="button"
             disabled={isSubmitting}

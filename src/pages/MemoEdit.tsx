@@ -7,9 +7,7 @@ import Editor from '../components/Editor';
 import Toolbar from '../components/Toolbar';
 import { useEditorStore, useLayoutStore } from '../store';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
-import { 
-  CloudUpload, Share2, History, MoreHorizontal, StickyNote, PanelLeft
-} from 'lucide-react';
+import { CloudUpload, Share2, History, MoreHorizontal, StickyNote, PanelLeft } from 'lucide-react';
 
 // Escape HTML characters to safely insert into HTML string
 function escapeHtml(text: string): string {
@@ -49,7 +47,7 @@ function replaceFirstH1(content: string, newTitle: string): string {
         const h1Node: JSONContent = {
           type: 'heading',
           attrs: { level: 1 },
-          content: [{ type: 'text', text: newTitle }]
+          content: [{ type: 'text', text: newTitle }],
         };
         parsed.content = [h1Node, ...(parsed.content || [])];
       }
@@ -72,7 +70,7 @@ function replaceFirstH1(content: string, newTitle: string): string {
 export default function MemoEdit() {
   const { memoId } = useParams<{ memoId: string }>();
   const navigate = useNavigate();
-  
+
   const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
   const memo = documents.find((d) => d.id === memoId);
@@ -91,7 +89,9 @@ export default function MemoEdit() {
   // Sync first <h1> inside the content when memoId changes
   useEffect(() => {
     if (!memoId) return;
-    const currentMemo = useKnowledgeBaseStore.getState().documents.find((item) => item.id === memoId);
+    const currentMemo = useKnowledgeBaseStore
+      .getState()
+      .documents.find((item) => item.id === memoId);
     if (!currentMemo) return;
     const updatedContent = replaceFirstH1(currentMemo.content, currentMemo.title);
     if (updatedContent !== currentMemo.content) {
@@ -128,7 +128,7 @@ export default function MemoEdit() {
       <div className="flex-1 flex items-center justify-center bg-bg-main">
         <div className="text-center">
           <h2 className="text-lg font-bold text-text-primary mb-2">小记不存在</h2>
-          <button 
+          <button
             onClick={() => navigate('/memo')}
             className="px-4 py-2 bg-accent hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
           >
@@ -139,7 +139,10 @@ export default function MemoEdit() {
     );
   }
 
-  const saveTime = new Date(memo.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const saveTime = new Date(memo.updatedAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -154,7 +157,7 @@ export default function MemoEdit() {
             <button
               onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
               className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title={isCatalogCollapsed ? "展开" : "折叠"}
+              title={isCatalogCollapsed ? '展开' : '折叠'}
             >
               <PanelLeft size={16} />
             </button>
@@ -165,9 +168,9 @@ export default function MemoEdit() {
                 onChange={(e) => {
                   const newTitle = e.target.value;
                   const updatedContent = replaceFirstH1(memo.content, newTitle);
-                  updateDocument(memo.id, { 
-                    title: newTitle, 
-                    content: updatedContent 
+                  updateDocument(memo.id, {
+                    title: newTitle,
+                    content: updatedContent,
                   });
                 }}
                 className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
@@ -188,7 +191,12 @@ export default function MemoEdit() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-text-secondary">
-            <span title="分享" className="cursor-pointer hover:text-text-primary transition-colors flex"><Share2 size={16} /></span>
+            <span
+              title="分享"
+              className="cursor-pointer hover:text-text-primary transition-colors flex"
+            >
+              <Share2 size={16} />
+            </span>
             <button
               title="历史记录"
               onClick={() => navigate(`/kb/kb-memo-system/doc/${memoId}/history`)}
@@ -196,7 +204,9 @@ export default function MemoEdit() {
             >
               <History size={16} />
             </button>
-            <span className="cursor-pointer hover:text-text-primary transition-colors flex"><MoreHorizontal size={16} /></span>
+            <span className="cursor-pointer hover:text-text-primary transition-colors flex">
+              <MoreHorizontal size={16} />
+            </span>
           </div>
         </header>
 

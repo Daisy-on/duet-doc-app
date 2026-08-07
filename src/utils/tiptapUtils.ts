@@ -45,7 +45,18 @@ export function extractPlainTextFromTiptap(rawContent: string | object | null | 
       for (const child of node.content) {
         traverse(child);
       }
-      if (node.type && ['paragraph', 'heading', 'codeBlock', 'bulletList', 'orderedList', 'listItem', 'tableRow'].includes(node.type)) {
+      if (
+        node.type &&
+        [
+          'paragraph',
+          'heading',
+          'codeBlock',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'tableRow',
+        ].includes(node.type)
+      ) {
         textPieces.push('\n');
       }
     }

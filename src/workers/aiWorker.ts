@@ -80,9 +80,7 @@ function extractGeneratedText(result: TextGenerationOutput): string {
         return genText.trim();
       }
       if (Array.isArray(genText)) {
-        const assistantMessage = [...genText]
-          .reverse()
-          .find((msg) => msg.role === 'assistant');
+        const assistantMessage = [...genText].reverse().find((msg) => msg.role === 'assistant');
         return assistantMessage?.content?.trim() ?? '';
       }
     }
@@ -98,9 +96,16 @@ async function detectGpuDevice(): Promise<string> {
       if (adapter) {
         const adapterObj = adapter as {
           info?: { vendor?: string; device?: string; description?: string; architecture?: string };
-          requestAdapterInfo?: () => Promise<{ vendor?: string; device?: string; description?: string; architecture?: string }>;
+          requestAdapterInfo?: () => Promise<{
+            vendor?: string;
+            device?: string;
+            description?: string;
+            architecture?: string;
+          }>;
         };
-        const info = adapterObj.info || (adapterObj.requestAdapterInfo ? await adapterObj.requestAdapterInfo() : null);
+        const info =
+          adapterObj.info ||
+          (adapterObj.requestAdapterInfo ? await adapterObj.requestAdapterInfo() : null);
         if (info) {
           const parts = [info.vendor, info.device || info.description].filter(Boolean);
           const name = parts.length > 0 ? parts.join(' ') : 'GPU';
@@ -154,7 +159,6 @@ self.onmessage = async (event: MessageEvent<AiWorkerRequest>) => {
         });
         return;
       }
-
 
       const startTime = performance.now();
       const result = await generator(message.payload.messages, {

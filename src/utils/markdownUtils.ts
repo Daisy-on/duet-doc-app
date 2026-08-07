@@ -22,12 +22,30 @@ export function markdownToHtml(markdownText: string): string {
 }
 
 const GENERIC_TITLES = new Set([
-  '总结', '概述', '结论', '回答', '简介', '小结', '说明', '分析', '注意事项', '提示', '核心要点',
-  'summary', 'overview', 'conclusion', 'note', 'introduction', 'notes'
+  '总结',
+  '概述',
+  '结论',
+  '回答',
+  '简介',
+  '小结',
+  '说明',
+  '分析',
+  '注意事项',
+  '提示',
+  '核心要点',
+  'summary',
+  'overview',
+  'conclusion',
+  'note',
+  'introduction',
+  'notes',
 ]);
 
 function isGenericTitle(title: string): boolean {
-  const lower = title.toLowerCase().trim().replace(/[:：\s]/g, '');
+  const lower = title
+    .toLowerCase()
+    .trim()
+    .replace(/[:：\s]/g, '');
   return GENERIC_TITLES.has(lower) || lower.length <= 2;
 }
 
@@ -35,9 +53,13 @@ function isGenericTitle(title: string): boolean {
  * Extracts a clean, non-truncated document title from Markdown content or prompt context.
  */
 export function getSmartTitle(content: string, fallbackTitle?: string): string {
-  const cleanFallback = fallbackTitle && fallbackTitle !== '新对话' 
-    ? fallbackTitle.trim().replace(/(\.\.\.|\u2026)$/, '').trim() 
-    : undefined;
+  const cleanFallback =
+    fallbackTitle && fallbackTitle !== '新对话'
+      ? fallbackTitle
+          .trim()
+          .replace(/(\.\.\.|\u2026)$/, '')
+          .trim()
+      : undefined;
 
   if (content) {
     // 1. Check for markdown headings (# Heading or ## Heading)

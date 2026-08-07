@@ -19,7 +19,10 @@ const COLORS = [
   '#ec4899', // Pink
 ];
 
-export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnowledgeBaseModalProps) {
+export default function CreateKnowledgeBaseModal({
+  isOpen,
+  onClose,
+}: CreateKnowledgeBaseModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
@@ -39,17 +42,20 @@ export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnow
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-[2px]" onClick={onClose}>
-      <div 
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
         className="bg-white rounded-2xl shadow-xl w-[480px] max-w-[92vw] border border-gray-100 overflow-hidden flex flex-col px-4.5 py-5.5 animate-modal-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-4 pb-2 border-b border-border-color/60">
           <h1 className="text-base font-bold text-gray-900 tracking-tight">新建知识库</h1>
-          <button 
+          <button
             type="button"
-            onClick={onClose} 
+            onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
           >
             <X size={16} />
@@ -59,7 +65,9 @@ export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnow
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">知识库名称 *</label>
+            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+              知识库名称 *
+            </label>
             <input
               type="text"
               required
@@ -72,7 +80,9 @@ export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnow
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">简介</label>
+            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+              简介
+            </label>
             <textarea
               placeholder="请输入知识库的简介或说明..."
               value={description}
@@ -83,7 +93,9 @@ export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnow
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">选择图标颜色</label>
+            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+              选择图标颜色
+            </label>
             <div className="flex gap-2.5 flex-wrap py-1">
               {COLORS.map((color) => (
                 <button
@@ -98,9 +110,7 @@ export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnow
                   }}
                   title={color}
                 >
-                  {selectedColor === color && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                  )}
+                  {selectedColor === color && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </button>
               ))}
             </div>
@@ -119,8 +129,8 @@ export default function CreateKnowledgeBaseModal({ isOpen, onClose }: CreateKnow
               type="submit"
               disabled={!name.trim()}
               className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-sm transition-all ${
-                name.trim() 
-                  ? 'bg-accent hover:bg-indigo-700 cursor-pointer' 
+                name.trim()
+                  ? 'bg-accent hover:bg-indigo-700 cursor-pointer'
                   : 'bg-indigo-300 cursor-not-allowed'
               }`}
             >

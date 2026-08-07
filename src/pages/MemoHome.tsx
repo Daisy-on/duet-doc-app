@@ -26,7 +26,7 @@ export default function MemoHome() {
           <button
             onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
             className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title={isCatalogCollapsed ? "展开" : "折叠"}
+            title={isCatalogCollapsed ? '展开' : '折叠'}
           >
             <PanelLeft size={16} />
           </button>
@@ -38,11 +38,11 @@ export default function MemoHome() {
             <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-400 to-indigo-400 flex items-center justify-center text-white shadow-lg mx-auto mb-6 hover:rotate-12 transition-transform duration-300">
               <StickyNote size={30} />
             </div>
-            
+
             <h3 className="text-lg font-bold text-text-primary mb-2 flex items-center justify-center gap-1.5">
               我的小记
             </h3>
-            
+
             <p className="text-xs text-text-secondary mb-6 leading-relaxed">
               小记是一个极简的速记本，适合用来放置代办清单、日常碎碎念和临时灵感。它不属于任何分组，并且可以随时一键打包移动到具体知识库中。
             </p>

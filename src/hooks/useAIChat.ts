@@ -50,7 +50,7 @@ export function useAIChat(sessionId: string | null) {
     async (
       run: StreamRun,
       status: 'complete' | 'stopped' | 'error',
-      eventMetadata?: Partial<AIResponseMetadata>
+      eventMetadata?: Partial<AIResponseMetadata>,
     ): Promise<void> => {
       if (run.finalizationPromise) {
         return run.finalizationPromise;
@@ -79,7 +79,9 @@ export function useAIChat(sessionId: string | null) {
         // 1. 同步更新 Zustand 内存状态，确保即使 IndexedDB 写库失败，UI 也不会卡在 streaming 状态
         useAIWritingStore.setState((state) => ({
           messages: state.messages
-            .filter((m) => (finalStatus === 'error' && !hasContent ? m.id !== run.assistantMsgId : true))
+            .filter((m) =>
+              finalStatus === 'error' && !hasContent ? m.id !== run.assistantMsgId : true,
+            )
             .map((m) =>
               m.id === run.assistantMsgId
                 ? {
@@ -93,7 +95,7 @@ export function useAIChat(sessionId: string | null) {
                         ? { ...run.currentResponseMetadata }
                         : undefined,
                   }
-                : m
+                : m,
             ),
         }));
 
@@ -131,7 +133,7 @@ export function useAIChat(sessionId: string | null) {
       run.finalizationPromise = promise;
       return promise;
     },
-    [commitMessage, removeMessage]
+    [commitMessage, removeMessage],
   );
 
   // 异步给新 Session 自动生成简短优雅标题
@@ -164,11 +166,13 @@ export function useAIChat(sessionId: string | null) {
               const updatedAt = Date.now();
               await db.chatSessions.update(targetSessionId, { title: cleanTitle, updatedAt });
               useAIWritingStore.setState((state) => ({
-                sessions: state.sessions.map((s) => (s.id === targetSessionId ? { ...s, title: cleanTitle, updatedAt } : s)),
+                sessions: state.sessions.map((s) =>
+                  s.id === targetSessionId ? { ...s, title: cleanTitle, updatedAt } : s,
+                ),
               }));
             }
           },
-        }
+        },
       );
     } catch {
       // 失败默默忽略，使用默认兜底
@@ -176,7 +180,11 @@ export function useAIChat(sessionId: string | null) {
   }, []);
 
   const sendChatMessage = useCallback(
-    async (userContent: string, referencedDocs: ReferencedDoc[] = [], overrideSessionId?: string) => {
+    async (
+      userContent: string,
+      referencedDocs: ReferencedDoc[] = [],
+      overrideSessionId?: string,
+    ) => {
       const targetSessionId = overrideSessionId || sessionId;
       if (!targetSessionId || !userContent.trim() || isGenerating) return;
 
@@ -222,7 +230,9 @@ export function useAIChat(sessionId: string | null) {
         }
 
         // 如果当前 Session 标题还是默认的 "新对话"，触发后台智能摘要标题
-        const targetSession = useAIWritingStore.getState().sessions.find((s) => s.id === targetSessionId);
+        const targetSession = useAIWritingStore
+          .getState()
+          .sessions.find((s) => s.id === targetSessionId);
         if (targetSession && (targetSession.title === '新对话' || !targetSession.title)) {
           summarizeAndSetTitle(targetSessionId, userContent.trim());
         }
@@ -256,7 +266,7 @@ export function useAIChat(sessionId: string | null) {
               m.id !== assistantMsgId &&
               m.id !== userMsg.id &&
               (m.status === undefined || m.status === 'complete' || m.status === 'stopped') &&
-              m.content.trim().length > 0
+              m.content.trim().length > 0,
           )
           .sort((a, b) => a.createdAt - b.createdAt);
 
@@ -380,7 +390,7 @@ export function useAIChat(sessionId: string | null) {
               run.finalizationPromise = finalizeStream(run, 'error');
             },
           },
-          run.controller.signal
+          run.controller.signal,
         );
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
@@ -391,12 +401,23 @@ export function useAIChat(sessionId: string | null) {
       }
 
       if (!run.finalized) {
-        await finalizeStream(run, run.stopRequested ? 'stopped' : 'error', { routeReason: 'unexpected_eof' });
+        await finalizeStream(run, run.stopRequested ? 'stopped' : 'error', {
+          routeReason: 'unexpected_eof',
+        });
       } else if (run.finalizationPromise) {
         await run.finalizationPromise;
       }
     },
-    [sessionId, isGenerating, isThinkingEnabled, addMessage, updateMessageStream, finalizeStream, stopGeneration, summarizeAndSetTitle]
+    [
+      sessionId,
+      isGenerating,
+      isThinkingEnabled,
+      addMessage,
+      updateMessageStream,
+      finalizeStream,
+      stopGeneration,
+      summarizeAndSetTitle,
+    ],
   );
 
   // 重新生成当前 Assistant 回答
@@ -405,7 +426,9 @@ export function useAIChat(sessionId: string | null) {
       if (!sessionId || isGenerating) return;
 
       const currentMessages = useAIWritingStore.getState().messages;
-      const sessionMsgs = currentMessages.filter((m) => m.sessionId === sessionId).sort((a, b) => a.createdAt - b.createdAt);
+      const sessionMsgs = currentMessages
+        .filter((m) => m.sessionId === sessionId)
+        .sort((a, b) => a.createdAt - b.createdAt);
 
       const targetIdx = sessionMsgs.findIndex((m) => m.id === assistantMsgId);
       if (targetIdx === -1) return;
@@ -431,7 +454,7 @@ export function useAIChat(sessionId: string | null) {
 
       await sendChatMessage(prevUserMsg.content, prevUserMsg.referencedDocs || []);
     },
-    [sessionId, isGenerating, removeMessage, sendChatMessage]
+    [sessionId, isGenerating, removeMessage, sendChatMessage],
   );
 
   useEffect(() => {

@@ -69,10 +69,7 @@ function FolderCard({
 
       {/* Actions (rename / delete) — only on non-system folders when hovered */}
       {!isSystem && hovered ? (
-        <div
-          className="flex items-center gap-1 shrink-0 ml-1"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="flex items-center gap-1 shrink-0 ml-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={onRename}
             title="重命名"
@@ -263,10 +260,7 @@ export default function Favorites() {
                     }}
                     className="flex-1 text-xs outline-none bg-transparent text-text-primary"
                   />
-                  <button
-                    onClick={confirmRename}
-                    className="text-accent cursor-pointer shrink-0"
-                  >
+                  <button onClick={confirmRename} className="text-accent cursor-pointer shrink-0">
                     <Check size={13} />
                   </button>
                   <button
@@ -310,10 +304,7 @@ export default function Favorites() {
                 placeholder="输入分组名称"
                 className="flex-1 text-xs outline-none bg-transparent text-text-primary placeholder-text-ghost"
               />
-              <button
-                onClick={handleCreateFolder}
-                className="text-accent cursor-pointer shrink-0"
-              >
+              <button onClick={handleCreateFolder} className="text-accent cursor-pointer shrink-0">
                 <Check size={13} />
               </button>
               <button
@@ -441,7 +432,9 @@ export default function Favorites() {
                           setMenuAnchorEl(e.currentTarget);
                         }}
                         className={`p-1 rounded-lg hover:bg-gray-200 text-text-secondary hover:text-text-primary transition-colors cursor-pointer ${
-                          activeDocId === item.docId ? 'opacity-100 bg-gray-200' : 'opacity-0 group-hover:opacity-100'
+                          activeDocId === item.docId
+                            ? 'opacity-100 bg-gray-200'
+                            : 'opacity-0 group-hover:opacity-100'
                         }`}
                       >
                         <MoreHorizontal size={14} />

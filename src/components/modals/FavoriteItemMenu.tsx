@@ -15,19 +15,13 @@ export default function FavoriteItemMenu({
   onClose,
   anchorEl,
 }: FavoriteItemMenuProps) {
-  const {
-    folders,
-    getFolderIds,
-    removeFavorite,
-    addToFolder,
-    removeFromFolder,
-    createFolder,
-  } = useFavoritesStore();
+  const { folders, getFolderIds, removeFavorite, addToFolder, removeFromFolder, createFolder } =
+    useFavoritesStore();
 
   const [view, setView] = useState<'main' | 'move'>('main');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  
+
   const popoverRef = useRef<HTMLDivElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,20 +52,18 @@ export default function FavoriteItemMenu({
     }
   }, [isCreatingFolder]);
 
-
-
   if (!isOpen) return null;
 
   // Position calculation relative to viewport (fixed)
   let posTop = 0;
   let posLeft = 0;
   const menuWidth = view === 'main' ? 140 : 200;
-  
+
   if (anchorEl) {
     const rect = anchorEl.getBoundingClientRect();
     posTop = rect.bottom + 6;
     posLeft = rect.right - menuWidth;
-    
+
     // Safety check for viewport bounds
     if (posLeft < 10) posLeft = 10;
     if (posTop + 240 > window.innerHeight) {
@@ -127,9 +119,9 @@ export default function FavoriteItemMenu({
             <FolderInput size={13} className="text-text-secondary" />
             移动收藏夹
           </button>
-          
+
           <div className="border-t border-border-color my-1" />
-          
+
           <button
             onClick={handleUnfavorite}
             className="flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 transition-colors cursor-pointer text-left w-full font-medium"
@@ -158,7 +150,9 @@ export default function FavoriteItemMenu({
               <div className="w-3.5 h-3.5 rounded border border-accent bg-accent flex items-center justify-center shrink-0">
                 <Check size={9} className="text-white" />
               </div>
-              <span className="text-[11px] text-text-primary flex-1 truncate font-medium">全部收藏</span>
+              <span className="text-[11px] text-text-primary flex-1 truncate font-medium">
+                全部收藏
+              </span>
             </div>
 
             {/* Custom Folders */}
@@ -177,7 +171,9 @@ export default function FavoriteItemMenu({
                   >
                     {isChecked && <Check size={9} className="text-white" />}
                   </div>
-                  <span className="text-[11px] text-text-primary flex-1 truncate">{folder.name}</span>
+                  <span className="text-[11px] text-text-primary flex-1 truncate">
+                    {folder.name}
+                  </span>
                 </button>
               );
             })}

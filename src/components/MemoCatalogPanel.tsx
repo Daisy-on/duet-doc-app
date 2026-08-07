@@ -11,24 +11,18 @@ import KBTreePickerModal from './modals/KBTreePickerModal';
 export default function MemoCatalogPanel() {
   const navigate = useNavigate();
   const { memoId } = useParams<{ memoId?: string }>();
-  
-  const { 
-    getMemos, createMemo, updateDocument, 
-    deleteDocument, moveDocument
-  } = useKnowledgeBaseStore();
 
-  const {
-    catalogWidth,
-    isCatalogCollapsed,
-    setCatalogWidth,
-    setIsCatalogCollapsed,
-  } = useLayoutStore();
+  const { getMemos, createMemo, updateDocument, deleteDocument, moveDocument } =
+    useKnowledgeBaseStore();
+
+  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } =
+    useLayoutStore();
 
   const memos = getMemos();
 
   // Selection states
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Renaming state
   const [renamingMemoId, setRenamingMemoId] = useState<string | null>(null);
   const [renamingTitle, setRenamingTitle] = useState('');
@@ -78,10 +72,10 @@ export default function MemoCatalogPanel() {
     if (selectedMemo) {
       // 1. Execute move
       moveDocument(selectedMemo.id, targetKbId, targetGroupId);
-      
+
       // 2. Clear state
       setIsMoveModalOpen(false);
-      
+
       // 3. Navigate user to the document's new location in KB
       navigate(`/kb/${targetKbId}/doc/${selectedMemo.id}`);
       setSelectedMemo(null);
@@ -176,88 +170,96 @@ export default function MemoCatalogPanel() {
               </div>
             </div>
 
-          {/* Search Box */}
-          <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color focus-within:border-accent rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0">
-            <Search size={14} className="shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索小记标题..."
-              className="w-full bg-transparent outline-none text-xs text-text-primary border-none p-0"
-            />
-          </div>
+            {/* Search Box */}
+            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color focus-within:border-accent rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0">
+              <Search size={14} className="shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索小记标题..."
+                className="w-full bg-transparent outline-none text-xs text-text-primary border-none p-0"
+              />
+            </div>
 
-          {/* Scroll List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
-            {filteredMemos.length === 0 ? (
-              <div className="text-center py-8 text-xs text-text-secondary">
-                {searchQuery.trim() ? '没有找到相关小记' : '暂无小记，点击上方 + 新建'}
-              </div>
-            ) : (
-              filteredMemos.map((memo) => {
-                const isActive = memo.id === memoId;
-                const isRenaming = renamingMemoId === memo.id;
+            {/* Scroll List */}
+            <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
+              {filteredMemos.length === 0 ? (
+                <div className="text-center py-8 text-xs text-text-secondary">
+                  {searchQuery.trim() ? '没有找到相关小记' : '暂无小记，点击上方 + 新建'}
+                </div>
+              ) : (
+                filteredMemos.map((memo) => {
+                  const isActive = memo.id === memoId;
+                  const isRenaming = renamingMemoId === memo.id;
 
-                return (
-                  <div
-                    key={memo.id}
-                    onClick={() => {
-                      if (!isRenaming) {
-                        navigate(`/memo/${memo.id}`);
-                      }
-                    }}
-                    className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
-                      isActive
-                        ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[10px]'
-                        : 'text-text-secondary'
-                    } ${activeMenuId === memo.id ? 'bg-hover-bg' : ''}`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <FileText size={14} className={isActive ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'} />
-                      {isRenaming ? (
-                        <input
-                          type="text"
-                          value={renamingTitle}
-                          onChange={(e) => setRenamingTitle(e.target.value)}
-                          onBlur={handleFinishRename}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleFinishRename();
-                            else if (e.key === 'Escape') handleCancelRename();
-                          }}
-                          className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                          onFocus={(e) => e.target.select()}
+                  return (
+                    <div
+                      key={memo.id}
+                      onClick={() => {
+                        if (!isRenaming) {
+                          navigate(`/memo/${memo.id}`);
+                        }
+                      }}
+                      className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+                        isActive
+                          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[10px]'
+                          : 'text-text-secondary'
+                      } ${activeMenuId === memo.id ? 'bg-hover-bg' : ''}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileText
+                          size={14}
+                          className={
+                            isActive ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'
+                          }
                         />
-                      ) : (
-                        <span className="truncate">{memo.title}</span>
+                        {isRenaming ? (
+                          <input
+                            type="text"
+                            value={renamingTitle}
+                            onChange={(e) => setRenamingTitle(e.target.value)}
+                            onBlur={handleFinishRename}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleFinishRename();
+                              else if (e.key === 'Escape') handleCancelRename();
+                            }}
+                            className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => e.target.select()}
+                          />
+                        ) : (
+                          <span className="truncate">{memo.title}</span>
+                        )}
+                      </div>
+
+                      {/* Dot menu on hover */}
+                      {!isRenaming && (
+                        <div
+                          className="flex items-center opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 ml-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={(e) => {
+                              setSelectedMemo(memo);
+                              setActiveMenuId(activeMenuId === memo.id ? null : memo.id);
+                              setMenuAnchorEl(activeMenuId === memo.id ? null : e.currentTarget);
+                            }}
+                            className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
+                            title="更多操作"
+                          >
+                            <MoreHorizontal size={13} />
+                          </button>
+                        </div>
                       )}
                     </div>
-
-                    {/* Dot menu on hover */}
-                    {!isRenaming && (
-                      <div className="flex items-center opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => {
-                            setSelectedMemo(memo);
-                            setActiveMenuId(activeMenuId === memo.id ? null : memo.id);
-                            setMenuAnchorEl(activeMenuId === memo.id ? null : e.currentTarget);
-                          }}
-                          className="text-text-secondary hover:text-text-primary hover:bg-black/5 p-1 rounded transition-colors flex"
-                          title="更多操作"
-                        >
-                          <MoreHorizontal size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
         {/* Drag handle resize line */}
         <div

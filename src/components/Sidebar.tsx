@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Home, Sparkles, StickyNote, Star, Folder, Search, Plus, MoreHorizontal } from 'lucide-react';
+import {
+  Home,
+  Sparkles,
+  StickyNote,
+  Star,
+  Folder,
+  Search,
+  Plus,
+  MoreHorizontal,
+} from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID, type KnowledgeBase } from '../store/knowledgeBaseStore';
 import { useAIWritingStore } from '../store/aiWritingStore';
@@ -12,11 +21,7 @@ export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
   const navigate = useNavigate();
   const { lastVisitedSessionId } = useAIWritingStore();
-  const {
-    knowledgeBases,
-    updateKnowledgeBase,
-    deleteKnowledgeBase,
-  } = useKnowledgeBaseStore();
+  const { knowledgeBases, updateKnowledgeBase, deleteKnowledgeBase } = useKnowledgeBaseStore();
   const { setIsCatalogCollapsed } = useLayoutStore();
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
@@ -77,18 +82,33 @@ export default function Sidebar() {
           <Search size={14} />
           <span className="truncate w-[90px]">搜索知识库...</span>
         </div>
-        <span className="bg-white px-1.5 py-0.5 rounded border border-border-color text-[11px] shadow-sm">⌘K</span>
+        <span className="bg-white px-1.5 py-0.5 rounded border border-border-color text-[11px] shadow-sm">
+          ⌘K
+        </span>
       </div>
 
       {/* Nav Menu */}
       <ul className="list-none mb-6 space-y-1 shrink-0">
         <li>
-          <NavLink to="/" end tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink
+            to="/"
+            end
+            tabIndex={-1}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+            }
+          >
             <Home size={16} /> 开始
           </NavLink>
         </li>
         <li>
-          <NavLink to={lastVisitedSessionId ? `/ai-writing/${lastVisitedSessionId}` : '/ai-writing'} tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink
+            to={lastVisitedSessionId ? `/ai-writing/${lastVisitedSessionId}` : '/ai-writing'}
+            tabIndex={-1}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+            }
+          >
             {({ isActive }) => (
               <>
                 <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> AI 写作
@@ -97,15 +117,28 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/memo" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink
+            to="/memo"
+            tabIndex={-1}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+            }
+          >
             <StickyNote size={16} /> 小记
           </NavLink>
         </li>
         <li>
-          <NavLink to="/favorites" tabIndex={-1} className={({ isActive }) => `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`}>
+          <NavLink
+            to="/favorites"
+            tabIndex={-1}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+            }
+          >
             {({ isActive }) => (
               <>
-                <Star size={16} className={isActive ? 'text-yellow-400 fill-yellow-400' : ''} /> 收藏
+                <Star size={16} className={isActive ? 'text-yellow-400 fill-yellow-400' : ''} />{' '}
+                收藏
               </>
             )}
           </NavLink>
@@ -114,7 +147,9 @@ export default function Sidebar() {
 
       {/* Doc Tree */}
       <div className="flex items-center justify-between mb-3 pl-3 pr-1 shrink-0 select-none">
-        <span className="text-[12px] text-text-secondary font-semibold tracking-wide">知识库列表</span>
+        <span className="text-[12px] text-text-secondary font-semibold tracking-wide">
+          知识库列表
+        </span>
         <button
           onClick={() => setIsCreateOpen(true)}
           className="text-text-secondary hover:text-text-primary p-0.5 hover:bg-hover-bg rounded transition-colors cursor-pointer flex font-medium"
@@ -139,11 +174,7 @@ export default function Sidebar() {
                 >
                   {isRenaming ? (
                     <div className="flex items-center gap-2 px-3 py-1.5 w-full">
-                      <Folder
-                        size={14}
-                        className="shrink-0"
-                        style={{ color: kb.icon }}
-                      />
+                      <Folder size={14} className="shrink-0" style={{ color: kb.icon }} />
                       <input
                         type="text"
                         value={renamingKbName}
@@ -167,7 +198,9 @@ export default function Sidebar() {
                           setIsCatalogCollapsed(false);
                         }}
                         className={`flex items-center gap-2.5 truncate flex-1 px-3 py-2 min-w-0 ${
-                          isActiveKb ? 'text-accent font-semibold' : 'text-text-secondary hover:text-text-primary'
+                          isActiveKb
+                            ? 'text-accent font-semibold'
+                            : 'text-text-secondary hover:text-text-primary'
                         }`}
                       >
                         <Folder
@@ -207,10 +240,7 @@ export default function Sidebar() {
       </div>
 
       {/* Modals */}
-      <CreateKnowledgeBaseModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-      />
+      <CreateKnowledgeBaseModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
 
       <ConfirmDeleteModal
         isOpen={isDeleteOpen}

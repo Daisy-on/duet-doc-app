@@ -10,9 +10,7 @@ export type GhostTextPayload = {
 
 type GhostTextState = GhostTextPayload | null;
 
-type GhostTextMeta =
-  | { type: 'set'; payload: GhostTextPayload }
-  | { type: 'clear' };
+type GhostTextMeta = { type: 'set'; payload: GhostTextPayload } | { type: 'clear' };
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -125,7 +123,7 @@ export const GhostTextExtension = Extension.create({
                 span.dataset.requestId = ghostText.requestId;
                 return span;
               },
-              { side: 1 }
+              { side: 1 },
             );
 
             return DecorationSet.create(state.doc, [widget]);

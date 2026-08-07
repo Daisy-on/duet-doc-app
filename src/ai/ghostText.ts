@@ -42,12 +42,13 @@ export function buildGhostTextPrompt(editor: Editor): GhostTextPromptInput | nul
     messages: [
       {
         role: 'system',
-        content: '你是一个文本续写助手。请直接、无缝地续写用户给出的文字。绝对不能重复用户已经输入的字！不要做任何解释，不要输出除了续写内容之外的任何字符。'
+        content:
+          '你是一个文本续写助手。请直接、无缝地续写用户给出的文字。绝对不能重复用户已经输入的字！不要做任何解释，不要输出除了续写内容之外的任何字符。',
       },
       {
         role: 'user',
-        content: contextText
-      }
+        content: contextText,
+      },
     ],
   };
 }

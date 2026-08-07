@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Search, Folder, ChevronDown, ChevronRight, FileText, Check, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Search,
+  Folder,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Check,
+  AlertCircle,
+} from 'lucide-react';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../../store/knowledgeBaseStore';
 import type { Group, Document, KnowledgeBase } from '../../store/knowledgeBaseStore';
 
@@ -56,7 +65,7 @@ export default function KBTreePickerModal({
   // Filter out system memo KB
   const visibleKBs = useMemo(
     () => knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID),
-    [knowledgeBases]
+    [knowledgeBases],
   );
 
   useEffect(() => {
@@ -139,23 +148,20 @@ export default function KBTreePickerModal({
   };
 
   const validationError =
-    validateSelection && selectedKbId
-      ? validateSelection(selectedKbId, selectedGroupId)
-      : null;
+    validateSelection && selectedKbId ? validateSelection(selectedKbId, selectedGroupId) : null;
 
   const isConfirmDisabled =
     (mode === 'document'
       ? !selectedDocId
       : mode === 'create-doc'
-      ? !selectedKbId || !docTitle.trim()
-      : !selectedKbId) || !!validationError;
+        ? !selectedKbId || !docTitle.trim()
+        : !selectedKbId) || !!validationError;
 
   // Filtered documents when search is active (document mode)
   const filteredDocs = searchQuery.trim()
     ? documents.filter(
         (doc) =>
-          doc.kbId !== MEMO_KB_ID &&
-          doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+          doc.kbId !== MEMO_KB_ID && doc.title.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : [];
 
@@ -165,7 +171,7 @@ export default function KBTreePickerModal({
         (g) =>
           g.kbId !== MEMO_KB_ID &&
           !forbiddenGroupIds.includes(g.id) &&
-          g.name.toLowerCase().includes(searchQuery.toLowerCase())
+          g.name.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : [];
 
@@ -198,12 +204,14 @@ export default function KBTreePickerModal({
 
     const isExpanded = !!expandedNodes[group.id];
     const subGroups = getChildGroups(group.id, group.kbId).filter(
-      (sub) => !forbiddenGroupIds.includes(sub.id)
+      (sub) => !forbiddenGroupIds.includes(sub.id),
     );
     const groupDocs = documents.filter((doc) => doc.groupId === group.id);
     const hasFolderChildren = subGroups.length > 0;
-    const hasChildren = mode === 'document' ? hasFolderChildren || groupDocs.length > 0 : hasFolderChildren;
-    const isFolderSelected = (mode === 'folder' || mode === 'create-doc') && selectedGroupId === group.id;
+    const hasChildren =
+      mode === 'document' ? hasFolderChildren || groupDocs.length > 0 : hasFolderChildren;
+    const isFolderSelected =
+      (mode === 'folder' || mode === 'create-doc') && selectedGroupId === group.id;
 
     return (
       <div className="space-y-1">
@@ -235,7 +243,10 @@ export default function KBTreePickerModal({
             ) : (
               <span className="w-4 shrink-0" />
             )}
-            <Folder size={14} className={`shrink-0 ${isFolderSelected ? 'text-accent' : 'text-indigo-400'}`} />
+            <Folder
+              size={14}
+              className={`shrink-0 ${isFolderSelected ? 'text-accent' : 'text-indigo-400'}`}
+            />
             <span className="truncate">{group.name}</span>
           </div>
           {isFolderSelected && <Check size={14} className="text-accent shrink-0" />}
@@ -264,7 +275,9 @@ export default function KBTreePickerModal({
                     <div className="flex items-center gap-2 min-w-0">
                       <FileText
                         size={14}
-                        className={isSelected ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'}
+                        className={
+                          isSelected ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'
+                        }
                       />
                       <span className="truncate">{doc.title}</span>
                     </div>
@@ -291,9 +304,7 @@ export default function KBTreePickerModal({
         <div className="flex justify-between items-start mb-3 pb-2 border-b border-border-color/60 shrink-0">
           <div>
             <h3 className="text-base font-bold text-gray-900 tracking-tight">{title}</h3>
-            {subtitle && (
-              <div className="text-[11px] text-text-secondary mt-0.5">{subtitle}</div>
-            )}
+            {subtitle && <div className="text-[11px] text-text-secondary mt-0.5">{subtitle}</div>}
           </div>
           <button
             type="button"
@@ -307,9 +318,7 @@ export default function KBTreePickerModal({
         {/* Title Input for create-doc mode */}
         {mode === 'create-doc' && (
           <div className="mb-3 shrink-0">
-            <label className="block text-[12px] font-bold text-text-secondary mb-1">
-              文档标题
-            </label>
+            <label className="block text-[12px] font-bold text-text-secondary mb-1">文档标题</label>
             <input
               type="text"
               value={docTitle}
@@ -364,7 +373,9 @@ export default function KBTreePickerModal({
                           <div className="flex items-center gap-2 min-w-0">
                             <FileText
                               size={14}
-                              className={isSelected ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'}
+                              className={
+                                isSelected ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'
+                              }
                             />
                             <span className="truncate">{doc.title}</span>
                           </div>
@@ -397,7 +408,12 @@ export default function KBTreePickerModal({
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <Folder size={14} className={isSelected ? 'text-accent shrink-0' : 'text-indigo-400 shrink-0'} />
+                            <Folder
+                              size={14}
+                              className={
+                                isSelected ? 'text-accent shrink-0' : 'text-indigo-400 shrink-0'
+                              }
+                            />
                             <span className="truncate">{group.name}</span>
                           </div>
                           {isSelected && <Check size={14} className="text-accent shrink-0" />}
@@ -414,13 +430,17 @@ export default function KBTreePickerModal({
               {visibleKBs.map((kb) => {
                 const isExpanded = !!expandedNodes[kb.id];
                 const kbRootGroups = getChildGroups(null, kb.id).filter(
-                  (g) => !forbiddenGroupIds.includes(g.id)
+                  (g) => !forbiddenGroupIds.includes(g.id),
                 );
                 const kbDocs = documents.filter((doc) => doc.kbId === kb.id);
                 const rootDocs = kbDocs.filter((doc) => doc.groupId === null);
                 const hasFolderContent = kbRootGroups.length > 0;
-                const hasContent = mode === 'document' ? hasFolderContent || rootDocs.length > 0 : hasFolderContent;
-                const isKbSelected = (mode === 'folder' || mode === 'create-doc') && selectedKbId === kb.id && selectedGroupId === null;
+                const hasContent =
+                  mode === 'document' ? hasFolderContent || rootDocs.length > 0 : hasFolderContent;
+                const isKbSelected =
+                  (mode === 'folder' || mode === 'create-doc') &&
+                  selectedKbId === kb.id &&
+                  selectedGroupId === null;
 
                 return (
                   <div key={kb.id} className="space-y-1">
@@ -451,15 +471,13 @@ export default function KBTreePickerModal({
                         ) : (
                           <span className="w-4 shrink-0" />
                         )}
-                        <Folder
-                          size={14}
-                          style={{ color: kb.icon }}
-                          className="shrink-0"
-                        />
+                        <Folder size={14} style={{ color: kb.icon }} className="shrink-0" />
                         <span className="truncate">
                           {kb.name}
                           {(mode === 'folder' || mode === 'create-doc') && (
-                            <span className="text-[10px] text-text-secondary font-normal ml-1">(根目录)</span>
+                            <span className="text-[10px] text-text-secondary font-normal ml-1">
+                              (根目录)
+                            </span>
                           )}
                         </span>
                       </div>
@@ -489,7 +507,11 @@ export default function KBTreePickerModal({
                                 <div className="flex items-center gap-2 min-w-0">
                                   <FileText
                                     size={14}
-                                    className={isSelected ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'}
+                                    className={
+                                      isSelected
+                                        ? 'text-accent shrink-0'
+                                        : 'text-text-secondary shrink-0'
+                                    }
                                   />
                                   <span className="truncate">{doc.title}</span>
                                 </div>
@@ -517,7 +539,8 @@ export default function KBTreePickerModal({
             {mode === 'document' ? (
               selectedDocId ? (
                 <>
-                  已选择引用文档：<span className="font-semibold text-accent mx-1">“{selectedDocTitle}”</span>
+                  已选择引用文档：
+                  <span className="font-semibold text-accent mx-1">“{selectedDocTitle}”</span>
                 </>
               ) : (
                 <span className="text-text-ghost">请在上方列表中选择需要引用的文档</span>
@@ -525,9 +548,7 @@ export default function KBTreePickerModal({
             ) : selectedKbId ? (
               <>
                 {mode === 'create-doc' ? '文档将生成保存至：' : '准备移动至：'}
-                <span className="font-semibold text-accent ml-1">
-                  {fullPathList.join(' / ')}
-                </span>
+                <span className="font-semibold text-accent ml-1">{fullPathList.join(' / ')}</span>
               </>
             ) : (
               <span className="text-text-ghost">请在上方列表中选择目标知识库或目录</span>

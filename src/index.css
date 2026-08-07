@@ -1,23 +1,24 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --color-bg-main: #FFFFFF;
-  --color-bg-sidebar: #F9FAFB;
-  --color-bg-panel: #F9FAFB;
+  --color-bg-main: #ffffff;
+  --color-bg-sidebar: #f9fafb;
+  --color-bg-panel: #f9fafb;
   --color-text-primary: #111827;
-  --color-text-secondary: #6B7280;
-  --color-text-ghost: #9CA3AF;
-  --color-accent: #6366F1;
-  --color-hover-bg: #F3F4F6;
-  --color-border-color: #E5E7EB;
-  --color-success-color: #10B981;
-  --color-selection-bg: #E0E7FF;
+  --color-text-secondary: #6b7280;
+  --color-text-ghost: #9ca3af;
+  --color-accent: #6366f1;
+  --color-hover-bg: #f3f4f6;
+  --color-border-color: #e5e7eb;
+  --color-success-color: #10b981;
+  --color-selection-bg: #e0e7ff;
 }
 
 body {
-  background-color: #E5E7EB;
+  background-color: #e5e7eb;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* 充满全屏的画布布局，后续接入 Tauri 后定制窗口外观 */
@@ -149,11 +150,13 @@ body {
 
 /* 行内代码 */
 .ProseMirror code {
-  background-color: #F3F4F6; /* gray-100 */
-  color: #EF4444; /* red-500 */
+  background-color: #f3f4f6; /* gray-100 */
+  color: #ef4444; /* red-500 */
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   font-size: 0.875em;
 }
 
@@ -203,81 +206,81 @@ body {
 }
 
 /* --- Highlight.js 语法高亮样式 --- */
-[data-theme="dark"] .hljs-comment,
-[data-theme="dark"] .hljs-quote {
+[data-theme='dark'] .hljs-comment,
+[data-theme='dark'] .hljs-quote {
   color: #6a9955;
 }
-[data-theme="dark"] .hljs-variable,
-[data-theme="dark"] .hljs-template-variable,
-[data-theme="dark"] .hljs-attribute,
-[data-theme="dark"] .hljs-tag,
-[data-theme="dark"] .hljs-name,
-[data-theme="dark"] .hljs-regexp,
-[data-theme="dark"] .hljs-link,
-[data-theme="dark"] .hljs-name,
-[data-theme="dark"] .hljs-selector-id,
-[data-theme="dark"] .hljs-selector-class {
+[data-theme='dark'] .hljs-variable,
+[data-theme='dark'] .hljs-template-variable,
+[data-theme='dark'] .hljs-attribute,
+[data-theme='dark'] .hljs-tag,
+[data-theme='dark'] .hljs-name,
+[data-theme='dark'] .hljs-regexp,
+[data-theme='dark'] .hljs-link,
+[data-theme='dark'] .hljs-name,
+[data-theme='dark'] .hljs-selector-id,
+[data-theme='dark'] .hljs-selector-class {
   color: #d16969;
 }
-[data-theme="dark"] .hljs-number,
-[data-theme="dark"] .hljs-meta,
-[data-theme="dark"] .hljs-built_in,
-[data-theme="dark"] .hljs-builtin-name,
-[data-theme="dark"] .hljs-literal,
-[data-theme="dark"] .hljs-type,
-[data-theme="dark"] .hljs-params {
+[data-theme='dark'] .hljs-number,
+[data-theme='dark'] .hljs-meta,
+[data-theme='dark'] .hljs-built_in,
+[data-theme='dark'] .hljs-builtin-name,
+[data-theme='dark'] .hljs-literal,
+[data-theme='dark'] .hljs-type,
+[data-theme='dark'] .hljs-params {
   color: #b5cea8;
 }
-[data-theme="dark"] .hljs-string,
-[data-theme="dark"] .hljs-symbol,
-[data-theme="dark"] .hljs-bullet {
+[data-theme='dark'] .hljs-string,
+[data-theme='dark'] .hljs-symbol,
+[data-theme='dark'] .hljs-bullet {
   color: #ce9178;
 }
-[data-theme="dark"] .hljs-title,
-[data-theme="dark"] .hljs-section {
+[data-theme='dark'] .hljs-title,
+[data-theme='dark'] .hljs-section {
   color: #dcdcaa;
 }
-[data-theme="dark"] .hljs-keyword,
-[data-theme="dark"] .hljs-selector-tag {
+[data-theme='dark'] .hljs-keyword,
+[data-theme='dark'] .hljs-selector-tag {
   color: #569cd6;
 }
 
-[data-theme="light"] .hljs-comment,
-[data-theme="light"] .hljs-quote {
+[data-theme='light'] .hljs-comment,
+[data-theme='light'] .hljs-quote {
   color: #008000;
 }
-[data-theme="light"] .hljs-variable,
-[data-theme="light"] .hljs-template-variable,
-[data-theme="light"] .hljs-attribute,
-[data-theme="light"] .hljs-tag,
-[data-theme="light"] .hljs-name,
-[data-theme="light"] .hljs-regexp,
-[data-theme="light"] .hljs-link,
-[data-theme="light"] .hljs-name,
-[data-theme="light"] .hljs-selector-id,
-[data-theme="light"] .hljs-selector-class {
+[data-theme='light'] .hljs-variable,
+[data-theme='light'] .hljs-template-variable,
+[data-theme='light'] .hljs-attribute,
+[data-theme='light'] .hljs-tag,
+[data-theme='light'] .hljs-name,
+[data-theme='light'] .hljs-regexp,
+[data-theme='light'] .hljs-link,
+[data-theme='light'] .hljs-name,
+[data-theme='light'] .hljs-selector-id,
+[data-theme='light'] .hljs-selector-class {
   color: #0000ff;
 }
-[data-theme="light"] .hljs-number,
-[data-theme="light"] .hljs-meta,
-[data-theme="light"] .hljs-built_in,
-[data-theme="light"] .hljs-builtin-name,
-[data-theme="light"] .hljs-literal,
-[data-theme="light"] .hljs-type,
-[data-theme="light"] .hljs-params {
+[data-theme='light'] .hljs-number,
+[data-theme='light'] .hljs-meta,
+[data-theme='light'] .hljs-built_in,
+[data-theme='light'] .hljs-builtin-name,
+[data-theme='light'] .hljs-literal,
+[data-theme='light'] .hljs-type,
+[data-theme='light'] .hljs-params {
   color: #098658;
 }
-[data-theme="light"] .hljs-string,
-[data-theme="light"] .hljs-symbol,
-[data-theme="light"] .hljs-bullet {
+[data-theme='light'] .hljs-string,
+[data-theme='light'] .hljs-symbol,
+[data-theme='light'] .hljs-bullet {
   color: #a31515;
 }
-[data-theme="light"] .hljs-title,
-[data-theme="light"] .hljs-section {
+[data-theme='light'] .hljs-title,
+[data-theme='light'] .hljs-section {
   color: #795e26;
 }
-[data-theme="light"] .hljs-keyword,
-[data-theme="light"] .hljs-selector-tag {
+[data-theme='light'] .hljs-keyword,
+[data-theme='light'] .hljs-selector-tag {
   color: #0000ff;
 }
 /* --- 自定义滚动条 --- */
@@ -296,10 +299,10 @@ body {
 }
 
 /* 暗色模式下的滚动条 */
-[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-thumb {
+[data-theme='dark'] .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #4b5563; /* gray-600 */
 }
-[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+[data-theme='dark'] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #6b7280; /* gray-500 */
 }
 
@@ -308,7 +311,7 @@ body {
   scrollbar-width: thin;
   scrollbar-color: #d1d5db transparent;
 }
-[data-theme="dark"] .custom-scrollbar {
+[data-theme='dark'] .custom-scrollbar {
   scrollbar-color: #4b5563 transparent;
 }
 /* --- TipTap 节点选中样式优化 --- */
@@ -322,7 +325,7 @@ body {
 
 .ProseMirror-selectednode .code-block::after,
 .is-fully-selected .code-block::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
@@ -503,7 +506,7 @@ body.is-selecting-codeblock .code-block * {
 }
 
 .markdown-body th {
-  background-color: #F9FAFB;
+  background-color: #f9fafb;
   font-weight: 700;
   text-align: left;
   padding: 0.5rem 0.75rem;
@@ -554,5 +557,3 @@ body.is-selecting-codeblock .code-block * {
 ::-webkit-scrollbar-button:horizontal:end:increment {
   display: none;
 }
-
-

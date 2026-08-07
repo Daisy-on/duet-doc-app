@@ -98,8 +98,11 @@ export function jsonToLines(content: string): string[] {
     .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n')
     .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n')
     .replace(/<\/?[^>]+(>|$)/g, ''); // strip tags
-  
-  return cleanText.split('\n').map(l => l.trim()).filter(Boolean);
+
+  return cleanText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
 }
 
 export function diffLines(oldLines: string[], newLines: string[]): DiffResult[] {

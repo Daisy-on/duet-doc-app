@@ -63,16 +63,19 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
-      <div 
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
         className="bg-white rounded-2xl shadow-2xl w-[420px] min-h-[320px] border border-border-color flex flex-col p-5 animate-modal-scale-in relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-5 pb-1">
           <h2 className="text-[17px] font-bold text-text-primary">新建文档</h2>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-md hover:bg-hover-bg"
           >
             <X size={18} />
@@ -98,15 +101,17 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between">
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">选择所属知识库</label>
+              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                选择所属知识库
+              </label>
               <div className="relative" ref={dropdownRef}>
                 {/* Trigger Button */}
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className={`w-full flex items-center justify-between pl-3.5 pr-3.5 py-2.5 border rounded-lg text-sm text-text-primary outline-none transition-all bg-white cursor-pointer select-none ${
-                    dropdownOpen 
-                      ? 'border-accent ring-2 ring-indigo-100 shadow-sm' 
+                    dropdownOpen
+                      ? 'border-accent ring-2 ring-indigo-100 shadow-sm'
                       : 'border-border-color hover:border-text-ghost shadow-sm'
                   }`}
                 >
@@ -145,22 +150,16 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
                             setDropdownOpen(false);
                           }}
                           className={`flex items-center justify-between px-3.5 py-2.5 text-sm transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'bg-indigo-50/50 text-accent font-semibold' 
+                            isSelected
+                              ? 'bg-indigo-50/50 text-accent font-semibold'
                               : 'text-text-primary hover:bg-hover-bg'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <Folder
-                              size={15}
-                              className="shrink-0"
-                              style={{ color: kb.icon }}
-                            />
+                            <Folder size={15} className="shrink-0" style={{ color: kb.icon }} />
                             <span className="truncate">{kb.name}</span>
                           </div>
-                          {isSelected && (
-                            <Check size={14} className="text-accent shrink-0" />
-                          )}
+                          {isSelected && <Check size={14} className="text-accent shrink-0" />}
                         </div>
                       );
                     })}

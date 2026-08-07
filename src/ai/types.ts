@@ -59,12 +59,7 @@ export interface AIResponseMetadata {
 }
 
 export type StreamEventType =
-  | 'start'
-  | 'reasoning_delta'
-  | 'text_delta'
-  | 'usage'
-  | 'finish'
-  | 'error';
+  'start' | 'reasoning_delta' | 'text_delta' | 'usage' | 'finish' | 'error';
 
 export interface AIStartEvent {
   event: 'start';

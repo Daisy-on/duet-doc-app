@@ -1,26 +1,26 @@
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Superscript from '@tiptap/extension-superscript'
-import Subscript from '@tiptap/extension-subscript'
-import { Link } from '@tiptap/extension-link'
-import { Table } from '@tiptap/extension-table'
-import { TableRow } from '@tiptap/extension-table'
-import { TableCell } from '@tiptap/extension-table'
-import { TableHeader } from '@tiptap/extension-table'
-import { CustomCodeBlock } from './CodeBlockExtension'
-import LinkHoverPopover from './LinkHoverPopover'
-import { common, createLowlight } from 'lowlight'
-import { useParams } from 'react-router-dom'
-import { useEditorStore, type HeadingItem } from '../../store'
-import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { Sparkles, MoreVertical } from 'lucide-react'
-import type { Editor as TiptapEditor } from '@tiptap/core'
-import { Extension } from '@tiptap/core'
-import { Plugin, PluginKey, NodeSelection } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import Superscript from '@tiptap/extension-superscript';
+import Subscript from '@tiptap/extension-subscript';
+import { Link } from '@tiptap/extension-link';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table';
+import { TableCell } from '@tiptap/extension-table';
+import { TableHeader } from '@tiptap/extension-table';
+import { CustomCodeBlock } from './CodeBlockExtension';
+import LinkHoverPopover from './LinkHoverPopover';
+import { common, createLowlight } from 'lowlight';
+import { useParams } from 'react-router-dom';
+import { useEditorStore, type HeadingItem } from '../../store';
+import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { Sparkles, MoreVertical } from 'lucide-react';
+import type { Editor as TiptapEditor } from '@tiptap/core';
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey, NodeSelection } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { GhostTextExtension } from '../../extensions/GhostTextExtension';
 import { buildGhostTextPrompt, cleanGhostText } from '../../ai/ghostText';
 import { AIDispatcher } from '../../ai/dispatcher';
@@ -32,8 +32,8 @@ import { runAssetGC } from '../../assets/runAssetGC';
 import { logAITrace, type AITrace } from '../../ai/aiLogger';
 
 interface BubblePos {
-  top: number
-  left: number
+  top: number;
+  left: number;
 }
 
 type GhostTextDiscardReason = NonNullable<AITrace['discardReason']>;
@@ -41,7 +41,7 @@ type GhostTextDiscardReason = NonNullable<AITrace['discardReason']>;
 function logGhostTextUIOutcome(
   requestId: string,
   status: 'rendered' | 'discarded',
-  options?: { discardReason?: GhostTextDiscardReason; outputChars?: number }
+  options?: { discardReason?: GhostTextDiscardReason; outputChars?: number },
 ): void {
   logAITrace({
     requestId,
@@ -55,32 +55,30 @@ function logGhostTextUIOutcome(
 
 // 从 ProseMirror 文档树中提取标题列表
 function extractHeadings(editor: TiptapEditor): HeadingItem[] {
-  const items: HeadingItem[] = []
-  const counter: Record<string, number> = {}
+  const items: HeadingItem[] = [];
+  const counter: Record<string, number> = {};
   editor.state.doc.forEach((node) => {
     if (node.type.name === 'heading') {
-      const text = node.textContent
-      const key = text.slice(0, 20)
-      counter[key] = (counter[key] ?? 0) + 1
-      const id = `heading-${key.replace(/\s+/g, '-')}-${counter[key]}`
-      items.push({ level: node.attrs.level as number, text, id })
+      const text = node.textContent;
+      const key = text.slice(0, 20);
+      counter[key] = (counter[key] ?? 0) + 1;
+      const id = `heading-${key.replace(/\s+/g, '-')}-${counter[key]}`;
+      items.push({ level: node.attrs.level as number, text, id });
     }
-  })
-  return items
+  });
+  return items;
 }
 
 // 给编辑器 DOM 里的标题元素打上 data-heading-id，用于点击大纲滚动
 function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) {
-  if (!editorEl) return
-  const domHeadings = editorEl.querySelectorAll('h1,h2,h3,h4,h5,h6')
+  if (!editorEl) return;
+  const domHeadings = editorEl.querySelectorAll('h1,h2,h3,h4,h5,h6');
   domHeadings.forEach((el, i) => {
     if (headings[i]) {
-      el.setAttribute('data-heading-id', headings[i].id)
+      el.setAttribute('data-heading-id', headings[i].id);
     }
-  })
+  });
 }
-
-
 
 const assistantHighlightPluginKey = new PluginKey<{
   isOpen: boolean;
@@ -116,7 +114,11 @@ const assistantSelectionHighlightExtension = Extension.create({
         props: {
           decorations(state) {
             const pluginState = assistantHighlightPluginKey.getState(state);
-            if (pluginState?.isOpen && pluginState.from < pluginState.to && pluginState.to <= state.doc.content.size) {
+            if (
+              pluginState?.isOpen &&
+              pluginState.from < pluginState.to &&
+              pluginState.to <= state.doc.content.size
+            ) {
               const deco = Decoration.inline(pluginState.from, pluginState.to, {
                 class: 'duet-blur-selection',
               });
@@ -131,26 +133,34 @@ const assistantSelectionHighlightExtension = Extension.create({
 });
 
 export default function Editor() {
-  const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>()
-  const currentDocId = docId || memoId
-  const { documents, updateDocument } = useKnowledgeBaseStore()
-  const doc = documents.find((d) => d.id === currentDocId)
+  const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>();
+  const currentDocId = docId || memoId;
+  const { documents, updateDocument } = useKnowledgeBaseStore();
+  const doc = documents.find((d) => d.id === currentDocId);
 
-  const setSelectedText = useEditorStore((state) => state.setSelectedText)
-  const setHeadings = useEditorStore((state) => state.setHeadings)
-  const setEditorInstance = useEditorStore((state) => state.setEditorInstance)
+  const setSelectedText = useEditorStore((state) => state.setSelectedText);
+  const setHeadings = useEditorStore((state) => state.setHeadings);
+  const setEditorInstance = useEditorStore((state) => state.setEditorInstance);
 
-  const [bubblePos, setBubblePos] = useState<BubblePos | null>(null)
-  const timerRef = useRef<number | null>(null)
-  const editorContainerRef = useRef<HTMLDivElement>(null)
+  const [bubblePos, setBubblePos] = useState<BubblePos | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const ghostTextTimerRef = useRef<number | null>(null);
   const currentDocIdRef = useRef<string | undefined>(currentDocId);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [assistantPos, setAssistantPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  const [assistantPos, setAssistantPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+  } | null>(null);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantTask, setAssistantTask] = useState<CloudAITask>('rewrite');
-  const [savedSelection, setSavedSelection] = useState<{ from: number; to: number; text: string } | null>(null);
+  const [savedSelection, setSavedSelection] = useState<{
+    from: number;
+    to: number;
+    text: string;
+  } | null>(null);
   const assistantRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -158,209 +168,226 @@ export default function Editor() {
   }, [currentDocId]);
 
   // 解析并同步标题到 Zustand，然后给 DOM 打标记
-  const syncHeadings = useCallback((editor: TiptapEditor) => {
-    const headings = extractHeadings(editor)
-    setHeadings(headings)
-    // 等 DOM 更新完再打 id（RAF 保证在渲染后执行）
-    requestAnimationFrame(() => {
-      const editorEl = editorContainerRef.current?.querySelector('.ProseMirror') as HTMLElement | null
-      stampHeadingIds(editorEl, headings)
-    })
-  }, [setHeadings])
+  const syncHeadings = useCallback(
+    (editor: TiptapEditor) => {
+      const headings = extractHeadings(editor);
+      setHeadings(headings);
+      // 等 DOM 更新完再打 id（RAF 保证在渲染后执行）
+      requestAnimationFrame(() => {
+        const editorEl = editorContainerRef.current?.querySelector(
+          '.ProseMirror',
+        ) as HTMLElement | null;
+        stampHeadingIds(editorEl, headings);
+      });
+    },
+    [setHeadings],
+  );
 
   // 幽灵文本调度函数：在选区更新时调用，清理先前的定时器和请求，根据当前文档内容和光标位置构建提示，延迟请求润色建议，并在返回后验证请求是否仍然相关，最后设置幽灵文本
-  const scheduleGhostText = useCallback((editor: TiptapEditor) => {
-    if (ghostTextTimerRef.current) {
-      window.clearTimeout(ghostTextTimerRef.current);
-    }
-
-    if (editor.isDestroyed) return;
-
-    editor.commands.clearGhostText();
-    AIDispatcher.clearGhostTextRequest();
-
-    if (!currentDocId) return;
-
-    const promptInput = buildGhostTextPrompt(editor);
-    if (!promptInput) return;
-
-    const requestDocId = currentDocId;
-    const requestCursorPos = promptInput.cursorPos;
-
-    ghostTextTimerRef.current = window.setTimeout(async () => {
-      const result = await AIDispatcher.requestGhostText({
-        messages: promptInput.messages,
-        docId: requestDocId,
-        cursorPos: requestCursorPos,
-        maxNewTokens: 16,
-      });
-
-      if (!result) return;
-      if (!result.text) {
-        logGhostTextUIOutcome(result.requestId, 'discarded', {
-          discardReason: 'empty_result',
-        });
-        return;
-      }
-      if (requestDocId !== currentDocIdRef.current) {
-        logGhostTextUIOutcome(result.requestId, 'discarded', {
-          discardReason: 'document_changed',
-          outputChars: result.text.length,
-        });
-        return;
-      }
-      if (editor.isDestroyed) {
-        logGhostTextUIOutcome(result.requestId, 'discarded', {
-          discardReason: 'editor_destroyed',
-          outputChars: result.text.length,
-        });
-        return;
+  const scheduleGhostText = useCallback(
+    (editor: TiptapEditor) => {
+      if (ghostTextTimerRef.current) {
+        window.clearTimeout(ghostTextTimerRef.current);
       }
 
-      const { from, to } = editor.state.selection;
-      if (from !== to) {
-        logGhostTextUIOutcome(result.requestId, 'discarded', {
-          discardReason: 'selection_changed',
-          outputChars: result.text.length,
+      if (editor.isDestroyed) return;
+
+      editor.commands.clearGhostText();
+      AIDispatcher.clearGhostTextRequest();
+
+      if (!currentDocId) return;
+
+      const promptInput = buildGhostTextPrompt(editor);
+      if (!promptInput) return;
+
+      const requestDocId = currentDocId;
+      const requestCursorPos = promptInput.cursorPos;
+
+      ghostTextTimerRef.current = window.setTimeout(async () => {
+        const result = await AIDispatcher.requestGhostText({
+          messages: promptInput.messages,
+          docId: requestDocId,
+          cursorPos: requestCursorPos,
+          maxNewTokens: 16,
         });
-        return;
-      }
-      if (from !== requestCursorPos) {
-        logGhostTextUIOutcome(result.requestId, 'discarded', {
-          discardReason: 'cursor_changed',
-          outputChars: result.text.length,
+
+        if (!result) return;
+        if (!result.text) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'empty_result',
+          });
+          return;
+        }
+        if (requestDocId !== currentDocIdRef.current) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'document_changed',
+            outputChars: result.text.length,
+          });
+          return;
+        }
+        if (editor.isDestroyed) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'editor_destroyed',
+            outputChars: result.text.length,
+          });
+          return;
+        }
+
+        const { from, to } = editor.state.selection;
+        if (from !== to) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'selection_changed',
+            outputChars: result.text.length,
+          });
+          return;
+        }
+        if (from !== requestCursorPos) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'cursor_changed',
+            outputChars: result.text.length,
+          });
+          return;
+        }
+
+        const text = cleanGhostText(result.text, promptInput.contextText);
+        if (!text) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'empty_after_clean',
+            outputChars: 0,
+          });
+          return;
+        }
+
+        const wasSet = editor.commands.setGhostText({
+          text,
+          pos: requestCursorPos,
+          requestId: result.requestId,
         });
-        return;
-      }
-
-      const text = cleanGhostText(result.text, promptInput.contextText);
-      if (!text) {
-        logGhostTextUIOutcome(result.requestId, 'discarded', {
-          discardReason: 'empty_after_clean',
-          outputChars: 0,
+        logGhostTextUIOutcome(result.requestId, wasSet ? 'rendered' : 'discarded', {
+          discardReason: wasSet ? undefined : 'command_rejected',
+          outputChars: text.length,
         });
-        return;
-      }
+      }, 500);
+    },
+    [currentDocId],
+  );
 
-      const wasSet = editor.commands.setGhostText({
-        text,
-        pos: requestCursorPos,
-        requestId: result.requestId,
-      });
-      logGhostTextUIOutcome(result.requestId, wasSet ? 'rendered' : 'discarded', {
-        discardReason: wasSet ? undefined : 'command_rejected',
-        outputChars: text.length,
-      });
-    }, 500);
-  }, [currentDocId]);
+  const extensions = useMemo(
+    () => [
+      StarterKit.configure({
+        codeBlock: false,
+        link: false,
+        underline: false,
+      }),
+      CustomCodeBlock.configure({
+        lowlight: createLowlight(common),
+      }),
+      Underline,
+      Superscript,
+      Subscript,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'text-accent underline hover:text-indigo-700 cursor-pointer',
+        },
+      }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      GhostTextExtension,
+      LocalImageExtension.configure({
+        getDocId: () => currentDocId || null,
+      }),
+      assistantSelectionHighlightExtension,
+    ],
+    [currentDocId],
+  );
 
-
-
-  const extensions = useMemo(() => [
-    StarterKit.configure({
-      codeBlock: false,
-      link: false,
-      underline: false,
-    }),
-    CustomCodeBlock.configure({
-      lowlight: createLowlight(common),
-    }),
-    Underline,
-    Superscript,
-    Subscript,
-    Link.configure({ 
-      openOnClick: false, 
-      autolink: true,
-      HTMLAttributes: {
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        class: 'text-accent underline hover:text-indigo-700 cursor-pointer',
+  const editor = useEditor(
+    {
+      extensions,
+      content: doc
+        ? doc.content.trim().startsWith('{')
+          ? JSON.parse(doc.content)
+          : doc.content
+        : '',
+      onCreate: ({ editor }) => {
+        syncHeadings(editor);
+        AIDispatcher.loadGhostTextModel();
       },
-    }),
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Table.configure({ resizable: true }),
-    TableRow,
-    TableHeader,
-    TableCell,
-    GhostTextExtension,
-    LocalImageExtension.configure({
-      getDocId: () => currentDocId || null,
-    }),
-    assistantSelectionHighlightExtension,
-  ], [currentDocId]);
+      onUpdate: ({ editor }) => {
+        if (currentDocId) {
+          const jsonStr = JSON.stringify(editor.getJSON());
+          let firstH1Text = '';
+          editor.state.doc.forEach((node) => {
+            if (node.type.name === 'heading' && node.attrs.level === 1 && !firstH1Text) {
+              firstH1Text = node.textContent;
+            }
+          });
 
-  const editor = useEditor({
-    extensions,
-    content: doc ? (doc.content.trim().startsWith('{') ? JSON.parse(doc.content) : doc.content) : '',
-    onCreate: ({ editor }) => {
-      syncHeadings(editor);
-      AIDispatcher.loadGhostTextModel();
-    },
-    onUpdate: ({ editor }) => {
-      if (currentDocId) {
-        const jsonStr = JSON.stringify(editor.getJSON())
-        let firstH1Text = ''
-        editor.state.doc.forEach((node) => {
-          if (node.type.name === 'heading' && node.attrs.level === 1 && !firstH1Text) {
-            firstH1Text = node.textContent
+          const updates: { content: string; title?: string } = { content: jsonStr };
+          if (firstH1Text && firstH1Text !== doc?.title) {
+            updates.title = firstH1Text;
           }
-        })
-        
-        const updates: { content: string; title?: string } = { content: jsonStr }
-        if (firstH1Text && firstH1Text !== doc?.title) {
-          updates.title = firstH1Text
+          updateDocument(currentDocId, updates);
         }
-        updateDocument(currentDocId, updates)
-      }
-      syncHeadings(editor);
-      scheduleGhostText(editor);
-    },
-    onSelectionUpdate: ({ editor }) => {
-      const { from, to } = editor.state.selection
+        syncHeadings(editor);
+        scheduleGhostText(editor);
+      },
+      onSelectionUpdate: ({ editor }) => {
+        const { from, to } = editor.state.selection;
 
-      // 清除先前的定时器
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-      }
-
-      if (from !== to) {
-        // 如果选区在代码块内，或者是代码块的节点选择，不显示润色气泡
-        const selection = editor.state.selection
-        const isCodeBlockSelection = editor.isActive('codeBlock') ||
-          (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock')
-
-        if (isCodeBlockSelection) {
-          setSelectedText('')
-          setBubblePos(null)
-          return
+        // 清除先前的定时器
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
         }
 
-        // 同步选中文本到 Zustand
-        const text = editor.state.doc.textBetween(from, to, ' ')
-        setSelectedText(text)
+        if (from !== to) {
+          // 如果选区在代码块内，或者是代码块的节点选择，不显示润色气泡
+          const selection = editor.state.selection;
+          const isCodeBlockSelection =
+            editor.isActive('codeBlock') ||
+            (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock');
 
-        // 延迟 500ms 显示气泡
-        timerRef.current = window.setTimeout(() => {
-          const selection = window.getSelection()
-          if (selection && selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0)
-            const rects = range.getClientRects()
-            // 获取第一行选区的矩形，如果不存在则退回到 getBoundingClientRect
-            const firstRect = rects[0] || range.getBoundingClientRect()
-            
-            // 气泡显示在第一行选区右上角：left 对齐第一行选区右侧，top 在第一行选区上方
-            setBubblePos({
-              top: firstRect.top - 12,   // 距离第一行选区上沿 12px（留给三角箭头）
-              left: firstRect.right,
-            })
+          if (isCodeBlockSelection) {
+            setSelectedText('');
+            setBubblePos(null);
+            return;
           }
-        }, 500)
-      } else {
-        setSelectedText('')
-        setBubblePos(null)
-      }
+
+          // 同步选中文本到 Zustand
+          const text = editor.state.doc.textBetween(from, to, ' ');
+          setSelectedText(text);
+
+          // 延迟 500ms 显示气泡
+          timerRef.current = window.setTimeout(() => {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0);
+              const rects = range.getClientRects();
+              // 获取第一行选区的矩形，如果不存在则退回到 getBoundingClientRect
+              const firstRect = rects[0] || range.getBoundingClientRect();
+
+              // 气泡显示在第一行选区右上角：left 对齐第一行选区右侧，top 在第一行选区上方
+              setBubblePos({
+                top: firstRect.top - 12, // 距离第一行选区上沿 12px（留给三角箭头）
+                left: firstRect.right,
+              });
+            }
+          }, 500);
+        } else {
+          setSelectedText('');
+          setBubblePos(null);
+        }
+      },
     },
-  }, [currentDocId])
+    [currentDocId],
+  );
 
   // 当文档切换时，在 Render 阶段推导重置 AI 助手弹窗与选区气泡，防止跨文档残留
   const [prevDocId, setPrevDocId] = useState(currentDocId);
@@ -373,60 +400,71 @@ export default function Editor() {
   }
 
   // 唤起智能助手输入框
-  const openAssistant = useCallback((defaultText: string, task: CloudAITask = 'rewrite') => {
-    if (!editor) return;
-    const { from, to } = editor.state.selection;
-    const text = editor.state.doc.textBetween(from, to, ' ');
-    setSavedSelection({ from, to, text });
-    setAssistantInput(defaultText);
-    setAssistantTask(task);
+  const openAssistant = useCallback(
+    (defaultText: string, task: CloudAITask = 'rewrite') => {
+      if (!editor) return;
+      const { from, to } = editor.state.selection;
+      const text = editor.state.doc.textBetween(from, to, ' ');
+      setSavedSelection({ from, to, text });
+      setAssistantInput(defaultText);
+      setAssistantTask(task);
 
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-    }
-
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0 && editorContainerRef.current) {
-      const range = selection.getRangeAt(0);
-      const rects = range.getClientRects();
-      // 获取选区最后一个矩形作为纵向定位基准
-      const lastRect = rects[rects.length - 1] || range.getBoundingClientRect();
-      // 获取整个选区的包围盒作为横向定位基准
-      const rangeRect = range.getBoundingClientRect();
-      
-      // 获取编辑器容器的视口矩形，用于精确对齐编辑区边缘
-      const containerRect = editorContainerRef.current.getBoundingClientRect();
-
-      const assistantWidth = 560;
-      const viewportHeight = window.innerHeight;
-
-      // 1. 横向定位：将输入框的中心对齐选区的水平中心
-      const selectionCenterX = rangeRect.left + rangeRect.width / 2;
-      let left = selectionCenterX - assistantWidth / 2;
-
-      // 限制输入框不超出编辑区边界（考虑 px-16 的左右 40px 边距，即正文文字对齐线）
-      const minLeft = containerRect.left + 64;
-      const maxLeft = containerRect.right - 64 - assistantWidth;
-      left = Math.max(minLeft, Math.min(left, maxLeft));
-
-      // 2. 纵向定位：默认定位在选区底部下方 12px 处（留出刚好露出选中行文字的空间）
-      const top = lastRect.bottom + 12;
-      let pos: { top?: number; bottom?: number; left: number };
-
-      // 如果下方空间不足（预测展开后高度约为300px），则定位在选区上方并设置 bottom 以使其向上扩展
-      if (top + 300 > viewportHeight) {
-        const firstRect = rects[0] || range.getBoundingClientRect();
-        const bottom = viewportHeight - firstRect.top + 12;
-        pos = { bottom, left };
-      } else {
-        pos = { top, left };
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
       }
 
-      setAssistantPos(pos);
-    }
-    setIsAssistantOpen(true);
-    setBubblePos(null); // 隐藏气泡菜单
-  }, [editor, setSavedSelection, setAssistantInput, setAssistantTask, setAssistantPos, setIsAssistantOpen, setBubblePos]);
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && editorContainerRef.current) {
+        const range = selection.getRangeAt(0);
+        const rects = range.getClientRects();
+        // 获取选区最后一个矩形作为纵向定位基准
+        const lastRect = rects[rects.length - 1] || range.getBoundingClientRect();
+        // 获取整个选区的包围盒作为横向定位基准
+        const rangeRect = range.getBoundingClientRect();
+
+        // 获取编辑器容器的视口矩形，用于精确对齐编辑区边缘
+        const containerRect = editorContainerRef.current.getBoundingClientRect();
+
+        const assistantWidth = 560;
+        const viewportHeight = window.innerHeight;
+
+        // 1. 横向定位：将输入框的中心对齐选区的水平中心
+        const selectionCenterX = rangeRect.left + rangeRect.width / 2;
+        let left = selectionCenterX - assistantWidth / 2;
+
+        // 限制输入框不超出编辑区边界（考虑 px-16 的左右 40px 边距，即正文文字对齐线）
+        const minLeft = containerRect.left + 64;
+        const maxLeft = containerRect.right - 64 - assistantWidth;
+        left = Math.max(minLeft, Math.min(left, maxLeft));
+
+        // 2. 纵向定位：默认定位在选区底部下方 12px 处（留出刚好露出选中行文字的空间）
+        const top = lastRect.bottom + 12;
+        let pos: { top?: number; bottom?: number; left: number };
+
+        // 如果下方空间不足（预测展开后高度约为300px），则定位在选区上方并设置 bottom 以使其向上扩展
+        if (top + 300 > viewportHeight) {
+          const firstRect = rects[0] || range.getBoundingClientRect();
+          const bottom = viewportHeight - firstRect.top + 12;
+          pos = { bottom, left };
+        } else {
+          pos = { top, left };
+        }
+
+        setAssistantPos(pos);
+      }
+      setIsAssistantOpen(true);
+      setBubblePos(null); // 隐藏气泡菜单
+    },
+    [
+      editor,
+      setSavedSelection,
+      setAssistantInput,
+      setAssistantTask,
+      setAssistantPos,
+      setIsAssistantOpen,
+      setBubblePos,
+    ],
+  );
 
   // 当助手打开状态改变或选区改变时，通过 Meta 事务强类型更新 ProseMirror Plugin State
   useEffect(() => {
@@ -447,33 +485,35 @@ export default function Editor() {
 
   // 同步 editor 实例到全局 store
   useEffect(() => {
-    setEditorInstance(editor)
+    setEditorInstance(editor);
     if (import.meta.env.DEV && editor) {
-      window.editor = editor
+      window.editor = editor;
     }
     return () => {
-      setEditorInstance(null)
+      setEditorInstance(null);
       if (import.meta.env.DEV) {
-        delete window.editor
+        delete window.editor;
       }
-    }
-  }, [editor, setEditorInstance])
+    };
+  }, [editor, setEditorInstance]);
 
   // 组件卸载时清理定时器并异步拉起 GC
   useEffect(() => {
     return () => {
       if (timerRef.current) {
-        clearTimeout(timerRef.current)
+        clearTimeout(timerRef.current);
       }
       if (ghostTextTimerRef.current) {
         clearTimeout(ghostTextTimerRef.current);
       }
       AIDispatcher.clearGhostTextRequest();
       if (currentDocIdRef.current) {
-        runAssetGC(currentDocIdRef.current).catch((err) => console.error('Asset GC error on unmount:', err));
+        runAssetGC(currentDocIdRef.current).catch((err) =>
+          console.error('Asset GC error on unmount:', err),
+        );
       }
-    }
-  }, [])
+    };
+  }, []);
 
   useEffect(() => {
     if (ghostTextTimerRef.current) {
@@ -545,7 +585,9 @@ export default function Editor() {
         if (!editor.isDestroyed) {
           editor.commands.clearGhostText();
           AIDispatcher.clearGhostTextRequest();
-          editor.commands.setContent(isJson ? JSON.parse(docContent) : docContent, { emitUpdate: false });
+          editor.commands.setContent(isJson ? JSON.parse(docContent) : docContent, {
+            emitUpdate: false,
+          });
           syncHeadings(editor);
         }
       });
@@ -595,9 +637,9 @@ export default function Editor() {
             <div
               className="px-3 py-1.5 text-[13px] font-medium rounded-md cursor-pointer flex items-center gap-1.5 text-indigo-200 hover:bg-gray-700 transition-colors"
               onMouseDown={(e) => {
-                e.preventDefault() // 防止点击时失去选区
-                e.stopPropagation()
-                openAssistant('', 'rewrite')
+                e.preventDefault(); // 防止点击时失去选区
+                e.stopPropagation();
+                openAssistant('', 'rewrite');
               }}
             >
               <Sparkles size={14} /> AI 润色
@@ -606,27 +648,33 @@ export default function Editor() {
             <div
               className="px-3 py-1.5 text-[13px] font-medium rounded-md cursor-pointer hover:bg-gray-700 transition-colors"
               onMouseDown={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                openAssistant('用更正式的口吻改写以下内容', 'rewrite')
+                e.preventDefault();
+                e.stopPropagation();
+                openAssistant('用更正式的口吻改写以下内容', 'rewrite');
               }}
-            >更正式</div>
+            >
+              更正式
+            </div>
             <div
               className="px-3 py-1.5 text-[13px] font-medium rounded-md cursor-pointer hover:bg-gray-700 transition-colors"
               onMouseDown={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                openAssistant('扩写选中的文本内容', 'expand')
+                e.preventDefault();
+                e.stopPropagation();
+                openAssistant('扩写选中的文本内容', 'expand');
               }}
-            >扩写</div>
+            >
+              扩写
+            </div>
             <div
               className="px-3 py-1.5 text-[13px] font-medium rounded-md cursor-pointer hover:bg-gray-700 transition-colors"
               onMouseDown={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                openAssistant('解释一下这段话的意思', 'explain')
+                e.preventDefault();
+                e.stopPropagation();
+                openAssistant('解释一下这段话的意思', 'explain');
               }}
-            >解释一下</div>
+            >
+              解释一下
+            </div>
             <div
               className="px-2 py-1.5 text-[13px] font-medium rounded-md cursor-pointer hover:bg-gray-700 transition-colors"
               onMouseDown={(e) => e.preventDefault()}
@@ -655,10 +703,10 @@ export default function Editor() {
           }}
         />
       )}
-      
+
       <LinkHoverPopover editor={editor} containerRef={editorContainerRef} />
 
       <EditorContent editor={editor} />
     </div>
-  )
+  );
 }

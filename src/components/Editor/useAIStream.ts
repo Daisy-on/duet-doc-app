@@ -52,7 +52,7 @@ export function useAIStream() {
             }
           },
         },
-        controller.signal
+        controller.signal,
       ).catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') {
           // Ignore abort error silently in UI
@@ -60,13 +60,16 @@ export function useAIStream() {
         }
         console.error('streamCloudTask failed:', err);
         if (abortControllerRef.current === controller) {
-          setError({ code: 'UNEXPECTED_ERROR', message: err instanceof Error ? err.message : String(err) });
+          setError({
+            code: 'UNEXPECTED_ERROR',
+            message: err instanceof Error ? err.message : String(err),
+          });
           setIsGenerating(false);
           abortControllerRef.current = null;
         }
       });
     },
-    [abortStream]
+    [abortStream],
   );
 
   const resetState = useCallback(() => {

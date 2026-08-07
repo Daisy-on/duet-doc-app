@@ -10,7 +10,8 @@ export default function AIChatListPanel() {
   const params = useParams<{ '*': string }>();
   const sessionId = params['*'] || undefined;
   const { sessions, updateSession, deleteSession, setActiveSessionId } = useAIWritingStore();
-  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } = useLayoutStore();
+  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } =
+    useLayoutStore();
 
   const [popoverOpenId, setPopoverOpenId] = useState<string | null>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
@@ -158,9 +159,7 @@ export default function AIChatListPanel() {
             {/* Sessions List */}
             <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
               {sessions.length === 0 ? (
-                <div className="text-center py-8 text-xs text-text-secondary">
-                  暂无对话历史
-                </div>
+                <div className="text-center py-8 text-xs text-text-secondary">暂无对话历史</div>
               ) : (
                 sessions.map((session) => {
                   const isActive = session.id === sessionId;
@@ -181,8 +180,13 @@ export default function AIChatListPanel() {
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <MessageSquare size={14} className={isActive ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'} />
-                        
+                        <MessageSquare
+                          size={14}
+                          className={
+                            isActive ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'
+                          }
+                        />
+
                         {isRenaming ? (
                           <input
                             autoFocus
@@ -208,14 +212,19 @@ export default function AIChatListPanel() {
                       </div>
 
                       {/* Popover Menu trigger */}
-                      <div className="relative shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="relative shrink-0 ml-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setPopoverOpenId(popoverOpenId === session.id ? null : session.id);
                           }}
                           className={`text-text-secondary hover:text-text-primary p-1 rounded hover:bg-hover-bg transition-all flex ${
-                            popoverOpenId === session.id ? 'opacity-100 bg-hover-bg text-text-primary' : 'opacity-0 group-hover/row:opacity-100'
+                            popoverOpenId === session.id
+                              ? 'opacity-100 bg-hover-bg text-text-primary'
+                              : 'opacity-0 group-hover/row:opacity-100'
                           }`}
                           title="更多选项"
                         >
@@ -278,7 +287,9 @@ export default function AIChatListPanel() {
         title="确认删除此对话记录？"
         description={
           <>
-            确定要删除对话 <span className="font-semibold text-text-primary">「{sessionToDelete?.title}」</span> 吗？删除后对话内容及历史回复将无法恢复。
+            确定要删除对话{' '}
+            <span className="font-semibold text-text-primary">「{sessionToDelete?.title}」</span>{' '}
+            吗？删除后对话内容及历史回复将无法恢复。
           </>
         }
       />

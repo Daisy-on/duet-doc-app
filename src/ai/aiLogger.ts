@@ -55,8 +55,7 @@ export interface AITrace {
 }
 
 export function logAITrace(trace: AITrace): void {
-  const isDebugEnabled =
-    import.meta.env.DEV || import.meta.env.VITE_AI_DEBUG === 'true';
+  const isDebugEnabled = import.meta.env.DEV || import.meta.env.VITE_AI_DEBUG === 'true';
 
   if (!isDebugEnabled) {
     return;

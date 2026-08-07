@@ -45,11 +45,15 @@ interface AIWritingStore {
   deleteSession: (id: string) => Promise<void>;
   setActiveSessionId: (id: string | null) => void;
   setIsThinkingEnabled: (enabled: boolean) => void;
-  
+
   addMessage: (msg: ChatMessage) => Promise<void>;
   updateMessageStream: (
     id: string,
-    updates: { content?: string; thinkingContent?: string; status?: 'streaming' | 'complete' | 'stopped' | 'error' }
+    updates: {
+      content?: string;
+      thinkingContent?: string;
+      status?: 'streaming' | 'complete' | 'stopped' | 'error';
+    },
   ) => void;
   commitMessage: (msg: ChatMessage) => Promise<void>;
   removeMessage: (id: string) => Promise<void>;
@@ -81,14 +85,16 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
 
       // 过滤并自动清理数据库里没有实际消息记录的空白历史 Session
       const validSessions = dbSessions.filter((s) => messageSessionIds.has(s.id));
-      const emptySessionIds = dbSessions.filter((s) => !messageSessionIds.has(s.id)).map((s) => s.id);
+      const emptySessionIds = dbSessions
+        .filter((s) => !messageSessionIds.has(s.id))
+        .map((s) => s.id);
       if (emptySessionIds.length > 0) {
         await db.chatSessions.bulkDelete(emptySessionIds);
       }
 
       const sorted = sortSessions(validSessions);
-      set({ 
-        sessions: sorted, 
+      set({
+        sessions: sorted,
         messages: dbMessages,
         activeSessionId: null,
       });
@@ -101,7 +107,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
     const state = get();
     // 检查是否已经存在未发送消息的空 Session，直接复用，避免创建多个空的“新对话”
     const existingEmpty = state.sessions.find(
-      (s) => s.title === '新对话' && !state.messages.some((m) => m.sessionId === s.id)
+      (s) => s.title === '新对话' && !state.messages.some((m) => m.sessionId === s.id),
     );
     if (existingEmpty) {
       set({ activeSessionId: existingEmpty.id, lastVisitedSessionId: existingEmpty.id });
@@ -141,8 +147,12 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
 
     set((state) => {
       const filteredSessions = state.sessions.filter((s) => s.id !== id);
-      const newActiveId = state.activeSessionId === id ? filteredSessions[0]?.id || null : state.activeSessionId;
-      const newLastVisited = state.lastVisitedSessionId === id ? filteredSessions[0]?.id || null : state.lastVisitedSessionId;
+      const newActiveId =
+        state.activeSessionId === id ? filteredSessions[0]?.id || null : state.activeSessionId;
+      const newLastVisited =
+        state.lastVisitedSessionId === id
+          ? filteredSessions[0]?.id || null
+          : state.lastVisitedSessionId;
       return {
         sessions: filteredSessions,
         messages: state.messages.filter((m) => m.sessionId !== id),
@@ -171,7 +181,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
 
     set((state) => {
       const updatedSessions = state.sessions.map((s) =>
-        s.id === msg.sessionId ? { ...s, updatedAt: now } : s
+        s.id === msg.sessionId ? { ...s, updatedAt: now } : s,
       );
       return {
         messages: [...state.messages, msg],
@@ -193,7 +203,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
 
     set((state) => {
       const updatedSessions = state.sessions.map((s) =>
-        s.id === msg.sessionId ? { ...s, updatedAt: now } : s
+        s.id === msg.sessionId ? { ...s, updatedAt: now } : s,
       );
       return {
         messages: state.messages.map((m) => (m.id === msg.id ? msg : m)),

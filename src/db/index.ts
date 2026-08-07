@@ -100,9 +100,13 @@ export async function deleteDocumentsCascadeInTx(tx: Transaction, docIds: string
  */
 export async function deleteDocumentsCascade(docIds: string[]) {
   if (!docIds || docIds.length === 0) return;
-  await db.transaction('rw', [db.documents, db.documentVersions, db.assets, db.favoriteItems], async (tx) => {
-    await deleteDocumentsCascadeInTx(tx, docIds);
-  });
+  await db.transaction(
+    'rw',
+    [db.documents, db.documentVersions, db.assets, db.favoriteItems],
+    async (tx) => {
+      await deleteDocumentsCascadeInTx(tx, docIds);
+    },
+  );
 }
 
 export default db;

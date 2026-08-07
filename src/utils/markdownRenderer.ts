@@ -75,7 +75,15 @@ renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
 };
 
 // Custom link renderer with URL normalization and target="_blank"
-renderer.link = function ({ href, title, text }: { href: string; title?: string | null; text: string }) {
+renderer.link = function ({
+  href,
+  title,
+  text,
+}: {
+  href: string;
+  title?: string | null;
+  text: string;
+}) {
   const normalizedHref = normalizeUrl(href);
   const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
   return `<a href="${normalizedHref}" target="_blank" rel="noopener noreferrer"${titleAttr} class="text-accent underline hover:text-indigo-700 cursor-pointer">${text}</a>`;
