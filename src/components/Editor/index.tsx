@@ -15,11 +15,11 @@ import { common, createLowlight } from 'lowlight'
 import { useParams } from 'react-router-dom'
 import { useEditorStore, type HeadingItem } from '../../store'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Sparkles, MoreVertical } from 'lucide-react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { Extension } from '@tiptap/core'
-import { Plugin } from '@tiptap/pm/state'
+import { Plugin, PluginKey, NodeSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { GhostTextExtension } from '../../extensions/GhostTextExtension';
 import { buildGhostTextPrompt, cleanGhostText } from '../../ai/ghostText';
@@ -82,6 +82,54 @@ function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) 
 
 
 
+const assistantHighlightPluginKey = new PluginKey<{
+  isOpen: boolean;
+  from: number;
+  to: number;
+}>('assistantSelectionHighlight');
+
+const assistantSelectionHighlightExtension = Extension.create({
+  name: 'assistantSelectionHighlight',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: assistantHighlightPluginKey,
+        state: {
+          init() {
+            return { isOpen: false, from: 0, to: 0 };
+          },
+          apply(tr, value) {
+            const meta = tr.getMeta(assistantHighlightPluginKey);
+            if (meta) {
+              return meta;
+            }
+            if (value.from || value.to) {
+              return {
+                ...value,
+                from: tr.mapping.map(value.from),
+                to: tr.mapping.map(value.to),
+              };
+            }
+            return value;
+          },
+        },
+        props: {
+          decorations(state) {
+            const pluginState = assistantHighlightPluginKey.getState(state);
+            if (pluginState?.isOpen && pluginState.from < pluginState.to && pluginState.to <= state.doc.content.size) {
+              const deco = Decoration.inline(pluginState.from, pluginState.to, {
+                class: 'duet-blur-selection',
+              });
+              return DecorationSet.create(state.doc, [deco]);
+            }
+            return DecorationSet.empty;
+          },
+        },
+      }),
+    ];
+  },
+});
+
 export default function Editor() {
   const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>()
   const currentDocId = docId || memoId
@@ -105,16 +153,9 @@ export default function Editor() {
   const [savedSelection, setSavedSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const assistantRef = useRef<HTMLDivElement>(null);
 
-  const isAssistantOpenRef = useRef(isAssistantOpen);
-  const savedSelectionRef = useRef(savedSelection);
-
   useEffect(() => {
-    isAssistantOpenRef.current = isAssistantOpen;
-  }, [isAssistantOpen]);
-
-  useEffect(() => {
-    savedSelectionRef.current = savedSelection;
-  }, [savedSelection]);
+    currentDocIdRef.current = currentDocId;
+  }, [currentDocId]);
 
   // 解析并同步标题到 Zustand，然后给 DOM 打标记
   const syncHeadings = useCallback((editor: TiptapEditor) => {
@@ -213,61 +254,41 @@ export default function Editor() {
 
 
 
+  const extensions = useMemo(() => [
+    StarterKit.configure({
+      codeBlock: false,
+      link: false,
+      underline: false,
+    }),
+    CustomCodeBlock.configure({
+      lowlight: createLowlight(common),
+    }),
+    Underline,
+    Superscript,
+    Subscript,
+    Link.configure({ 
+      openOnClick: false, 
+      autolink: true,
+      HTMLAttributes: {
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        class: 'text-accent underline hover:text-indigo-700 cursor-pointer',
+      },
+    }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    GhostTextExtension,
+    LocalImageExtension.configure({
+      getDocId: () => currentDocId || null,
+    }),
+    assistantSelectionHighlightExtension,
+  ], [currentDocId]);
+
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false,
-        link: false,
-        underline: false,
-      }),
-      CustomCodeBlock.configure({
-        lowlight: createLowlight(common),
-      }),
-      Underline,
-      Superscript,
-      Subscript,
-      Link.configure({ 
-        openOnClick: false, 
-        autolink: true,
-        HTMLAttributes: {
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          class: 'text-accent underline hover:text-indigo-700 cursor-pointer',
-        },
-      }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      GhostTextExtension,
-      LocalImageExtension.configure({
-        getDocId: () => currentDocIdRef.current || null,
-      }),
-      Extension.create({
-        name: 'assistantSelectionHighlight',
-        addProseMirrorPlugins() {
-          return [
-            new Plugin({
-              props: {
-                decorations(state) {
-                  if (isAssistantOpenRef.current && savedSelectionRef.current) {
-                    const { from, to } = savedSelectionRef.current;
-                    if (from < to && to <= state.doc.content.size) {
-                      const deco = Decoration.inline(from, to, {
-                        class: 'duet-blur-selection',
-                      });
-                      return DecorationSet.create(state.doc, [deco]);
-                    }
-                  }
-                  return DecorationSet.empty;
-                },
-              },
-            }),
-          ];
-        },
-      }),
-    ],
+    extensions,
     content: doc ? (doc.content.trim().startsWith('{') ? JSON.parse(doc.content) : doc.content) : '',
     onCreate: ({ editor }) => {
       syncHeadings(editor);
@@ -304,7 +325,7 @@ export default function Editor() {
         // 如果选区在代码块内，或者是代码块的节点选择，不显示润色气泡
         const selection = editor.state.selection
         const isCodeBlockSelection = editor.isActive('codeBlock') ||
-          ('node' in selection && (selection as any).node?.type.name === 'codeBlock')
+          (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock')
 
         if (isCodeBlockSelection) {
           setSelectedText('')
@@ -390,18 +411,24 @@ export default function Editor() {
     }
     setIsAssistantOpen(true);
     setBubblePos(null); // 隐藏气泡菜单
-  }, [editor]);
+  }, [editor, setSavedSelection, setAssistantInput, setAssistantTask, setAssistantPos, setIsAssistantOpen, setBubblePos]);
 
-  // 当助手打开状态改变时，强制 ProseMirror 重绘以更新高亮 Decoration
+  // 当助手打开状态改变或选区改变时，通过 Meta 事务强类型更新 ProseMirror Plugin State
   useEffect(() => {
     if (editor && !editor.isDestroyed) {
       queueMicrotask(() => {
         if (!editor.isDestroyed) {
-          editor.view.dispatch(editor.view.state.tr);
+          const tr = editor.view.state.tr;
+          tr.setMeta(assistantHighlightPluginKey, {
+            isOpen: isAssistantOpen,
+            from: savedSelection?.from ?? 0,
+            to: savedSelection?.to ?? 0,
+          });
+          editor.view.dispatch(tr);
         }
       });
     }
-  }, [isAssistantOpen, editor]);
+  }, [isAssistantOpen, savedSelection, editor]);
 
   // 同步 editor 实例到全局 store
   useEffect(() => {
@@ -490,22 +517,23 @@ export default function Editor() {
   }, [isAssistantOpen]);
 
   // 同步外部 content 状态
+  const docContent = doc?.content;
   useEffect(() => {
-    if (editor && doc && !editor.isDestroyed) {
-      const isJson = doc.content.trim().startsWith('{')
-      const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML()
-      if (doc.content !== currentContent) {
-        queueMicrotask(() => {
-          if (!editor.isDestroyed) {
-            editor.commands.clearGhostText();
-            AIDispatcher.clearGhostTextRequest();
-            editor.commands.setContent(isJson ? JSON.parse(doc.content) : doc.content, { emitUpdate: false });
-            syncHeadings(editor);
-          }
-        });
-      }
+    if (!editor || !docContent || editor.isDestroyed) return;
+
+    const isJson = docContent.trim().startsWith('{');
+    const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML();
+    if (docContent !== currentContent) {
+      queueMicrotask(() => {
+        if (!editor.isDestroyed) {
+          editor.commands.clearGhostText();
+          AIDispatcher.clearGhostTextRequest();
+          editor.commands.setContent(isJson ? JSON.parse(docContent) : docContent, { emitUpdate: false });
+          syncHeadings(editor);
+        }
+      });
     }
-  }, [doc?.content, editor, syncHeadings])
+  }, [docContent, editor, syncHeadings]);
 
   // 拦截链接点击（包含 CTRL+点击 / CMD+点击），确保始终在外部新标签页中打开规范化外链
   useEffect(() => {
@@ -534,11 +562,6 @@ export default function Editor() {
       container.removeEventListener('click', handleLinkClick, true);
     };
   }, []);
-
-  // 文档切换时清理 AI 润色的定时器和请求
-  useEffect(() => {
-    currentDocIdRef.current = currentDocId;
-  }, [currentDocId]);
 
   return (
     <div ref={editorContainerRef} className="flex-1 px-16 py-10 overflow-y-auto relative">
