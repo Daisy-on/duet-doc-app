@@ -147,7 +147,7 @@ export default function Editor() {
   const currentDocIdRef = useRef<string | undefined>(currentDocId);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [assistantPos, setAssistantPos] = useState<BubblePos | null>(null);
+  const [assistantPos, setAssistantPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantTask, setAssistantTask] = useState<CloudAITask>('rewrite');
   const [savedSelection, setSavedSelection] = useState<{ from: number; to: number; text: string } | null>(null);
@@ -397,7 +397,7 @@ export default function Editor() {
       // 获取编辑器容器的视口矩形，用于精确对齐编辑区边缘
       const containerRect = editorContainerRef.current.getBoundingClientRect();
 
-      const assistantWidth = 460;
+      const assistantWidth = 560;
       const assistantHeight = 46; // 输入框大致高度
       const viewportHeight = window.innerHeight;
 
@@ -412,14 +412,18 @@ export default function Editor() {
 
       // 2. 纵向定位：默认定位在选区底部下方 12px 处（留出刚好露出选中行文字的空间）
       let top = lastRect.bottom + 12;
+      let pos: { top?: number; bottom?: number; left: number };
 
-      // 如果下方空间不足（会超出视口底部），则定位在选区上方
-      if (top + assistantHeight > viewportHeight - 16) {
+      // 如果下方空间不足（预测展开后高度约为300px），则定位在选区上方并设置 bottom 以使其向上扩展
+      if (top + 300 > viewportHeight) {
         const firstRect = rects[0] || range.getBoundingClientRect();
-        top = firstRect.top - assistantHeight - 12;
+        const bottom = viewportHeight - firstRect.top + 12;
+        pos = { bottom, left };
+      } else {
+        pos = { top, left };
       }
 
-      setAssistantPos({ top, left });
+      setAssistantPos(pos);
     }
     setIsAssistantOpen(true);
     setBubblePos(null); // 隐藏气泡菜单

@@ -11,7 +11,7 @@ interface SavedSelection {
 }
 
 interface AIAssistantPopoverProps {
-  assistantPos: { top: number; left: number };
+  assistantPos: { top?: number; bottom?: number; left: number };
   assistantRef: React.RefObject<HTMLDivElement | null>;
   task: CloudAITask;
   defaultInstruction: string;
@@ -89,10 +89,11 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
       className="fixed z-50 animate-modal-scale-in"
       style={{
         top: assistantPos.top,
+        bottom: assistantPos.bottom,
         left: assistantPos.left,
       }}
     >
-      <div className="bg-white text-zinc-800 rounded-xl p-3 shadow-xl border border-zinc-200/80 w-[480px] flex flex-col gap-2.5">
+      <div className="bg-white text-zinc-800 rounded-xl p-3 shadow-xl border border-zinc-200/80 w-[560px] flex flex-col gap-2.5">
         {/* 输入行 */}
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center text-indigo-500 shrink-0">

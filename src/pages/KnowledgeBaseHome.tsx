@@ -96,7 +96,10 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
       <CatalogPanel />
 
       {/* Main content view */}
-      <main className="flex-1 flex flex-col min-w-0 bg-bg-main overflow-y-auto">
+      <main 
+        className="flex-1 flex flex-col min-w-0 bg-bg-main overflow-y-auto"
+        style={{ scrollbarGutter: 'stable' }}
+      >
         {/* Top Header Bar */}
         <header className="h-[60px] border-b border-border-color flex justify-between items-center px-8 shrink-0 bg-white">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -129,38 +132,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
           </div>
         </header>
 
-        {/* Breadcrumb Navigation Bar */}
-        <div className="px-10 py-3 bg-gray-50/70 border-b border-border-color flex items-center gap-1.5 text-[12px] font-semibold text-text-secondary select-none shrink-0">
-          <span 
-            onClick={() => setCurrentGroupId(null)}
-            className="hover:text-accent cursor-pointer transition-colors text-text-primary font-bold"
-          >
-            {kb.name}
-          </span>
-          {ancestors.map((ancestor, index) => {
-            const isLast = index === ancestors.length - 1;
-            return (
-              <React.Fragment key={ancestor.id}>
-                <ChevronRight size={12} className="text-gray-400 shrink-0" />
-                {isLast ? (
-                  <span className="text-text-primary font-bold truncate max-w-[150px]">
-                    {ancestor.name}
-                  </span>
-                ) : (
-                  <span
-                    onClick={() => setCurrentGroupId(ancestor.id)}
-                    className="hover:text-accent cursor-pointer transition-colors truncate max-w-[150px]"
-                  >
-                    {ancestor.name}
-                  </span>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-
         {/* Details Banner */}
-        <div className="px-10 py-8 border-b border-border-color bg-white shrink-0">
+        <div className="px-10 py-10 border-b border-border-color bg-white shrink-0">
           <div className="max-w-4xl mx-auto flex items-start gap-6">
             <div 
               className="w-16 h-16 rounded-xl flex items-center justify-center text-white shadow-md shrink-0 transition-transform duration-300 hover:scale-105"
@@ -193,8 +166,49 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
         </div>
 
         {/* Catalog Main Content List Area */}
-        <div className="p-10 flex-1 bg-bg-main">
+        <div className="p-6 flex-1 bg-bg-main">
           <div className="max-w-4xl mx-auto">
+            
+            {/* Integrated Breadcrumb Header */}
+            <div className="flex items-center justify-between mb-4 pb-5 border-b border-border-color/60">
+              <div className="flex items-center gap-1 text-[13px] font-medium text-text-secondary select-none overflow-x-auto">
+                <div 
+                  onClick={() => setCurrentGroupId(null)}
+                  className={`flex items-center gap-1.5 transition-all px-2.5 py-1.5 rounded-lg ${
+                    !activeGroupId 
+                      ? "text-accent bg-indigo-50 border border-indigo-100/50 shadow-sm" 
+                      : "hover:text-accent cursor-pointer hover:bg-gray-200/50"
+                  }`}
+                >
+                  <Folder size={14} className={!activeGroupId ? "text-accent" : ""} />
+                  <span className={!activeGroupId ? "font-bold" : ""}>{kb.name}</span>
+                </div>
+                
+                {ancestors.map((ancestor, index) => {
+                  const isLast = index === ancestors.length - 1;
+                  return (
+                    <React.Fragment key={ancestor.id}>
+                      <ChevronRight size={14} className="text-gray-300 mx-0.5 shrink-0" />
+                      <div
+                        onClick={!isLast ? () => setCurrentGroupId(ancestor.id) : undefined}
+                        className={`flex items-center gap-1.5 transition-all px-2.5 py-1.5 rounded-lg ${
+                          isLast 
+                            ? "text-accent bg-indigo-50 border border-indigo-100/50 shadow-sm" 
+                            : "hover:text-accent cursor-pointer hover:bg-gray-200/50"
+                        }`}
+                      >
+                        <span className={`truncate max-w-[150px] ${isLast ? "font-bold" : ""}`}>
+                          {ancestor.name}
+                        </span>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] font-semibold text-text-secondary/70 uppercase tracking-wider bg-white border border-border-color/60 px-2 py-1 rounded-md shadow-sm shrink-0">
+                当前路径
+              </div>
+            </div>
             
             {/* Sub-groups Grid */}
             {currentSubGroups.length > 0 && (
