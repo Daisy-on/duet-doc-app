@@ -153,6 +153,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   },
 
   setActiveSessionId: (id) => {
+    if (get().activeSessionId === id) return;
     set((state) => ({
       activeSessionId: id,
       lastVisitedSessionId: id ? id : state.lastVisitedSessionId,

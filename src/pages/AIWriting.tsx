@@ -87,6 +87,9 @@ export default function AIWriting() {
   const lastMsgCountRef = useRef(0);
   const lastSessionIdRef = useRef<string | null>(null);
 
+  // Real-time timer for live streaming thinking seconds
+  const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
+
   // Backend health status state
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
 
@@ -121,7 +124,13 @@ export default function AIWriting() {
     }
   }, [toastText]);
 
-  // Sync activeSessionId with URL route param
+  // Sync activeSessionId with URL route param & reset live thinking seconds on session switch
+  const [prevSessionId, setPrevSessionId] = useState(sessionId);
+  if (prevSessionId !== sessionId) {
+    setPrevSessionId(sessionId);
+    setLiveThinkingSeconds(0);
+  }
+
   useEffect(() => {
     setActiveSessionId(sessionId || null);
   }, [sessionId, setActiveSessionId]);
@@ -149,9 +158,6 @@ export default function AIWriting() {
     const newHeight = Math.min(Math.max(textarea.scrollHeight, 52), 220);
     textarea.style.height = `${newHeight}px`;
   }, [inputText]);
-
-  // Real-time timer for live streaming thinking seconds
-  const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
 
   useEffect(() => {
     if (!isGenerating) return;
