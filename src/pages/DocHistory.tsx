@@ -217,23 +217,80 @@ export default function DocHistory() {
   const isIdentical = diffResults.every((item: DiffResult) => item.left.type === 'normal' && item.right.type === 'normal');
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white text-gray-800 select-none">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white text-gray-800 select-none">
       
-      {/* 1. Left Sidebar - Checklist of history snapshots (Narrowed to 240px) */}
-      <aside className="w-[240px] border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3 bg-white">
+      {/* Global Top Bar */}
+      <header className="h-[60px] border-b border-gray-200 flex justify-between items-center px-4 shrink-0 bg-white">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate(`/kb/${kbId}/doc/${docId}`)}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer text-gray-500 hover:text-gray-900"
             title="返回编辑页"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={18} />
           </button>
-          <div className="min-w-0">
-            <h2 className="font-semibold text-sm truncate text-gray-900">历史记录</h2>
-            <p className="text-[11px] text-gray-500 truncate mt-0.5">{doc.title}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="font-semibold text-[15px] text-gray-900 shrink-0">历史记录</h2>
+            <div className="w-[1px] h-3.5 bg-gray-300 mx-1.5 shrink-0" />
+            <p className="text-[13px] text-gray-500 truncate max-w-[200px] sm:max-w-[300px]">{doc.title}</p>
+          </div>
+          <div className="ml-4 flex items-center gap-2">
+            <span className="bg-indigo-50 px-2.5 py-1 rounded text-xs text-indigo-600 font-semibold border border-indigo-100 flex items-center gap-1.5 shrink-0">
+              <History size={13} />
+              对比视图
+            </span>
           </div>
         </div>
+
+        <div className="flex items-center gap-4 shrink-0">
+          {/* Select comparison version dropdown */}
+          <div className="flex items-center gap-2 text-xs text-gray-500 overflow-x-auto whitespace-nowrap">
+            <span>当前选中版本与</span>
+            <select
+              value={compareId}
+              onChange={(e) => setCompareId(e.target.value)}
+              className="bg-white border border-gray-300 rounded px-2.5 py-1 outline-none text-gray-800 cursor-pointer focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors text-xs font-medium"
+            >
+              {versions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {formatTime(v.createdAt)} ({v.saveType === 'auto' ? '自动保存' : v.saveType === 'manual' ? '手动保存' : '已发布'})
+                </option>
+              ))}
+            </select>
+            <span>对比</span>
+          </div>
+
+          <div className="w-[1px] h-4 bg-gray-200 shrink-0" />
+
+          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2 py-0.5 flex gap-2 shrink-0">
+            <span className="flex items-center gap-1 text-emerald-600 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              新增内容
+            </span>
+            <span className="flex items-center gap-1 text-red-600 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              删除内容
+            </span>
+          </span>
+
+          <button
+            onClick={handleRestore}
+            disabled={!selectedId || restoring}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer text-white ${
+              !selectedId || restoring
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
+                : 'bg-green-700 hover:bg-green-600 hover:shadow'
+            }`}
+          >
+            {restoring ? '正在恢复...' : '恢复此记录'}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 1. Left Sidebar - Checklist of history snapshots (Narrowed to 240px) */}
+        <aside className="w-[240px] border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
 
         <div className="p-3 border-b border-gray-200 bg-gray-50 text-[11px] text-gray-500 space-y-1">
           <label className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors">
@@ -281,58 +338,6 @@ export default function DocHistory() {
 
       {/* 2. Right Panel - Side-by-side comparison */}
       <main className="flex-1 flex flex-col min-w-0 bg-white">
-        
-        {/* Top Control Bar */}
-        <header className="h-[60px] border-b border-gray-200 flex justify-between items-center px-6 shrink-0 bg-white">
-          <div className="flex items-center gap-3.5 text-sm min-w-0">
-            <span className="bg-indigo-50 px-2.5 py-1 rounded text-xs text-indigo-600 font-semibold border border-indigo-100 flex items-center gap-1.5 shrink-0">
-              <History size={13} />
-              对比视图
-            </span>
-
-            {/* Select comparison version dropdown */}
-            <div className="flex items-center gap-2 text-xs text-gray-500 ml-2 overflow-x-auto whitespace-nowrap py-1">
-              <span>当前选中版本与</span>
-              <select
-                value={compareId}
-                onChange={(e) => setCompareId(e.target.value)}
-                className="bg-white border border-gray-300 rounded px-2.5 py-1 outline-none text-gray-800 cursor-pointer focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors text-xs font-medium"
-              >
-                {versions.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {formatTime(v.createdAt)} ({v.saveType === 'auto' ? '自动保存' : v.saveType === 'manual' ? '手动保存' : '已发布'})
-                  </option>
-                ))}
-              </select>
-              <span>对比</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2 py-0.5 flex gap-2 shrink-0">
-              <span className="flex items-center gap-1 text-emerald-600 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                新增内容
-              </span>
-              <span className="flex items-center gap-1 text-red-600 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                删除内容
-              </span>
-            </span>
-
-            <button
-              onClick={handleRestore}
-              disabled={!selectedId || restoring}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer text-white ${
-                !selectedId || restoring
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
-                  : 'bg-indigo-600 hover:bg-indigo-500 hover:shadow'
-              }`}
-            >
-              {restoring ? '正在恢复...' : '恢复此记录'}
-            </button>
-          </div>
-        </header>
 
         {/* Diff Canvas Area */}
         <div ref={containerRef} className="flex-1 flex overflow-hidden relative bg-white">
@@ -448,6 +453,7 @@ export default function DocHistory() {
         </div>
       </main>
 
+      </div>
     </div>
   );
 }
