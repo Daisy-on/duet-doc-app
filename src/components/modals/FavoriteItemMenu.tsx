@@ -58,14 +58,7 @@ export default function FavoriteItemMenu({
     }
   }, [isCreatingFolder]);
 
-  // Reset view when opening/closing or changing docId
-  useEffect(() => {
-    if (isOpen) {
-      setView('main');
-      setIsCreatingFolder(false);
-      setNewFolderName('');
-    }
-  }, [isOpen, docId]);
+
 
   if (!isOpen) return null;
 

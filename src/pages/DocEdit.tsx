@@ -80,7 +80,7 @@ export default function DocEdit() {
   const doc = documents.find((d) => d.id === docId);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
-  const { isFavorited } = useFavoritesStore();
+  const { isFavorited, addFavorite } = useFavoritesStore();
   const [isFavOpen, setIsFavOpen] = useState(false);
   const [favBtnEl, setFavBtnEl] = useState<HTMLButtonElement | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
@@ -204,6 +204,11 @@ export default function DocEdit() {
             <button
               title="收藏"
               onClick={(e) => {
+                if (docId && !isFavorited(docId)) {
+                  addFavorite(docId);
+                  setToastText('已收藏到「全部收藏」');
+                  setTimeout(() => setToastText(null), 2500);
+                }
                 setFavBtnEl(e.currentTarget);
                 setIsFavOpen((prev) => !prev);
               }}
@@ -239,7 +244,7 @@ export default function DocEdit() {
       <OutlinePanel />
 
       {/* 收藏弹窗 */}
-      {docId && (
+      {docId && isFavOpen && (
         <FavoritePopover
           docId={docId}
           isOpen={isFavOpen}

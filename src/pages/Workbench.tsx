@@ -167,11 +167,13 @@ export default function Workbench() {
       />
 
       {/* Create Doc Modal */}
-      <CreateDocModal
-        isOpen={isDocModalOpen}
-        onClose={() => setIsDocModalOpen(false)}
-        onCreateKBClick={() => setIsKBModalOpen(true)}
-      />
+      {isDocModalOpen && (
+        <CreateDocModal
+          isOpen={isDocModalOpen}
+          onClose={() => setIsDocModalOpen(false)}
+          onCreateKBClick={() => setIsKBModalOpen(true)}
+        />
+      )}
     </main>
   );
 }

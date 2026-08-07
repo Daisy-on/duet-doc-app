@@ -456,15 +456,18 @@ export default function Favorites() {
       </main>
 
       {/* Popover Menu */}
-      <FavoriteItemMenu
-        docId={activeDocId || ''}
-        isOpen={activeDocId !== null}
-        onClose={() => {
-          setActiveDocId(null);
-          setMenuAnchorEl(null);
-        }}
-        anchorEl={menuAnchorEl}
-      />
+      {activeDocId && (
+        <FavoriteItemMenu
+          key={activeDocId}
+          docId={activeDocId}
+          isOpen={Boolean(activeDocId)}
+          onClose={() => {
+            setActiveDocId(null);
+            setMenuAnchorEl(null);
+          }}
+          anchorEl={menuAnchorEl}
+        />
+      )}
     </div>
   );
 }

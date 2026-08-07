@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FileText, FolderPlus, Folder, Calendar, BookOpen, User, ChevronRight, Plus, PanelLeft } from 'lucide-react';
 import CatalogPanel from '../components/CatalogPanel';
@@ -31,6 +31,10 @@ function formatRelativeTime(timestamp: number): string {
 
 export default function KnowledgeBaseHome() {
   const { kbId } = useParams<{ kbId: string }>();
+  return <KnowledgeBaseHomeContent key={kbId || 'empty'} kbId={kbId} />;
+}
+
+function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
   const navigate = useNavigate();
   
   const groups = useKnowledgeBaseStore((state) => state.groups);
@@ -49,22 +53,11 @@ export default function KnowledgeBaseHome() {
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
   
-  // Track currently selected sub-group
+  // Track currently selected sub-group for this KB instance
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
 
-  // Reset folder selection when switching KBs
-  useEffect(() => {
-    setCurrentGroupId(null);
-  }, [kbId]);
-
-  // Reset selected folder if the current group was deleted (e.g. via CatalogPanel)
-  useEffect(() => {
-    if (currentGroupId) {
-      if (!groups.some((g) => g.id === currentGroupId)) {
-        setCurrentGroupId(null);
-      }
-    }
-  }, [currentGroupId, groups]);
+  // Validate currentGroupId in case the group was deleted via CatalogPanel
+  const activeGroupId = (currentGroupId && groups.some((g) => g.id === currentGroupId)) ? currentGroupId : null;
 
   if (!kb || !kbId) {
     return (
@@ -86,14 +79,14 @@ export default function KnowledgeBaseHome() {
   const allGroups = groups.filter((g) => g.kbId === kbId).sort((a, b) => a.order - b.order);
 
   // Filter groups and docs for current layer
-  const currentSubGroups = getChildGroups(currentGroupId, kbId);
-  const currentDocs = allDocs.filter((doc) => doc.groupId === currentGroupId);
-  const currentGroup = currentGroupId ? allGroups.find((g) => g.id === currentGroupId) : null;
-  const ancestors = currentGroupId ? getGroupAncestors(currentGroupId) : [];
+  const currentSubGroups = getChildGroups(activeGroupId, kbId);
+  const currentDocs = allDocs.filter((doc) => doc.groupId === activeGroupId);
+  const currentGroup = activeGroupId ? allGroups.find((g) => g.id === activeGroupId) : null;
+  const ancestors = activeGroupId ? getGroupAncestors(activeGroupId) : [];
 
   const handleCreateDocument = () => {
     // Create new document in this KB inside current group layer
-    const newDocId = createDocument(kbId, currentGroupId, '新建文档');
+    const newDocId = createDocument(kbId, activeGroupId, '新建文档');
     navigate(`/kb/${kbId}/doc/${newDocId}`);
   };
 

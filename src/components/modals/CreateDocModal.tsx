@@ -16,15 +16,6 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Reset selectedKbId to first KB or ensure it is valid when modal opens or KBs change
-  useEffect(() => {
-    if (isOpen) {
-      if (!selectedKbId || !knowledgeBases.some(kb => kb.id === selectedKbId)) {
-        setSelectedKbId(knowledgeBases[0]?.id || '');
-      }
-    }
-  }, [isOpen, knowledgeBases, selectedKbId]);
-
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -51,18 +42,19 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
     };
   }, []);
 
-  const selectedKb = knowledgeBases.find((kb) => kb.id === selectedKbId);
+  const selectedKb = knowledgeBases.find((kb) => kb.id === selectedKbId) || knowledgeBases[0];
+  const effectiveKbId = selectedKb?.id || '';
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedKbId) return;
+    if (!effectiveKbId) return;
 
     // Create a new document in the selected KB's root level (groupId: null)
-    const newDocId = createDocument(selectedKbId, null, '新建文档');
+    const newDocId = createDocument(effectiveKbId, null, '新建文档');
     onClose();
-    navigate(`/kb/${selectedKbId}/doc/${newDocId}`);
+    navigate(`/kb/${effectiveKbId}/doc/${newDocId}`);
   };
 
   const handleCreateKBClick = () => {
@@ -73,7 +65,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
       <div 
-        className="bg-white rounded-xl shadow-2xl w-[420px] min-h-[320px] border border-border-color flex flex-col p-6 animate-modal-scale-in relative"
+        className="bg-white rounded-2xl shadow-2xl w-[420px] min-h-[320px] border border-border-color flex flex-col p-5 animate-modal-scale-in relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -144,7 +136,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
                 {dropdownOpen && (
                   <div className="absolute left-0 right-0 mt-1.5 bg-white border border-border-color rounded-lg shadow-xl py-1.5 max-h-[172px] overflow-y-auto z-50 animate-dropdown-fade-in custom-scrollbar">
                     {knowledgeBases.map((kb) => {
-                      const isSelected = kb.id === selectedKbId;
+                      const isSelected = kb.id === effectiveKbId;
                       return (
                         <div
                           key={kb.id}
@@ -182,13 +174,13 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-border-color rounded-lg text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors"
+                className="px-4 py-2 border border-border-color rounded-xl text-[13px] font-medium text-text-secondary hover:bg-hover-bg transition-colors"
               >
                 取消
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-accent hover:bg-indigo-700 text-white rounded-lg text-[13px] font-semibold shadow-sm transition-colors cursor-pointer"
+                className="px-5 py-2 bg-accent hover:bg-indigo-700 text-white rounded-xl text-[13px] font-semibold shadow-sm transition-colors cursor-pointer"
               >
                 创建文档
               </button>

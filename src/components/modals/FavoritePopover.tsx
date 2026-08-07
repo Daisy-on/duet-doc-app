@@ -20,14 +20,12 @@ export default function FavoritePopover({
     folders,
     isFavorited,
     getFolderIds,
-    addFavorite,
     removeFavorite,
     addToFolder,
     removeFromFolder,
     createFolder,
   } = useFavoritesStore();
 
-  const [showToast, setShowToast] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -36,16 +34,7 @@ export default function FavoritePopover({
   const favorited = isFavorited(docId);
   const activeFolderIds = getFolderIds(docId);
 
-  // Auto-favorite when first opened (if not yet favorited)
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!isFavorited(docId)) {
-      addFavorite(docId);
-      setShowToast(true);
-      const timer = setTimeout(() => setShowToast(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+
 
   // Close on outside click
   useEffect(() => {
@@ -119,13 +108,7 @@ export default function FavoritePopover({
       style={{ position: 'fixed', top: posTop, right: posRight, zIndex: 9999, width: 232 }}
       className="bg-white border border-border-color rounded-xl shadow-2xl py-3 animate-dropdown-fade-in"
     >
-      {/* Success toast */}
-      {showToast && (
-        <div className="mx-3 mb-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 font-medium">
-          <Check size={13} className="shrink-0" />
-          已收藏到「全部收藏」
-        </div>
-      )}
+
 
       {/* Header row */}
       <div className="px-3 mb-2 flex items-center justify-between">
