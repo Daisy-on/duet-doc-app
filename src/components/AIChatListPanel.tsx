@@ -225,7 +225,7 @@ export default function AIChatListPanel() {
                         {popoverOpenId === session.id && (
                           <div
                             ref={popoverRef}
-                            className="absolute right-0 top-7 z-50 w-32 bg-white shadow-lg rounded-lg border border-border-color py-1 text-text-primary text-[12px] overflow-hidden"
+                            className="absolute right-0 top-7 z-50 w-32 bg-white shadow-lg rounded-xl border border-border-color py-1 text-text-primary text-[12px] overflow-hidden"
                           >
                             <button
                               onClick={(e) => handleTogglePin(session.id, session.isPinned, e)}

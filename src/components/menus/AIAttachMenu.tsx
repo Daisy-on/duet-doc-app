@@ -67,12 +67,12 @@ export default function AIAttachMenu({
       {/* Dropdown container */}
       <div
         style={style}
-        className="z-[115] w-48 bg-white border border-border-color rounded-xl shadow-xl py-1.5 animate-dropdown-fade-in"
+        className="z-[115] w-38 bg-white border border-border-color rounded-xl shadow-xl py-1.5 animate-dropdown-fade-in"
       >
         <button
           type="button"
           onClick={triggerFileUpload}
-          className="w-full px-6 py-3 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+          className="w-full px-3 py-2.5 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
         >
           <Upload size={14} className="text-indigo-500" />
           <span>上传本地文件</span>
@@ -84,7 +84,7 @@ export default function AIAttachMenu({
             onOpenDocSelector();
             onClose();
           }}
-          className="w-full px-6 py-3 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+          className="w-full px-3 py-2.5 text-xs font-semibold text-text-primary hover:bg-hover-bg flex items-center gap-2.5 transition-colors text-left cursor-pointer"
         >
           <FileText size={14} className="text-emerald-500" />
           <span>引用知识库文档</span>
