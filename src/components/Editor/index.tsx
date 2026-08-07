@@ -398,7 +398,6 @@ export default function Editor() {
       const containerRect = editorContainerRef.current.getBoundingClientRect();
 
       const assistantWidth = 560;
-      const assistantHeight = 46; // 输入框大致高度
       const viewportHeight = window.innerHeight;
 
       // 1. 横向定位：将输入框的中心对齐选区的水平中心
@@ -411,7 +410,7 @@ export default function Editor() {
       left = Math.max(minLeft, Math.min(left, maxLeft));
 
       // 2. 纵向定位：默认定位在选区底部下方 12px 处（留出刚好露出选中行文字的空间）
-      let top = lastRect.bottom + 12;
+      const top = lastRect.bottom + 12;
       let pos: { top?: number; bottom?: number; left: number };
 
       // 如果下方空间不足（预测展开后高度约为300px），则定位在选区上方并设置 bottom 以使其向上扩展
