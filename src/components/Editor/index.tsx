@@ -174,6 +174,8 @@ export default function Editor() {
       window.clearTimeout(ghostTextTimerRef.current);
     }
 
+    if (editor.isDestroyed) return;
+
     editor.commands.clearGhostText();
     AIDispatcher.clearGhostTextRequest();
 
@@ -358,7 +360,17 @@ export default function Editor() {
         setBubblePos(null)
       }
     },
-  })
+  }, [currentDocId])
+
+  // 当文档切换时，在 Render 阶段推导重置 AI 助手弹窗与选区气泡，防止跨文档残留
+  const [prevDocId, setPrevDocId] = useState(currentDocId);
+  if (prevDocId !== currentDocId) {
+    setPrevDocId(currentDocId);
+    setIsAssistantOpen(false);
+    setSavedSelection(null);
+    setAssistantPos(null);
+    setBubblePos(null);
+  }
 
   // 唤起智能助手输入框
   const openAssistant = useCallback((defaultText: string, task: CloudAITask = 'rewrite') => {
@@ -466,7 +478,9 @@ export default function Editor() {
     }
 
     AIDispatcher.clearGhostTextRequest();
-    editor?.commands.clearGhostText();
+    if (editor && !editor.isDestroyed) {
+      editor.commands.clearGhostText();
+    }
   }, [currentDocId, editor]);
 
   // 监听 AI Worker 空闲且之前有丢弃请求的自定义事件，以触发冷却重试
