@@ -15,28 +15,37 @@ DuetDoc 是一个智能协作文档编辑器，采用了创新的 **“端云分
 ## 🚀 快速开始
 
 ### 1. 准备环境
+
 - **Node.js**: v18+ (推荐 v20)
 - **浏览器**: 支持 WebGPU 的现代浏览器 (推荐 Chrome 113+ 或 Edge 113+)
 - **显卡**: 推荐使用配备独立显卡的设备以保障端侧打字补全体验，若使用集成显卡，生成速度会相对降低。
 
 ### 2. 依赖安装
+
 在前端项目根目录下执行：
+
 ```bash
 npm install
 ```
 
 ### 3. 配置环境变量
+
 复制根目录下的 `.env.example` 为 `.env.local`：
+
 ```bash
 cp .env.example .env.local
 ```
+
 确保 `.env.local` 里的 `VITE_API_BASE_URL` 指向您的本地或远程后端地址（默认 `http://127.0.0.1:8000`）。
+
 > **🚨 安全警告**: `VITE_API_BASE_URL` 会暴露在前端代码中。但是 **API Key (如 DeepSeek API Key) 绝对不能写入前端**。所有的云端模型鉴权请在后端仓库进行配置！
 
 ### 4. 手动下载端侧模型权重
+
 出于体积考虑，端侧使用的量化模型已被 `.gitignore` 忽略，无法通过 Git 克隆获取。您需要手动下载模型（如 `Qwen2.5-0.5B-Instruct-ONNX`）并放置在项目的 `public` 目录下。
 
 **预期的目录结构**:
+
 ```
 duet-doc-app/
   ├─ public/
@@ -49,26 +58,33 @@ duet-doc-app/
 ```
 
 ### 5. 启动前后端服务
+
 **启动后端**: (请先参考后端仓库 README 完成依赖安装)
+
 ```bash
 cd ../duet-doc-backend
 uvicorn app.main:app --reload --port 8000
 ```
-*(默认端口: 8000)*
+
+_(默认端口: 8000)_
 
 **启动前端**:
+
 ```bash
 # 在 duet-doc-app 目录下
 npm run dev
 ```
-*(默认端口: 5173)*
+
+_(默认端口: 5173)_
 
 在浏览器中访问 `http://localhost:5173` 即可体验。
 
 ### 6. 生产环境构建
+
 ```bash
 npm run build
 ```
+
 执行后会在 `dist` 目录下生成静态文件，可部署至 Nginx、Vercel 或其他静态托管服务。由于打包包含了 ONNX WASM 运行时，产物较大，建议配置服务器的 Gzip 或 Brotli 压缩。
 
 ---
