@@ -1,17 +1,30 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Workbench from './pages/Workbench';
-import KnowledgeBaseHome from './pages/KnowledgeBaseHome';
-import DocEdit from './pages/DocEdit';
-import AIWriting from './pages/AIWriting';
-import MemoHome from './pages/MemoHome';
-import MemoEdit from './pages/MemoEdit';
-import Favorites from './pages/Favorites';
-import DocHistory from './pages/DocHistory';
 import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
 import { useFavoritesStore } from './store/favoritesStore';
 import { useAIWritingStore } from './store/aiWritingStore';
+
+const KnowledgeBaseHome = lazy(() => import('./pages/KnowledgeBaseHome'));
+const DocEdit = lazy(() => import('./pages/DocEdit'));
+const AIWriting = lazy(() => import('./pages/AIWriting'));
+const MemoHome = lazy(() => import('./pages/MemoHome'));
+const MemoEdit = lazy(() => import('./pages/MemoEdit'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const DocHistory = lazy(() => import('./pages/DocHistory'));
+
+function RouteLoadingFallback() {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-bg-main text-sm text-text-secondary">
+      页面加载中...
+    </div>
+  );
+}
+
+function lazyRoute(element: ReactNode) {
+  return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
+}
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -64,14 +77,14 @@ function App() {
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Workbench />} />
-          <Route path="kb/:kbId" element={<KnowledgeBaseHome />} />
-          <Route path="kb/:kbId/doc/:docId" element={<DocEdit />} />
-          <Route path="ai-writing/*" element={<AIWriting />} />
-          <Route path="memo" element={<MemoHome />} />
-          <Route path="memo/:memoId" element={<MemoEdit />} />
-          <Route path="favorites" element={<Favorites />} />
+          <Route path="kb/:kbId" element={lazyRoute(<KnowledgeBaseHome />)} />
+          <Route path="kb/:kbId/doc/:docId" element={lazyRoute(<DocEdit />)} />
+          <Route path="ai-writing/*" element={lazyRoute(<AIWriting />)} />
+          <Route path="memo" element={lazyRoute(<MemoHome />)} />
+          <Route path="memo/:memoId" element={lazyRoute(<MemoEdit />)} />
+          <Route path="favorites" element={lazyRoute(<Favorites />)} />
         </Route>
-        <Route path="kb/:kbId/doc/:docId/history" element={<DocHistory />} />
+        <Route path="kb/:kbId/doc/:docId/history" element={lazyRoute(<DocHistory />)} />
       </Routes>
     </BrowserRouter>
   );
