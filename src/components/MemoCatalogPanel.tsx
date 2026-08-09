@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Search, FileText, MoreHorizontal } from 'lucide-react';
-import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { MEMO_KB_ID, useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import type { Document } from '../store/knowledgeBaseStore';
 import MemoActionMenu from './menus/MemoActionMenu';
@@ -12,13 +12,18 @@ export default function MemoCatalogPanel() {
   const navigate = useNavigate();
   const { memoId } = useParams<{ memoId?: string }>();
 
-  const { getMemos, createMemo, updateDocument, deleteDocument, moveDocument } =
-    useKnowledgeBaseStore();
+  const documents = useKnowledgeBaseStore((state) => state.documents);
+  const createMemo = useKnowledgeBaseStore((state) => state.createMemo);
+  const updateDocument = useKnowledgeBaseStore((state) => state.updateDocument);
+  const deleteDocument = useKnowledgeBaseStore((state) => state.deleteDocument);
+  const moveDocument = useKnowledgeBaseStore((state) => state.moveDocument);
 
-  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } =
-    useLayoutStore();
+  const catalogWidth = useLayoutStore((state) => state.catalogWidth);
+  const isCatalogCollapsed = useLayoutStore((state) => state.isCatalogCollapsed);
+  const setCatalogWidth = useLayoutStore((state) => state.setCatalogWidth);
+  const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
-  const memos = getMemos();
+  const memos = documents.filter((document) => document.kbId === MEMO_KB_ID);
 
   // Selection states
   const [searchQuery, setSearchQuery] = useState('');

@@ -81,12 +81,15 @@ export default function DocEdit() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
 
-  const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
-  const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
-  const doc = documents.find((d) => d.id === docId);
+  const doc = useKnowledgeBaseStore((state) => state.documents.find((item) => item.id === docId));
+  const updateDocument = useKnowledgeBaseStore((state) => state.updateDocument);
+  const createManualVersion = useKnowledgeBaseStore((state) => state.createManualVersion);
+  const isCatalogCollapsed = useLayoutStore((state) => state.isCatalogCollapsed);
+  const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
-  const { isFavorited, addFavorite } = useFavoritesStore();
+  const isFavorited = useFavoritesStore((state) => state.isFavorited);
+  const addFavorite = useFavoritesStore((state) => state.addFavorite);
   const [isFavOpen, setIsFavOpen] = useState(false);
   const [favBtnEl, setFavBtnEl] = useState<HTMLButtonElement | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);

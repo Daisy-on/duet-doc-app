@@ -135,8 +135,10 @@ const assistantSelectionHighlightExtension = Extension.create({
 export default function Editor() {
   const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>();
   const currentDocId = docId || memoId;
-  const { documents, updateDocument } = useKnowledgeBaseStore();
-  const doc = documents.find((d) => d.id === currentDocId);
+  const doc = useKnowledgeBaseStore((state) =>
+    state.documents.find((item) => item.id === currentDocId),
+  );
+  const updateDocument = useKnowledgeBaseStore((state) => state.updateDocument);
 
   const setSelectedText = useEditorStore((state) => state.setSelectedText);
   const setHeadings = useEditorStore((state) => state.setHeadings);

@@ -20,9 +20,11 @@ import KbActionMenu from './menus/KbActionMenu';
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
   const navigate = useNavigate();
-  const { lastVisitedSessionId } = useAIWritingStore();
-  const { knowledgeBases, updateKnowledgeBase, deleteKnowledgeBase } = useKnowledgeBaseStore();
-  const { setIsCatalogCollapsed } = useLayoutStore();
+  const lastVisitedSessionId = useAIWritingStore((state) => state.lastVisitedSessionId);
+  const knowledgeBases = useKnowledgeBaseStore((state) => state.knowledgeBases);
+  const updateKnowledgeBase = useKnowledgeBaseStore((state) => state.updateKnowledgeBase);
+  const deleteKnowledgeBase = useKnowledgeBaseStore((state) => state.deleteKnowledgeBase);
+  const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
 

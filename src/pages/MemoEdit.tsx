@@ -71,9 +71,11 @@ export default function MemoEdit() {
   const { memoId } = useParams<{ memoId: string }>();
   const navigate = useNavigate();
 
-  const { documents, updateDocument, createManualVersion } = useKnowledgeBaseStore();
-  const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
-  const memo = documents.find((d) => d.id === memoId);
+  const memo = useKnowledgeBaseStore((state) => state.documents.find((item) => item.id === memoId));
+  const updateDocument = useKnowledgeBaseStore((state) => state.updateDocument);
+  const createManualVersion = useKnowledgeBaseStore((state) => state.createManualVersion);
+  const isCatalogCollapsed = useLayoutStore((state) => state.isCatalogCollapsed);
+  const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
   const [toastText, setToastText] = useState<string | null>(null);

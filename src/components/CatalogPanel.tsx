@@ -211,7 +211,7 @@ function GroupTreeNode({
   setDocActionMenuAnchorEl,
   clearGroupMenus,
 }: GroupTreeNodeProps) {
-  const { getChildGroups } = useKnowledgeBaseStore();
+  const getChildGroups = useKnowledgeBaseStore((state) => state.getChildGroups);
 
   const subGroups = getChildGroups(group.id, kbId);
   const groupDocs = documents.filter((doc) => doc.groupId === group.id);
@@ -414,29 +414,29 @@ export default function CatalogPanel() {
   const { kbId, docId } = useParams<{ kbId?: string; docId?: string }>();
   const navigate = useNavigate();
 
-  const {
-    getKnowledgeBase,
-    getDocumentsByKb,
-    createDocument,
-    createGroup,
-    updateGroup,
-    deleteGroup,
-    updateDocument,
-    deleteDocument,
-    getChildGroups,
-    getDescendantGroupIds,
-    moveDocument,
-    moveGroup,
-    getGroupAncestors,
-    groups,
-  } = useKnowledgeBaseStore();
+  const knowledgeBases = useKnowledgeBaseStore((state) => state.knowledgeBases);
+  const allDocuments = useKnowledgeBaseStore((state) => state.documents);
+  const groups = useKnowledgeBaseStore((state) => state.groups);
+  const createDocument = useKnowledgeBaseStore((state) => state.createDocument);
+  const createGroup = useKnowledgeBaseStore((state) => state.createGroup);
+  const updateGroup = useKnowledgeBaseStore((state) => state.updateGroup);
+  const deleteGroup = useKnowledgeBaseStore((state) => state.deleteGroup);
+  const updateDocument = useKnowledgeBaseStore((state) => state.updateDocument);
+  const deleteDocument = useKnowledgeBaseStore((state) => state.deleteDocument);
+  const getChildGroups = useKnowledgeBaseStore((state) => state.getChildGroups);
+  const getDescendantGroupIds = useKnowledgeBaseStore((state) => state.getDescendantGroupIds);
+  const moveDocument = useKnowledgeBaseStore((state) => state.moveDocument);
+  const moveGroup = useKnowledgeBaseStore((state) => state.moveGroup);
+  const getGroupAncestors = useKnowledgeBaseStore((state) => state.getGroupAncestors);
 
-  const { catalogWidth, isCatalogCollapsed, setCatalogWidth, setIsCatalogCollapsed } =
-    useLayoutStore();
+  const catalogWidth = useLayoutStore((state) => state.catalogWidth);
+  const isCatalogCollapsed = useLayoutStore((state) => state.isCatalogCollapsed);
+  const setCatalogWidth = useLayoutStore((state) => state.setCatalogWidth);
+  const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
-  const kb = kbId ? getKnowledgeBase(kbId) : undefined;
+  const kb = kbId ? knowledgeBases.find((item) => item.id === kbId) : undefined;
   const rootGroups = kbId ? getChildGroups(null, kbId) : [];
-  const documents = kbId ? getDocumentsByKb(kbId) : [];
+  const documents = kbId ? allDocuments.filter((item) => item.kbId === kbId) : [];
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
