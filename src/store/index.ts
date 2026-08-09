@@ -12,6 +12,8 @@ interface EditorState {
   setSelectedText: (text: string) => void;
   headings: HeadingItem[];
   setHeadings: (headings: HeadingItem[]) => void;
+  activeEditorDocumentId: string | null;
+  setActiveEditorDocumentId: (documentId: string | null) => void;
   // 编辑器实例（由 Editor 组件写入，供 Toolbar 读取）
   editorInstance: Editor | null;
   setEditorInstance: (editor: Editor | null) => void;
@@ -22,6 +24,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedText: (text) => set({ selectedText: text }),
   headings: [],
   setHeadings: (headings) => set({ headings }),
+  activeEditorDocumentId: null,
+  setActiveEditorDocumentId: (documentId) => set({ activeEditorDocumentId: documentId }),
   editorInstance: null,
   setEditorInstance: (editor) => set({ editorInstance: editor }),
 }));

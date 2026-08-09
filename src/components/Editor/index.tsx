@@ -141,6 +141,7 @@ export default function Editor() {
   const setSelectedText = useEditorStore((state) => state.setSelectedText);
   const setHeadings = useEditorStore((state) => state.setHeadings);
   const setEditorInstance = useEditorStore((state) => state.setEditorInstance);
+  const setActiveEditorDocumentId = useEditorStore((state) => state.setActiveEditorDocumentId);
 
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -165,7 +166,14 @@ export default function Editor() {
 
   useEffect(() => {
     currentDocIdRef.current = currentDocId;
-  }, [currentDocId]);
+    setActiveEditorDocumentId(currentDocId ?? null);
+
+    return () => {
+      if (useEditorStore.getState().activeEditorDocumentId === currentDocId) {
+        setActiveEditorDocumentId(null);
+      }
+    };
+  }, [currentDocId, setActiveEditorDocumentId]);
 
   // 解析并同步标题到 Zustand，然后给 DOM 打标记
   const syncHeadings = useCallback(
@@ -301,11 +309,11 @@ export default function Editor() {
       TableCell,
       GhostTextExtension,
       LocalImageExtension.configure({
-        getDocId: () => currentDocId || null,
+        getDocId: () => useEditorStore.getState().activeEditorDocumentId,
       }),
       assistantSelectionHighlightExtension,
     ],
-    [currentDocId],
+    [],
   );
 
   const editor = useEditor(
@@ -386,7 +394,7 @@ export default function Editor() {
         }
       },
     },
-    [currentDocId],
+    [],
   );
 
   // 当文档切换时，在 Render 阶段推导重置 AI 助手弹窗与选区气泡，防止跨文档残留

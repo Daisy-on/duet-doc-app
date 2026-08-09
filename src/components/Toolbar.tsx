@@ -709,7 +709,7 @@ export default function Toolbar({ editor }: ToolbarProps) {
     setFormatPainterActive((v) => !v);
   }, []);
 
-  if (!editor) return null;
+  if (!editor || editor.isDestroyed) return null;
 
   return (
     <div className="px-6 py-2 border-b border-border-color flex items-center gap-1 text-text-secondary shrink-0 flex-wrap">
