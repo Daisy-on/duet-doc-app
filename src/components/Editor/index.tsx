@@ -38,6 +38,9 @@ interface BubblePos {
 
 type GhostTextDiscardReason = NonNullable<AITrace['discardReason']>;
 
+const GHOST_TEXT_PRELOAD_DELAY_MS = 2000;
+const GHOST_TEXT_IDLE_TIMEOUT_MS = 3000;
+
 function logGhostTextUIOutcome(
   requestId: string,
   status: 'rendered' | 'discarded',
@@ -329,7 +332,6 @@ export default function Editor() {
         : '',
       onCreate: ({ editor }) => {
         syncHeadings(editor);
-        AIDispatcher.loadGhostTextModel();
       },
       onUpdate: ({ editor }) => {
         if (currentDocId) {
@@ -399,6 +401,105 @@ export default function Editor() {
     },
     [],
   );
+
+  // 首屏稳定后空闲预热端侧模型；用户开始编辑时可立即抢占加载。
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const initialStatus = AIDispatcher.getGhostTextStatus();
+    if (initialStatus === 'loading' || initialStatus === 'ready') return;
+
+    let preloadTimerId: number | null = null;
+    let idleCallbackId: number | null = null;
+    let fallbackIdleTimerId: number | null = null;
+    let autoDelayElapsed = false;
+    let started = false;
+
+    const cancelPendingSchedule = () => {
+      if (preloadTimerId !== null) {
+        window.clearTimeout(preloadTimerId);
+        preloadTimerId = null;
+      }
+      if (idleCallbackId !== null) {
+        window.cancelIdleCallback(idleCallbackId);
+        idleCallbackId = null;
+      }
+      if (fallbackIdleTimerId !== null) {
+        window.clearTimeout(fallbackIdleTimerId);
+        fallbackIdleTimerId = null;
+      }
+    };
+
+    const startLoading = (allowErrorRetry: boolean) => {
+      if (started || document.visibilityState !== 'visible') return;
+
+      const status = AIDispatcher.getGhostTextStatus();
+      if (status === 'loading' || status === 'ready') {
+        started = true;
+        cancelPendingSchedule();
+        return;
+      }
+      if (status === 'error' && !allowErrorRetry) return;
+
+      started = true;
+      cancelPendingSchedule();
+      AIDispatcher.loadGhostTextModel();
+    };
+
+    const scheduleIdlePreload = () => {
+      if (
+        started ||
+        idleCallbackId !== null ||
+        fallbackIdleTimerId !== null ||
+        document.visibilityState !== 'visible'
+      ) {
+        return;
+      }
+
+      if (typeof window.requestIdleCallback === 'function') {
+        idleCallbackId = window.requestIdleCallback(
+          () => {
+            idleCallbackId = null;
+            startLoading(false);
+          },
+          { timeout: GHOST_TEXT_IDLE_TIMEOUT_MS },
+        );
+      } else {
+        fallbackIdleTimerId = window.setTimeout(() => {
+          fallbackIdleTimerId = null;
+          startLoading(false);
+        }, 0);
+      }
+    };
+
+    const handleUserIntent = () => {
+      startLoading(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && autoDelayElapsed && !started) {
+        scheduleIdlePreload();
+      }
+    };
+
+    preloadTimerId = window.setTimeout(() => {
+      preloadTimerId = null;
+      autoDelayElapsed = true;
+      scheduleIdlePreload();
+    }, GHOST_TEXT_PRELOAD_DELAY_MS);
+
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener('pointerdown', handleUserIntent, { once: true });
+    editorElement.addEventListener('keydown', handleUserIntent, { once: true });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelPendingSchedule();
+      editorElement.removeEventListener('pointerdown', handleUserIntent);
+      editorElement.removeEventListener('keydown', handleUserIntent);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [editor]);
 
   // 当文档切换时，在 Render 阶段推导重置 AI 助手弹窗与选区气泡，防止跨文档残留
   const [prevDocId, setPrevDocId] = useState(currentDocId);
