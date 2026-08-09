@@ -40,6 +40,7 @@ type GhostTextDiscardReason = NonNullable<AITrace['discardReason']>;
 
 const GHOST_TEXT_PRELOAD_DELAY_MS = 2000;
 const GHOST_TEXT_IDLE_TIMEOUT_MS = 3000;
+const HEADING_SYNC_DELAY_MS = 150;
 
 function logGhostTextUIOutcome(
   requestId: string,
@@ -152,6 +153,9 @@ export default function Editor() {
   const timerRef = useRef<number | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const ghostTextTimerRef = useRef<number | null>(null);
+  const headingSyncTimerRef = useRef<number | null>(null);
+  const headingRafRef = useRef<number | null>(null);
+  const lastHeadingSignatureRef = useRef('');
   const currentDocIdRef = useRef<string | undefined>(currentDocId);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -180,13 +184,30 @@ export default function Editor() {
     };
   }, [currentDocId, setActiveEditorDocumentId]);
 
-  // 解析并同步标题到 Zustand，然后给 DOM 打标记
-  const syncHeadings = useCallback(
-    (editor: TiptapEditor) => {
+  // 解析并同步标题到 Zustand，然后给 DOM 打标记。
+  // 普通输入延迟合并；创建编辑器或外部替换内容时可强制立即同步。
+  const commitHeadings = useCallback(
+    (editor: TiptapEditor, force = false) => {
+      if (editor.isDestroyed) return;
+
       const headings = extractHeadings(editor);
-      setHeadings(headings);
-      // 等 DOM 更新完再打 id（RAF 保证在渲染后执行）
-      requestAnimationFrame(() => {
+      const signature = JSON.stringify(headings.map(({ level, id, text }) => [level, id, text]));
+      const hasChanged = signature !== lastHeadingSignatureRef.current;
+
+      if (!hasChanged && !force) return;
+
+      if (hasChanged) {
+        lastHeadingSignatureRef.current = signature;
+        setHeadings(headings);
+      }
+
+      if (headingRafRef.current !== null) {
+        cancelAnimationFrame(headingRafRef.current);
+      }
+
+      // 等 DOM 更新完再打 id，并保证同一时刻最多只有一个待执行帧。
+      headingRafRef.current = requestAnimationFrame(() => {
+        headingRafRef.current = null;
         const editorEl = editorContainerRef.current?.querySelector(
           '.ProseMirror',
         ) as HTMLElement | null;
@@ -194,6 +215,26 @@ export default function Editor() {
       });
     },
     [setHeadings],
+  );
+
+  const syncHeadings = useCallback(
+    (editor: TiptapEditor, immediate = false) => {
+      if (headingSyncTimerRef.current !== null) {
+        window.clearTimeout(headingSyncTimerRef.current);
+        headingSyncTimerRef.current = null;
+      }
+
+      if (immediate) {
+        commitHeadings(editor, true);
+        return;
+      }
+
+      headingSyncTimerRef.current = window.setTimeout(() => {
+        headingSyncTimerRef.current = null;
+        commitHeadings(editor);
+      }, HEADING_SYNC_DELAY_MS);
+    },
+    [commitHeadings],
   );
 
   // 幽灵文本调度函数：在选区更新时调用，清理先前的定时器和请求，根据当前文档内容和光标位置构建提示，延迟请求润色建议，并在返回后验证请求是否仍然相关，最后设置幽灵文本
@@ -339,7 +380,7 @@ export default function Editor() {
           : doc.content
         : '',
       onCreate: ({ editor }) => {
-        syncHeadings(editor);
+        syncHeadings(editor, true);
       },
       onUpdate: ({ editor }) => {
         if (currentDocId) {
@@ -626,6 +667,12 @@ export default function Editor() {
       if (ghostTextTimerRef.current) {
         clearTimeout(ghostTextTimerRef.current);
       }
+      if (headingSyncTimerRef.current !== null) {
+        clearTimeout(headingSyncTimerRef.current);
+      }
+      if (headingRafRef.current !== null) {
+        cancelAnimationFrame(headingRafRef.current);
+      }
       AIDispatcher.clearGhostTextRequest();
       if (currentDocIdRef.current) {
         runAssetGC(currentDocIdRef.current).catch((err) =>
@@ -708,7 +755,7 @@ export default function Editor() {
           editor.commands.setContent(isJson ? JSON.parse(docContent) : docContent, {
             emitUpdate: false,
           });
-          syncHeadings(editor);
+          syncHeadings(editor, true);
         }
       });
     }
