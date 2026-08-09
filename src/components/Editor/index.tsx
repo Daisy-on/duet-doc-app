@@ -210,13 +210,21 @@ export default function Editor() {
 
       if (!currentDocId) return;
 
-      const promptInput = buildGhostTextPrompt(editor);
-      if (!promptInput) return;
-
       const requestDocId = currentDocId;
-      const requestCursorPos = promptInput.cursorPos;
 
       ghostTextTimerRef.current = window.setTimeout(async () => {
+        ghostTextTimerRef.current = null;
+
+        if (editor.isDestroyed || requestDocId !== currentDocIdRef.current) {
+          return;
+        }
+
+        // 仅在用户停止输入、定时器真正触发时读取最新的编辑器上下文，
+        // 避免每次 onUpdate 都遍历文档并创建临时 Prompt 数据。
+        const promptInput = buildGhostTextPrompt(editor);
+        if (!promptInput) return;
+
+        const requestCursorPos = promptInput.cursorPos;
         const result = await AIDispatcher.requestGhostText({
           messages: promptInput.messages,
           docId: requestDocId,
