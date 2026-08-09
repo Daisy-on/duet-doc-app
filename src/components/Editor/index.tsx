@@ -318,6 +318,7 @@ export default function Editor() {
 
   const editor = useEditor(
     {
+      immediatelyRender: false,
       extensions,
       content: doc
         ? doc.content.trim().startsWith('{')
