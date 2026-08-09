@@ -78,6 +78,7 @@ export default function MemoEdit() {
   const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
+  const flushPendingDocumentUpdate = useEditorStore((state) => state.flushPendingDocumentUpdate);
   const [toastText, setToastText] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,6 +147,11 @@ export default function MemoEdit() {
     minute: '2-digit',
   });
 
+  const openHistory = () => {
+    flushPendingDocumentUpdate(memoId);
+    navigate(`/kb/kb-memo-system/doc/${memoId}/history`);
+  };
+
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Left panel for list of Memos */}
@@ -169,7 +175,11 @@ export default function MemoEdit() {
                 value={memo.title}
                 onChange={(e) => {
                   const newTitle = e.target.value;
-                  const updatedContent = replaceFirstH1(memo.content, newTitle);
+                  flushPendingDocumentUpdate(memo.id);
+                  const latestContent =
+                    useKnowledgeBaseStore.getState().documents.find((item) => item.id === memo.id)
+                      ?.content ?? memo.content;
+                  const updatedContent = replaceFirstH1(latestContent, newTitle);
                   updateDocument(memo.id, {
                     title: newTitle,
                     content: updatedContent,
@@ -180,7 +190,7 @@ export default function MemoEdit() {
               />
               <div className="flex items-center gap-3 text-xs shrink-0">
                 <button
-                  onClick={() => navigate(`/kb/kb-memo-system/doc/${memoId}/history`)}
+                  onClick={openHistory}
                   className="text-text-secondary hover:text-accent hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                   title="查看历史版本"
                 >
@@ -201,7 +211,7 @@ export default function MemoEdit() {
             </span>
             <button
               title="历史记录"
-              onClick={() => navigate(`/kb/kb-memo-system/doc/${memoId}/history`)}
+              onClick={openHistory}
               className="cursor-pointer hover:text-text-primary transition-colors flex bg-transparent border-none p-0 outline-none"
             >
               <History size={16} />

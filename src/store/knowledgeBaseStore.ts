@@ -6,6 +6,7 @@ import { useFavoritesStore } from './favoritesStore';
 import { saveCoordinator, type SaveUpdates, type DeleteHandle } from '../utils/SaveCoordinator';
 import { extractAssetIds } from '../utils/assetUtils';
 import { runAssetGC } from '../assets/runAssetGC';
+import { useEditorStore } from './index';
 
 export const MEMO_KB_ID = 'kb-memo-system';
 
@@ -508,6 +509,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       // 1. 在开启写事务前预先从 DB 识别并建立保存屏障（切勿在 Dexie 事务回调内 await 非 IDB 的外部 Promise）
       const initialDocs = await db.documents.where('kbId').equals(id).toArray();
       docIds = initialDocs.map((d) => d.id);
+      for (const docId of docIds) {
+        useEditorStore.getState().flushPendingDocumentUpdate(docId);
+      }
       handle = await saveCoordinator.prepareDelete(docIds);
 
       // 2. 开启原子写事务
@@ -638,6 +642,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       docIds = initialDocs
         .filter((d) => d.groupId && deleteGroupIdsSet.has(d.groupId))
         .map((d) => d.id);
+      for (const docId of docIds) {
+        useEditorStore.getState().flushPendingDocumentUpdate(docId);
+      }
       handle = await saveCoordinator.prepareDelete(docIds);
 
       // 2. 开启原子写事务
@@ -734,11 +741,13 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   },
 
   flushDocumentAutosave: async (id) => {
+    useEditorStore.getState().flushPendingDocumentUpdate(id);
     await saveCoordinator.pauseAndFlush(id, internalPersistDocument);
     saveCoordinator.resume(id, internalPersistDocument);
   },
 
   createManualVersion: async (docId) => {
+    useEditorStore.getState().flushPendingDocumentUpdate(docId);
     await saveCoordinator.pauseAndFlush(docId, internalPersistDocument);
     return await saveCoordinator.runExclusive(docId, async () => {
       try {
@@ -795,6 +804,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     if (!version) throw new Error('Version not found');
 
     const docId = version.docId;
+    useEditorStore.getState().flushPendingDocumentUpdate(docId);
 
     // 1. Safely pause and flush any pending autosaves for this docId
     await saveCoordinator.pauseAndFlush(docId, internalPersistDocument);
@@ -900,6 +910,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     let handle: DeleteHandle | null = null;
 
     try {
+      useEditorStore.getState().flushPendingDocumentUpdate(id);
       handle = await saveCoordinator.prepareDelete([id]);
 
       await db.transaction(

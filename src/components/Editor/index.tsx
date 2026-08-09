@@ -41,6 +41,7 @@ type GhostTextDiscardReason = NonNullable<AITrace['discardReason']>;
 const GHOST_TEXT_PRELOAD_DELAY_MS = 2000;
 const GHOST_TEXT_IDLE_TIMEOUT_MS = 3000;
 const HEADING_SYNC_DELAY_MS = 150;
+const EDITOR_UPDATE_DELAY_MS = 200;
 
 function logGhostTextUIOutcome(
   requestId: string,
@@ -148,6 +149,7 @@ export default function Editor() {
   const setHeadings = useEditorStore((state) => state.setHeadings);
   const setEditorInstance = useEditorStore((state) => state.setEditorInstance);
   const setActiveEditorDocumentId = useEditorStore((state) => state.setActiveEditorDocumentId);
+  const setEditorUpdateController = useEditorStore((state) => state.setEditorUpdateController);
 
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -156,6 +158,15 @@ export default function Editor() {
   const headingSyncTimerRef = useRef<number | null>(null);
   const headingRafRef = useRef<number | null>(null);
   const lastHeadingSignatureRef = useRef('');
+  const editorUpdateTimerRef = useRef<number | null>(null);
+  const pendingDocumentUpdateRef = useRef<{
+    documentId: string;
+    editor: TiptapEditor;
+  } | null>(null);
+  const lastAppliedDocumentContentRef = useRef<{
+    documentId: string | undefined;
+    content: string | undefined;
+  }>({ documentId: currentDocId, content: doc?.content });
   const currentDocIdRef = useRef<string | undefined>(currentDocId);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -174,6 +185,9 @@ export default function Editor() {
   const assistantRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (currentDocIdRef.current && currentDocIdRef.current !== currentDocId) {
+      useEditorStore.getState().flushPendingDocumentUpdate(currentDocIdRef.current);
+    }
     currentDocIdRef.current = currentDocId;
     setActiveEditorDocumentId(currentDocId ?? null);
 
@@ -334,6 +348,90 @@ export default function Editor() {
     [currentDocId],
   );
 
+  const persistEditorContent = useCallback(
+    (documentId: string, editor: TiptapEditor) => {
+      if (editor.isDestroyed) return;
+
+      const jsonStr = JSON.stringify(editor.getJSON());
+      let firstH1Text = '';
+      editor.state.doc.forEach((node) => {
+        if (node.type.name === 'heading' && node.attrs.level === 1 && !firstH1Text) {
+          firstH1Text = node.textContent;
+        }
+      });
+
+      const latestDocument = useKnowledgeBaseStore
+        .getState()
+        .documents.find((item) => item.id === documentId);
+      const updates: { content: string; title?: string } = { content: jsonStr };
+      if (firstH1Text && firstH1Text !== latestDocument?.title) {
+        updates.title = firstH1Text;
+      }
+
+      lastAppliedDocumentContentRef.current = {
+        documentId,
+        content: jsonStr,
+      };
+      updateDocument(documentId, updates);
+    },
+    [updateDocument],
+  );
+
+  const flushPendingDocumentUpdate = useCallback(
+    (documentId?: string): string | null => {
+      const pendingUpdate = pendingDocumentUpdateRef.current;
+      if (!pendingUpdate || (documentId && pendingUpdate.documentId !== documentId)) {
+        return null;
+      }
+
+      if (editorUpdateTimerRef.current !== null) {
+        window.clearTimeout(editorUpdateTimerRef.current);
+        editorUpdateTimerRef.current = null;
+      }
+      pendingDocumentUpdateRef.current = null;
+
+      if (pendingUpdate.editor.isDestroyed) return null;
+      persistEditorContent(pendingUpdate.documentId, pendingUpdate.editor);
+      return pendingUpdate.documentId;
+    },
+    [persistEditorContent],
+  );
+
+  const cancelPendingDocumentUpdate = useCallback((documentId?: string) => {
+    const pendingUpdate = pendingDocumentUpdateRef.current;
+    if (!pendingUpdate || (documentId && pendingUpdate.documentId !== documentId)) {
+      return;
+    }
+
+    if (editorUpdateTimerRef.current !== null) {
+      window.clearTimeout(editorUpdateTimerRef.current);
+      editorUpdateTimerRef.current = null;
+    }
+    pendingDocumentUpdateRef.current = null;
+  }, []);
+
+  const scheduleDocumentUpdate = useCallback(
+    (editor: TiptapEditor) => {
+      const documentId = currentDocIdRef.current;
+      if (!documentId || editor.isDestroyed) return;
+
+      const pendingUpdate = pendingDocumentUpdateRef.current;
+      if (pendingUpdate && pendingUpdate.documentId !== documentId) {
+        flushPendingDocumentUpdate();
+      }
+
+      pendingDocumentUpdateRef.current = { documentId, editor };
+      if (editorUpdateTimerRef.current !== null) {
+        window.clearTimeout(editorUpdateTimerRef.current);
+      }
+      editorUpdateTimerRef.current = window.setTimeout(() => {
+        editorUpdateTimerRef.current = null;
+        flushPendingDocumentUpdate(documentId);
+      }, EDITOR_UPDATE_DELAY_MS);
+    },
+    [flushPendingDocumentUpdate],
+  );
+
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -383,21 +481,7 @@ export default function Editor() {
         syncHeadings(editor, true);
       },
       onUpdate: ({ editor }) => {
-        if (currentDocId) {
-          const jsonStr = JSON.stringify(editor.getJSON());
-          let firstH1Text = '';
-          editor.state.doc.forEach((node) => {
-            if (node.type.name === 'heading' && node.attrs.level === 1 && !firstH1Text) {
-              firstH1Text = node.textContent;
-            }
-          });
-
-          const updates: { content: string; title?: string } = { content: jsonStr };
-          if (firstH1Text && firstH1Text !== doc?.title) {
-            updates.title = firstH1Text;
-          }
-          updateDocument(currentDocId, updates);
-        }
+        scheduleDocumentUpdate(editor);
         syncHeadings(editor);
         scheduleGhostText(editor);
       },
@@ -450,6 +534,40 @@ export default function Editor() {
     },
     [],
   );
+
+  useEffect(() => {
+    const controller = {
+      flush: flushPendingDocumentUpdate,
+      cancel: cancelPendingDocumentUpdate,
+    };
+    setEditorUpdateController(controller);
+
+    return () => {
+      flushPendingDocumentUpdate();
+      if (useEditorStore.getState().editorUpdateController === controller) {
+        setEditorUpdateController(null);
+      }
+    };
+  }, [cancelPendingDocumentUpdate, flushPendingDocumentUpdate, setEditorUpdateController]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+
+      const flushedDocumentId = flushPendingDocumentUpdate();
+      if (flushedDocumentId) {
+        useKnowledgeBaseStore
+          .getState()
+          .flushDocumentAutosave(flushedDocumentId)
+          .catch((err) => console.error('Failed to flush hidden document:', err));
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [flushPendingDocumentUpdate]);
 
   // 首屏稳定后空闲预热端侧模型；用户开始编辑时可立即抢占加载。
   useEffect(() => {
@@ -673,6 +791,9 @@ export default function Editor() {
       if (headingRafRef.current !== null) {
         cancelAnimationFrame(headingRafRef.current);
       }
+      if (editorUpdateTimerRef.current !== null) {
+        clearTimeout(editorUpdateTimerRef.current);
+      }
       AIDispatcher.clearGhostTextRequest();
       if (currentDocIdRef.current) {
         runAssetGC(currentDocIdRef.current).catch((err) =>
@@ -745,21 +866,46 @@ export default function Editor() {
   useEffect(() => {
     if (!editor || !docContent || editor.isDestroyed) return;
 
-    const isJson = docContent.trim().startsWith('{');
-    const currentContent = isJson ? JSON.stringify(editor.getJSON()) : editor.getHTML();
-    if (docContent !== currentContent) {
-      queueMicrotask(() => {
-        if (!editor.isDestroyed) {
-          editor.commands.clearGhostText();
-          AIDispatcher.clearGhostTextRequest();
-          editor.commands.setContent(isJson ? JSON.parse(docContent) : docContent, {
-            emitUpdate: false,
-          });
-          syncHeadings(editor, true);
-        }
-      });
+    const currentDocumentId = currentDocIdRef.current;
+    const lastAppliedContent = lastAppliedDocumentContentRef.current;
+    if (
+      lastAppliedContent.documentId === currentDocumentId &&
+      lastAppliedContent.content === docContent
+    ) {
+      return;
     }
-  }, [docContent, editor, syncHeadings]);
+
+    flushPendingDocumentUpdate();
+    queueMicrotask(() => {
+      if (editor.isDestroyed) return;
+
+      const latestDocumentId = currentDocIdRef.current;
+      const latestContent = useKnowledgeBaseStore
+        .getState()
+        .documents.find((item) => item.id === latestDocumentId)?.content;
+      if (!latestDocumentId || !latestContent) return;
+
+      const latestAppliedContent = lastAppliedDocumentContentRef.current;
+      if (
+        latestAppliedContent.documentId === latestDocumentId &&
+        latestAppliedContent.content === latestContent
+      ) {
+        return;
+      }
+
+      const isJson = latestContent.trim().startsWith('{');
+      editor.commands.clearGhostText();
+      AIDispatcher.clearGhostTextRequest();
+      editor.commands.setContent(isJson ? JSON.parse(latestContent) : latestContent, {
+        emitUpdate: false,
+      });
+      lastAppliedDocumentContentRef.current = {
+        documentId: latestDocumentId,
+        content: latestContent,
+      };
+      syncHeadings(editor, true);
+    });
+  }, [docContent, editor, flushPendingDocumentUpdate, syncHeadings]);
 
   // 拦截链接点击（包含 CTRL+点击 / CMD+点击），确保始终在外部新标签页中打开规范化外链
   useEffect(() => {

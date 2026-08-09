@@ -88,6 +88,7 @@ export default function DocEdit() {
   const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
   const editorInstance = useEditorStore((state) => state.editorInstance);
+  const flushPendingDocumentUpdate = useEditorStore((state) => state.flushPendingDocumentUpdate);
   const isFavorited = useFavoritesStore((state) => state.isFavorited);
   const addFavorite = useFavoritesStore((state) => state.addFavorite);
   const [isFavOpen, setIsFavOpen] = useState(false);
@@ -164,6 +165,11 @@ export default function DocEdit() {
     minute: '2-digit',
   });
 
+  const openHistory = () => {
+    flushPendingDocumentUpdate(docId);
+    navigate(`/kb/${kbId}/doc/${docId}/history`);
+  };
+
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* 2. 中间目录面板 */}
@@ -187,13 +193,11 @@ export default function DocEdit() {
                 value={doc.title}
                 onChange={(e) => {
                   const newTitle = e.target.value;
-                  const updatedContent = replaceFirstH1(doc.content, newTitle);
-                  console.log(
-                    '[DocEdit input onChange] newTitle:',
-                    newTitle,
-                    'updatedContent:',
-                    updatedContent,
-                  );
+                  flushPendingDocumentUpdate(doc.id);
+                  const latestContent =
+                    useKnowledgeBaseStore.getState().documents.find((item) => item.id === doc.id)
+                      ?.content ?? doc.content;
+                  const updatedContent = replaceFirstH1(latestContent, newTitle);
                   updateDocument(doc.id, {
                     title: newTitle,
                     content: updatedContent,
@@ -204,7 +208,7 @@ export default function DocEdit() {
               />
               <div className="flex items-center gap-3 text-xs shrink-0">
                 <button
-                  onClick={() => navigate(`/kb/${kbId}/doc/${docId}/history`)}
+                  onClick={openHistory}
                   className="text-text-secondary hover:text-accent hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                   title="查看历史版本"
                 >
@@ -249,7 +253,7 @@ export default function DocEdit() {
             </span>
             <button
               title="历史记录"
-              onClick={() => navigate(`/kb/${kbId}/doc/${docId}/history`)}
+              onClick={openHistory}
               className="cursor-pointer hover:text-text-primary transition-colors flex bg-transparent border-none p-0 outline-none"
             >
               <History size={16} />
