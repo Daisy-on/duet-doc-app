@@ -9,6 +9,7 @@ import { useAIWritingStore } from './store/aiWritingStore';
 const KnowledgeBaseHome = lazy(() => import('./pages/KnowledgeBaseHome'));
 const DocEdit = lazy(() => import('./pages/DocEdit'));
 const AIWriting = lazy(() => import('./pages/AIWriting'));
+const EmbeddingBenchmark = lazy(() => import('./pages/EmbeddingBenchmark'));
 const MemoHome = lazy(() => import('./pages/MemoHome'));
 const MemoEdit = lazy(() => import('./pages/MemoEdit'));
 const Favorites = lazy(() => import('./pages/Favorites'));
@@ -85,6 +86,7 @@ function App() {
           <Route path="favorites" element={lazyRoute(<Favorites />)} />
         </Route>
         <Route path="kb/:kbId/doc/:docId/history" element={lazyRoute(<DocHistory />)} />
+        <Route path="dev/embedding-benchmark" element={lazyRoute(<EmbeddingBenchmark />)} />
       </Routes>
     </BrowserRouter>
   );
