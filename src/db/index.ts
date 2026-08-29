@@ -2,6 +2,7 @@ import Dexie, { type Table, type Transaction } from 'dexie';
 import type { KnowledgeBase, Group, Document } from '../store/knowledgeBaseStore';
 import type { FavoriteFolder, FavoriteItem } from '../store/favoritesStore';
 import type { ChatSession, ChatMessage } from '../store/aiWritingStore';
+import type { DocumentChunk, DocumentIndexState } from '../rag/types';
 
 export interface DocumentVersion {
   id: string;
@@ -36,6 +37,8 @@ export class DuetDocDB extends Dexie {
   chatMessages!: Table<ChatMessage, string>;
   documentVersions!: Table<DocumentVersion, string>;
   assets!: Table<DocumentAsset, string>;
+  documentChunks!: Table<DocumentChunk, string>;
+  documentIndexStates!: Table<DocumentIndexState, string>;
 
   constructor() {
     super('DuetDocDB');
@@ -79,6 +82,20 @@ export class DuetDocDB extends Dexie {
       documentVersions: 'id, docId, createdAt, [docId+createdAt]',
       assets: 'id, docId, createdAt',
     });
+    this.version(5).stores({
+      knowledgeBases: 'id, createdAt',
+      groups: 'id, kbId, parentGroupId, createdAt',
+      documents: 'id, kbId, groupId, createdAt',
+      favoriteFolders: 'id, createdAt',
+      favoriteItems: 'id, docId, favoritedAt',
+      chatSessions: 'id, createdAt',
+      chatMessages: 'id, sessionId, createdAt',
+      documentVersions: 'id, docId, createdAt, [docId+createdAt]',
+      assets: 'id, docId, createdAt',
+      documentChunks:
+        'id, sourceId, kbId, sourceType, contentHash, indexedAt, [sourceId+chunkIndex]',
+      documentIndexStates: 'sourceId, kbId, status, sourceUpdatedAt',
+    });
   }
 }
 
@@ -93,6 +110,8 @@ export async function deleteDocumentsCascadeInTx(tx: Transaction, docIds: string
   await tx.table('documentVersions').where('docId').anyOf(docIds).delete();
   await tx.table('assets').where('docId').anyOf(docIds).delete();
   await tx.table('favoriteItems').where('docId').anyOf(docIds).delete();
+  await tx.table('documentChunks').where('sourceId').anyOf(docIds).delete();
+  await tx.table('documentIndexStates').bulkDelete(docIds);
 }
 
 /**
@@ -102,7 +121,14 @@ export async function deleteDocumentsCascade(docIds: string[]) {
   if (!docIds || docIds.length === 0) return;
   await db.transaction(
     'rw',
-    [db.documents, db.documentVersions, db.assets, db.favoriteItems],
+    [
+      db.documents,
+      db.documentVersions,
+      db.assets,
+      db.favoriteItems,
+      db.documentChunks,
+      db.documentIndexStates,
+    ],
     async (tx) => {
       await deleteDocumentsCascadeInTx(tx, docIds);
     },

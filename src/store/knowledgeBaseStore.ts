@@ -7,6 +7,8 @@ import { saveCoordinator, type SaveUpdates, type DeleteHandle } from '../utils/S
 import { extractAssetIds } from '../utils/assetUtils';
 import { runAssetGC } from '../assets/runAssetGC';
 import { useEditorStore } from './index';
+import { scheduleDocumentIndex } from '../rag/documentIndexer';
+import { updateDocumentChunkScope } from '../rag/chunkRepository';
 
 export const MEMO_KB_ID = 'kb-memo-system';
 
@@ -369,6 +371,7 @@ let games = reactive([
 
 const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
   const now = Date.now();
+  let persistedDocument: Document | null = null;
   await db.transaction('rw', [db.documents, db.documentVersions, db.assets], async (tx) => {
     const docTable = tx.table<Document, string>('documents');
     const verTable = tx.table<DocumentVersion, string>('documentVersions');
@@ -385,6 +388,12 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
       content: newContent,
       updatedAt: now,
     });
+    persistedDocument = {
+      ...existingDoc,
+      title: newTitle,
+      content: newContent,
+      updatedAt: now,
+    };
 
     if (updates.content !== undefined) {
       const oldAssets = extractAssetIds(oldContent);
@@ -440,6 +449,9 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
 
   if (updates.content !== undefined) {
     runAssetGC(id).catch((err) => console.error('Asset GC error:', err));
+  }
+  if (persistedDocument && (updates.content !== undefined || updates.title !== undefined)) {
+    scheduleDocumentIndex(persistedDocument);
   }
 };
 
@@ -524,6 +536,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
           db.documentVersions,
           db.assets,
           db.favoriteItems,
+          db.documentChunks,
+          db.documentIndexStates,
         ],
         async (tx) => {
           const dbDocs = await tx.table('documents').where('kbId').equals(id).toArray();
@@ -650,7 +664,15 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       // 2. 开启原子写事务
       await db.transaction(
         'rw',
-        [db.groups, db.documents, db.documentVersions, db.assets, db.favoriteItems],
+        [
+          db.groups,
+          db.documents,
+          db.documentVersions,
+          db.assets,
+          db.favoriteItems,
+          db.documentChunks,
+          db.documentIndexStates,
+        ],
         async (tx) => {
           const allGroups = await tx.table('groups').toArray();
           deleteGroupIdsSet = new Set<string>([id]);
@@ -725,7 +747,10 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    db.documents.add(newDoc).catch((err) => console.error('Dexie error:', err));
+    db.documents
+      .add(newDoc)
+      .then(() => scheduleDocumentIndex(newDoc))
+      .catch((err) => console.error('Dexie error:', err));
     set((state) => ({
       documents: [...state.documents, newDoc],
     }));
@@ -898,6 +923,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
         // Run Asset GC after restoring
         runAssetGC(docId).catch((err) => console.error('Asset GC error after restore:', err));
+        const restoredDocument = await db.documents.get(docId);
+        if (restoredDocument) scheduleDocumentIndex(restoredDocument);
 
         return { restored: true };
       } finally {
@@ -915,7 +942,14 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
       await db.transaction(
         'rw',
-        [db.documents, db.documentVersions, db.assets, db.favoriteItems],
+        [
+          db.documents,
+          db.documentVersions,
+          db.assets,
+          db.favoriteItems,
+          db.documentChunks,
+          db.documentIndexStates,
+        ],
         async (tx) => {
           await deleteDocumentsCascadeInTx(tx, [id]);
         },
@@ -1023,6 +1057,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     const updatedAt = Date.now();
     db.documents
       .update(id, { kbId: targetKbId, groupId: targetGroupId, updatedAt })
+      .then(() =>
+        updateDocumentChunkScope(id, targetKbId, targetKbId === MEMO_KB_ID ? 'memo' : 'document'),
+      )
       .catch((err) => console.error('Dexie error:', err));
     set((state) => ({
       documents: state.documents.map((doc) =>
@@ -1066,6 +1103,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
     // 3. Move group, descendants and all their documents
     const allGroupIds = [groupId, ...descendantIds];
+    const movedDocumentIds = get()
+      .documents.filter((doc) => doc.groupId && allGroupIds.includes(doc.groupId))
+      .map((doc) => doc.id);
 
     // Save updates in Dexie
     db.groups
@@ -1076,6 +1116,17 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         updatedAt: Date.now(),
       })
       .catch((err) => console.error(err));
+    void Promise.all(
+      movedDocumentIds.map((docId) =>
+        updateDocumentChunkScope(
+          docId,
+          targetKbId,
+          targetKbId === MEMO_KB_ID ? 'memo' : 'document',
+        ),
+      ),
+    ).catch((err) =>
+      console.error('[LocalRAG] Failed to update moved document index metadata:', err),
+    );
     descendantIds.forEach((descId) => {
       const descG = get().groups.find((g) => g.id === descId);
       if (descG) {
