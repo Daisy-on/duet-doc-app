@@ -203,6 +203,11 @@ function parseAndEmitEvent(
         callbacks.onUsage?.(data);
         break;
 
+      case 'tool_call':
+        if (data.routeReason) trace.routeReason = data.routeReason;
+        callbacks.onToolCall?.(data);
+        break;
+
       case 'finish':
         if (data.finishReason) trace.finishReason = data.finishReason;
         if (data.ttftMs) trace.ttftMs = data.ttftMs;
