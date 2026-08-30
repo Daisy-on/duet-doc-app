@@ -1,10 +1,20 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { AIDispatcher } from '../ai/dispatcher';
-import type { AIMessage, AIContext, AIRequest, AIResponseMetadata } from '../ai/types';
+import type {
+  AIMessage,
+  AIContext,
+  AIRequest,
+  AIResponseMetadata,
+  AIToolCall,
+  AIFinishEvent,
+  StreamCallbacks,
+} from '../ai/types';
 import { useAIWritingStore, type ChatMessage, type ReferencedDoc } from '../store/aiWritingStore';
 import { db } from '../db';
 import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
+import { searchLocalKnowledge } from '../rag/localRetriever';
+import type { RetrievedChunk } from '../rag/types';
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARS = 30000;
@@ -25,6 +35,31 @@ interface StreamRun {
   stopRequested: boolean;
   finalized: boolean;
   finalizationPromise: Promise<void> | null;
+}
+
+function toResponseMetadata(event?: AIFinishEvent): Partial<AIResponseMetadata> {
+  if (!event) return {};
+
+  return {
+    finishReason: event.finishReason,
+    ttftMs: event.ttftMs,
+    totalLatencyMs: event.totalLatencyMs,
+    routeReason: event.routeReason,
+  };
+}
+
+function toRetrievedContext(chunk: RetrievedChunk): AIContext {
+  return {
+    sourceId: chunk.sourceId,
+    title: chunk.title,
+    content: chunk.content,
+    sourceType: chunk.sourceType,
+    origin: 'local_retrieval',
+    chunkId: chunk.id,
+    chunkIndex: chunk.chunkIndex,
+    headingPath: chunk.headingPath,
+    score: chunk.score,
+  };
 }
 
 export function useAIChat(sessionId: string | null) {
@@ -302,6 +337,7 @@ export function useAIChat(sessionId: string | null) {
                   title: fullDoc.title,
                   content: extractPlainTextFromTiptap(fullDoc.content),
                   sourceType: 'document',
+                  origin: 'manual',
                 });
               }
             } catch {
@@ -320,6 +356,8 @@ export function useAIChat(sessionId: string | null) {
           task: 'chat',
           messages: payloadMessages,
           contexts: contexts.length > 0 ? contexts : undefined,
+          capabilities: ['knowledge_search'],
+          toolChoice: 'auto',
           options: {
             thinking: isThinkingEnabled,
             maxTokens: 4096,
@@ -342,56 +380,110 @@ export function useAIChat(sessionId: string | null) {
           });
         };
 
+        let requestedToolCall: AIToolCall | undefined;
+        let streamFailed = false;
+        let finishMetadata: Partial<AIResponseMetadata> = {};
+        const createStreamCallbacks = (
+          onToolCall?: (toolCall: AIToolCall) => void,
+        ): StreamCallbacks => ({
+          onStart: (event) => {
+            if (run.finalized || !event) return;
+            if (event.requestId) run.currentResponseMetadata.requestId = event.requestId;
+            if (event.provider) run.currentResponseMetadata.provider = event.provider;
+            if (event.model) run.currentResponseMetadata.model = event.model;
+            if (event.routeReason) run.currentResponseMetadata.routeReason = event.routeReason;
+          },
+          onReasoningDelta: (delta) => {
+            if (run.finalized) return;
+            if (!run.thinkingStartTime) run.thinkingStartTime = Date.now();
+            run.reasoningBuffer += delta;
+            scheduleRAFUpdate();
+          },
+          onTextDelta: (delta) => {
+            if (run.finalized) return;
+            if (run.thinkingStartTime && !run.thinkingDurationMs) {
+              run.thinkingDurationMs = Date.now() - run.thinkingStartTime;
+            }
+            run.textBuffer += delta;
+            scheduleRAFUpdate();
+          },
+          onUsage: (event) => {
+            if (run.finalized) return;
+            if (event.usage) run.currentResponseMetadata.usage = event.usage;
+            if (event.routeReason) run.currentResponseMetadata.routeReason = event.routeReason;
+          },
+          onToolCall: (event) => {
+            if (event.toolCall) onToolCall?.(event.toolCall);
+          },
+          onFinish: (event) => {
+            finishMetadata = toResponseMetadata(event);
+          },
+          onError: () => {
+            streamFailed = true;
+          },
+        });
+
         await AIDispatcher.streamCloudTask(
           request,
-          {
-            onStart: (event) => {
-              if (run.finalized) return;
-              if (event) {
-                if (event.requestId) run.currentResponseMetadata.requestId = event.requestId;
-                if (event.provider) run.currentResponseMetadata.provider = event.provider;
-                if (event.model) run.currentResponseMetadata.model = event.model;
-                if (event.routeReason) run.currentResponseMetadata.routeReason = event.routeReason;
-              }
-            },
-            onReasoningDelta: (delta) => {
-              if (run.finalized) return;
-              if (!run.thinkingStartTime) {
-                run.thinkingStartTime = Date.now();
-              }
-              run.reasoningBuffer += delta;
-              scheduleRAFUpdate();
-            },
-            onTextDelta: (delta) => {
-              if (run.finalized) return;
-              if (run.thinkingStartTime && !run.thinkingDurationMs) {
-                run.thinkingDurationMs = Date.now() - run.thinkingStartTime;
-              }
-              run.textBuffer += delta;
-              scheduleRAFUpdate();
-            },
-            onUsage: (event) => {
-              if (run.finalized) return;
-              if (event.usage) run.currentResponseMetadata.usage = event.usage;
-              if (event.routeReason) run.currentResponseMetadata.routeReason = event.routeReason;
-            },
-            onFinish: (event) => {
-              const meta: Partial<AIResponseMetadata> = {};
-              if (event) {
-                if (event.finishReason) meta.finishReason = event.finishReason;
-                if (event.ttftMs) meta.ttftMs = event.ttftMs;
-                if (event.totalLatencyMs) meta.totalLatencyMs = event.totalLatencyMs;
-                if (event.routeReason) meta.routeReason = event.routeReason;
-              }
-              const targetStatus = run.stopRequested ? 'stopped' : 'complete';
-              run.finalizationPromise = finalizeStream(run, targetStatus, meta);
-            },
-            onError: () => {
-              run.finalizationPromise = finalizeStream(run, 'error');
-            },
-          },
+          createStreamCallbacks((toolCall) => {
+            requestedToolCall = toolCall;
+          }),
           run.controller.signal,
         );
+
+        if (streamFailed) {
+          await finalizeStream(run, 'error');
+          return;
+        }
+        if (run.stopRequested || run.controller.signal.aborted) {
+          await finalizeStream(run, 'stopped');
+          return;
+        }
+
+        if (requestedToolCall) {
+          // The gateway requests a capability; the browser executes the local search.
+          run.textBuffer = '';
+          const { query, sourceTypes, sortBy, timeRangeDays, topK } = requestedToolCall.arguments;
+          const localSourceTypes = sourceTypes?.filter(
+            (sourceType): sourceType is 'document' | 'memo' => sourceType !== 'selection',
+          );
+          const minimumUpdatedAt = timeRangeDays
+            ? Date.now() - timeRangeDays * 24 * 60 * 60 * 1000
+            : undefined;
+          const retrievedChunks = await searchLocalKnowledge(query?.trim() || userContent.trim(), {
+            sourceTypes: localSourceTypes,
+            sortBy,
+            limit: topK,
+          });
+          const retrievedContexts = retrievedChunks
+            .filter((chunk) => !minimumUpdatedAt || chunk.sourceUpdatedAt >= minimumUpdatedAt)
+            .map(toRetrievedContext);
+
+          if (run.stopRequested || run.controller.signal.aborted) {
+            await finalizeStream(run, 'stopped');
+            return;
+          }
+
+          streamFailed = false;
+          finishMetadata = {};
+          await AIDispatcher.streamCloudTask(
+            {
+              ...request,
+              contexts: [...contexts, ...retrievedContexts],
+              toolChoice: 'none',
+              toolContinuation: { toolCall: requestedToolCall },
+            },
+            createStreamCallbacks(),
+            run.controller.signal,
+          );
+
+          if (streamFailed) {
+            await finalizeStream(run, 'error');
+            return;
+          }
+        }
+
+        await finalizeStream(run, run.stopRequested ? 'stopped' : 'complete', finishMetadata);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
           run.finalizationPromise = finalizeStream(run, 'stopped');
