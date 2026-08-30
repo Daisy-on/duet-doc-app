@@ -29,7 +29,7 @@ import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
 import KBTreePickerModal from '../components/modals/KBTreePickerModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
-import type { ChatMessage, ReferencedDoc } from '../store/aiWritingStore';
+import type { ChatMessage, KnowledgeSource, ReferencedDoc } from '../store/aiWritingStore';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
 import { useAIChat } from '../hooks/useAIChat';
@@ -50,6 +50,10 @@ function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
     return `思考了 ${approxSec}s`;
   }
   return '思考完成';
+}
+
+function uniqueKnowledgeSources(sources: KnowledgeSource[]): KnowledgeSource[] {
+  return Array.from(new Map(sources.map((source) => [source.sourceId, source])).values());
 }
 
 export default function AIWriting() {
@@ -350,9 +354,7 @@ export default function AIWriting() {
               <Sparkles size={14} className="text-indigo-500" />
             </button>
             <div className="flex items-center gap-3 ml-1 min-w-0">
-              <h2 className="text-[15px] font-bold text-text-primary truncate">
-                和 Duet AI 一起写作
-              </h2>
+              <h2 className="text-[15px] font-bold text-text-primary truncate">Duet 助手</h2>
               <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
                 {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
               </span>
@@ -405,8 +407,7 @@ export default function AIWriting() {
                 </div>
                 <h1 className="text-xl font-bold text-text-primary mb-2">Hi，今天想写点什么？</h1>
                 <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
-                  引用知识库文档，或是直接提问。Duet AI
-                  具备端云协同的大模型推理能力，协助你快速撰写、精炼与重构文本。
+                  引用知识库文档，或直接提问。
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
@@ -444,7 +445,7 @@ export default function AIWriting() {
                     >
                       {!isUser && (
                         <div className="text-[14px] text-text-secondary font-bold mb-1 px-1">
-                          Duet AI
+                          Duet 助手
                         </div>
                       )}
 
@@ -517,6 +518,38 @@ export default function AIWriting() {
                             </div>
                           )}
                         </div>
+
+                        {!isUser && msg.knowledgeSources && msg.knowledgeSources.length > 0 && (
+                          <div className="mt-3 pt-2.5 border-t border-border-color/70">
+                            <div className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                              <Sparkles size={11} className="text-indigo-500" />
+                              <span className="font-medium">已检索知识库</span>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-text-secondary">
+                              {uniqueKnowledgeSources(msg.knowledgeSources)
+                                .slice(0, 3)
+                                .map((source) => (
+                                  <span
+                                    key={source.sourceId}
+                                    className="inline-flex items-center gap-1 min-w-0"
+                                    title={source.headingPath.join(' > ') || source.title}
+                                  >
+                                    {source.sourceType === 'memo' ? (
+                                      <StickyNote size={11} className="shrink-0 text-emerald-500" />
+                                    ) : (
+                                      <FileText size={11} className="shrink-0 text-indigo-500" />
+                                    )}
+                                    <span className="max-w-[190px] truncate">{source.title}</span>
+                                  </span>
+                                ))}
+                              {uniqueKnowledgeSources(msg.knowledgeSources).length > 3 && (
+                                <span>
+                                  +{uniqueKnowledgeSources(msg.knowledgeSources).length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* 提示中断或失败状态 */}
                         {!isUser && msg.status === 'stopped' && (
@@ -607,7 +640,7 @@ export default function AIWriting() {
                   sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
                     <div className="flex flex-col items-start animate-pulse">
                       <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
-                        Duet AI
+                        Duet 助手
                       </div>
                       <div className="bg-white border border-border-color rounded-2xl rounded-tl-none px-4 py-3 text-xs text-text-secondary flex items-center gap-2 shadow-sm">
                         <Loader2 size={14} className="animate-spin text-accent" />
@@ -666,7 +699,9 @@ export default function AIWriting() {
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={
-                    currentSessionId ? '与 Duet AI 对话，输入并发送...' : '与 Duet AI 开启新对话...'
+                    currentSessionId
+                      ? '与 Duet 助手对话，输入并发送...'
+                      : '与 Duet 助手开启新对话...'
                   }
                   className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
                   style={{ minHeight: '52px' }}

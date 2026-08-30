@@ -113,7 +113,7 @@ export default function Sidebar() {
           >
             {({ isActive }) => (
               <>
-                <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> AI 写作
+                <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> Duet 助手
               </>
             )}
           </NavLink>

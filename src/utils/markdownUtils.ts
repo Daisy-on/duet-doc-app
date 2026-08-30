@@ -87,5 +87,5 @@ export function getSmartTitle(content: string, fallbackTitle?: string): string {
   }
 
   // 4. Ultimate fallback
-  return cleanFallback || 'AI 写作文档';
+  return cleanFallback || 'Duet 助手文档';
 }

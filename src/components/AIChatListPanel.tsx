@@ -138,7 +138,7 @@ export default function AIChatListPanel() {
             <div className="p-5 pb-3 flex justify-between items-center shrink-0">
               <div className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5">
                 <Sparkles size={16} className="text-accent" />
-                <span>AI 写作对话</span>
+                <span>Duet 助手</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <button

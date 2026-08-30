@@ -10,7 +10,12 @@ import type {
   AIFinishEvent,
   StreamCallbacks,
 } from '../ai/types';
-import { useAIWritingStore, type ChatMessage, type ReferencedDoc } from '../store/aiWritingStore';
+import {
+  useAIWritingStore,
+  type ChatMessage,
+  type KnowledgeSource,
+  type ReferencedDoc,
+} from '../store/aiWritingStore';
 import { db } from '../db';
 import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
 import { searchLocalKnowledge } from '../rag/localRetriever';
@@ -27,6 +32,7 @@ interface StreamRun {
 
   textBuffer: string;
   reasoningBuffer: string;
+  knowledgeSources: KnowledgeSource[];
   rafId: number | null;
   thinkingStartTime: number;
   thinkingDurationMs: number;
@@ -59,6 +65,16 @@ function toRetrievedContext(chunk: RetrievedChunk): AIContext {
     chunkIndex: chunk.chunkIndex,
     headingPath: chunk.headingPath,
     score: chunk.score,
+  };
+}
+
+function toKnowledgeSource(chunk: RetrievedChunk): KnowledgeSource {
+  return {
+    sourceId: chunk.sourceId,
+    sourceType: chunk.sourceType,
+    title: chunk.title,
+    chunkIndex: chunk.chunkIndex,
+    headingPath: chunk.headingPath,
   };
 }
 
@@ -123,6 +139,7 @@ export function useAIChat(sessionId: string | null) {
                     ...m,
                     thinkingContent: run.reasoningBuffer,
                     thinkingDurationMs: run.thinkingDurationMs || undefined,
+                    knowledgeSources: run.knowledgeSources,
                     content: run.textBuffer,
                     status: finalStatus,
                     aiMetadata:
@@ -145,6 +162,7 @@ export function useAIChat(sessionId: string | null) {
               role: 'assistant',
               thinkingContent: run.reasoningBuffer,
               thinkingDurationMs: run.thinkingDurationMs || undefined,
+              knowledgeSources: run.knowledgeSources,
               content: run.textBuffer,
               status: finalStatus,
               aiMetadata:
@@ -235,6 +253,7 @@ export function useAIChat(sessionId: string | null) {
         targetSessionId,
         textBuffer: '',
         reasoningBuffer: '',
+        knowledgeSources: [],
         rafId: null,
         thinkingStartTime: 0,
         thinkingDurationMs: 0,
@@ -458,6 +477,9 @@ export function useAIChat(sessionId: string | null) {
           const retrievedContexts = retrievedChunks
             .filter((chunk) => !minimumUpdatedAt || chunk.sourceUpdatedAt >= minimumUpdatedAt)
             .map(toRetrievedContext);
+          run.knowledgeSources = retrievedChunks
+            .filter((chunk) => !minimumUpdatedAt || chunk.sourceUpdatedAt >= minimumUpdatedAt)
+            .map(toKnowledgeSource);
 
           if (run.stopRequested || run.controller.signal.aborted) {
             await finalizeStream(run, 'stopped');

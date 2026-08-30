@@ -8,6 +8,14 @@ export interface ReferencedDoc {
   title: string;
 }
 
+export interface KnowledgeSource {
+  sourceId: string;
+  sourceType: 'document' | 'memo';
+  title: string;
+  chunkIndex: number;
+  headingPath: string[];
+}
+
 export interface ChatMessage {
   id: string;
   sessionId: string;
@@ -19,6 +27,7 @@ export interface ChatMessage {
   thinkingDurationMs?: number;
   webSearchUrls?: { title: string; url: string }[];
   referencedDocs?: ReferencedDoc[];
+  knowledgeSources?: KnowledgeSource[];
   aiMetadata?: AIResponseMetadata;
 }
 
