@@ -369,8 +369,8 @@ export default function LocalRetrievalSandbox() {
                 <h2 className="text-sm font-semibold">批量评测</h2>
               </div>
               <p className="mt-1 text-xs text-text-secondary">
-                载入固定问题集后顺序执行本地检索，计算
-                Hit@K、MRR、来源召回率、关键词覆盖率和热查询耗时。
+                载入固定问题集后顺序执行本地检索，计算 Hit@K、MRR、来源召回率、Keyword Recall@K
+                和热查询耗时。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -546,11 +546,27 @@ export default function LocalRetrievalSandbox() {
                   value={formatPercent(evaluationRun.summary.sourceRecallAt5)}
                 />
                 <Metric
-                  label="关键词覆盖率"
+                  label="Keyword Recall@1"
                   value={
-                    evaluationRun.summary.averageKeywordRecall === null
+                    evaluationRun.summary.averageKeywordRecallAt1 === null
                       ? '未标注'
-                      : formatPercent(evaluationRun.summary.averageKeywordRecall)
+                      : formatPercent(evaluationRun.summary.averageKeywordRecallAt1)
+                  }
+                />
+                <Metric
+                  label="Keyword Recall@3"
+                  value={
+                    evaluationRun.summary.averageKeywordRecallAt3 === null
+                      ? '未标注'
+                      : formatPercent(evaluationRun.summary.averageKeywordRecallAt3)
+                  }
+                />
+                <Metric
+                  label="Keyword Recall@5"
+                  value={
+                    evaluationRun.summary.averageKeywordRecallAt5 === null
+                      ? '未标注'
+                      : formatPercent(evaluationRun.summary.averageKeywordRecallAt5)
                   }
                 />
                 <Metric
@@ -623,11 +639,21 @@ export default function LocalRetrievalSandbox() {
                           <p>R@5 {formatPercent(result.sourceRecallAt5)}</p>
                         </td>
                         <td className="px-3 py-3 leading-5">
-                          {result.keywordRecall === undefined ? (
+                          {result.keywordRecallAt5 === undefined ? (
                             '-'
                           ) : (
                             <>
-                              <p className="font-mono">{formatPercent(result.keywordRecall)}</p>
+                              <div className="font-mono">
+                                <p>K@1 {formatPercent(result.keywordRecallAt1 ?? 0)}</p>
+                                <p>K@3 {formatPercent(result.keywordRecallAt3 ?? 0)}</p>
+                                <p>K@5 {formatPercent(result.keywordRecallAt5)}</p>
+                                <p>
+                                  完整覆盖{' '}
+                                  {result.firstFullKeywordRank === null
+                                    ? '未达到'
+                                    : `#${result.firstFullKeywordRank}`}
+                                </p>
+                              </div>
                               <p className="mt-1 text-success-color">
                                 已命中：{result.matchedKeywords?.join('、') || '无'}
                               </p>

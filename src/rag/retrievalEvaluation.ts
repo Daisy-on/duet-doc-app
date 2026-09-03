@@ -42,7 +42,10 @@ export interface RetrievalEvaluationCaseResult {
   sourceRecallAt1: number;
   sourceRecallAt3: number;
   sourceRecallAt5: number;
-  keywordRecall?: number;
+  keywordRecallAt1?: number;
+  keywordRecallAt3?: number;
+  keywordRecallAt5?: number;
+  firstFullKeywordRank?: number | null;
   matchedKeywords?: string[];
   missingKeywords?: string[];
   topResults: RetrievalEvaluationSource[];
@@ -58,7 +61,9 @@ export interface RetrievalEvaluationSummary {
   sourceRecallAt3: number;
   sourceRecallAt5: number;
   keywordCaseCount: number;
-  averageKeywordRecall: number | null;
+  averageKeywordRecallAt1: number | null;
+  averageKeywordRecallAt3: number | null;
+  averageKeywordRecallAt5: number | null;
   averageDurationMs: number;
   p50DurationMs: number;
   p95DurationMs: number;
@@ -162,14 +167,14 @@ function calculateSourceRecall(
   return matchedSourceCount / expectedSourceIds.size;
 }
 
-function evaluateKeywords(
+function getKeywordCoverage(
   results: RetrievedChunk[],
   expectedSourceIds: Set<string>,
-  expectedKeywords: string[] | undefined,
-): { keywordRecall?: number; matchedKeywords?: string[]; missingKeywords?: string[] } {
-  if (!expectedKeywords) return {};
-
+  expectedKeywords: string[],
+  limit: number,
+) {
   const relevantContent = results
+    .slice(0, limit)
     .filter((result) => expectedSourceIds.has(result.sourceId))
     .flatMap((result) => [result.title, ...result.headingPath, result.content])
     .join('\n');
@@ -179,9 +184,45 @@ function evaluateKeywords(
   const matchedKeywordSet = new Set(matchedKeywords);
 
   return {
-    keywordRecall: matchedKeywords.length / expectedKeywords.length,
+    recall: matchedKeywords.length / expectedKeywords.length,
     matchedKeywords,
     missingKeywords: expectedKeywords.filter((keyword) => !matchedKeywordSet.has(keyword)),
+  };
+}
+
+function evaluateKeywords(
+  results: RetrievedChunk[],
+  expectedSourceIds: Set<string>,
+  expectedKeywords: string[] | undefined,
+): {
+  keywordRecallAt1?: number;
+  keywordRecallAt3?: number;
+  keywordRecallAt5?: number;
+  firstFullKeywordRank?: number | null;
+  matchedKeywords?: string[];
+  missingKeywords?: string[];
+} {
+  if (!expectedKeywords) return {};
+
+  const at1 = getKeywordCoverage(results, expectedSourceIds, expectedKeywords, 1);
+  const at3 = getKeywordCoverage(results, expectedSourceIds, expectedKeywords, 3);
+  const at5 = getKeywordCoverage(results, expectedSourceIds, expectedKeywords, 5);
+  let firstFullKeywordRank: number | null = null;
+
+  for (let rank = 1; rank <= results.length; rank += 1) {
+    if (getKeywordCoverage(results, expectedSourceIds, expectedKeywords, rank).recall === 1) {
+      firstFullKeywordRank = rank;
+      break;
+    }
+  }
+
+  return {
+    keywordRecallAt1: at1.recall,
+    keywordRecallAt3: at3.recall,
+    keywordRecallAt5: at5.recall,
+    firstFullKeywordRank,
+    matchedKeywords: at5.matchedKeywords,
+    missingKeywords: at5.missingKeywords,
   };
 }
 
@@ -325,7 +366,7 @@ export async function runRetrievalEvaluation(
   }
 
   const durations = results.map((result) => result.durationMs);
-  const keywordResults = results.filter((result) => result.keywordRecall !== undefined);
+  const keywordResults = results.filter((result) => result.keywordRecallAt5 !== undefined);
   const total = results.length;
   const summary: RetrievalEvaluationSummary = {
     completedCases: total,
@@ -343,8 +384,16 @@ export async function runRetrievalEvaluation(
       ? results.reduce((sum, result) => sum + result.sourceRecallAt5, 0) / total
       : 0,
     keywordCaseCount: keywordResults.length,
-    averageKeywordRecall: keywordResults.length
-      ? keywordResults.reduce((sum, result) => sum + (result.keywordRecall ?? 0), 0) /
+    averageKeywordRecallAt1: keywordResults.length
+      ? keywordResults.reduce((sum, result) => sum + (result.keywordRecallAt1 ?? 0), 0) /
+        keywordResults.length
+      : null,
+    averageKeywordRecallAt3: keywordResults.length
+      ? keywordResults.reduce((sum, result) => sum + (result.keywordRecallAt3 ?? 0), 0) /
+        keywordResults.length
+      : null,
+    averageKeywordRecallAt5: keywordResults.length
+      ? keywordResults.reduce((sum, result) => sum + (result.keywordRecallAt5 ?? 0), 0) /
         keywordResults.length
       : null,
     averageDurationMs: total ? durations.reduce((sum, duration) => sum + duration, 0) / total : 0,
