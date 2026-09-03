@@ -28,7 +28,12 @@ import {
   type RetrievalEvaluationRun,
 } from '../rag/retrievalEvaluation';
 import { searchLocalKnowledge } from '../rag/localRetriever';
-import type { IndexProgress, IndexRunResult, RetrievedChunk } from '../rag/types';
+import type {
+  IndexProgress,
+  IndexRunResult,
+  LocalRetrievalStrategy,
+  RetrievedChunk,
+} from '../rag/types';
 
 const EVALUATION_CASES_STORAGE_KEY = 'duet-doc:local-rag:evaluation-cases';
 const DEFAULT_EVALUATION_LABEL = 'V0-vector-baseline';
@@ -80,6 +85,7 @@ export default function LocalRetrievalSandbox() {
   const [evaluationInput, setEvaluationInput] = useState(getStoredEvaluationCases);
   const [evaluationCases, setEvaluationCases] = useState(getStoredEvaluationCaseDefinitions);
   const [evaluationLabel, setEvaluationLabel] = useState(DEFAULT_EVALUATION_LABEL);
+  const [retrievalStrategy, setRetrievalStrategy] = useState<LocalRetrievalStrategy>('vector');
   const [evaluationProgress, setEvaluationProgress] = useState<{
     completed: number;
     total: number;
@@ -120,7 +126,7 @@ export default function LocalRetrievalSandbox() {
     setError(null);
 
     try {
-      setResults(await searchLocalKnowledge(query));
+      setResults(await searchLocalKnowledge(query, { strategy: retrievalStrategy }));
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地检索失败。'));
     } finally {
@@ -214,6 +220,7 @@ export default function LocalRetrievalSandbox() {
       }
 
       const run = await runRetrievalEvaluation(evaluationCases, {
+        strategy: retrievalStrategy,
         shouldContinue: () => !stopEvaluationRef.current,
         onProgress: (completed, total) => setEvaluationProgress({ completed, total }),
       });
@@ -400,7 +407,7 @@ export default function LocalRetrievalSandbox() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_220px]">
             <label className="text-xs font-medium text-text-secondary">
               评测标签
               <input
@@ -409,6 +416,26 @@ export default function LocalRetrievalSandbox() {
                 className="mt-1 h-9 w-full border border-border-color px-3 text-sm text-text-primary outline-none focus:border-accent"
               />
             </label>
+            <div className="text-xs font-medium text-text-secondary">
+              检索策略
+              <div className="mt-1 flex h-9 overflow-hidden rounded-md border border-border-color">
+                {(['vector', 'hybrid'] as const).map((strategy) => (
+                  <button
+                    key={strategy}
+                    type="button"
+                    onClick={() => setRetrievalStrategy(strategy)}
+                    disabled={isEvaluating}
+                    className={`px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      retrievalStrategy === strategy
+                        ? 'bg-accent text-white'
+                        : 'bg-white text-text-primary hover:bg-hover-bg'
+                    }`}
+                  >
+                    {strategy === 'vector' ? '纯向量' : '混合检索'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-end gap-2">
               <button
                 type="button"
@@ -521,6 +548,8 @@ export default function LocalRetrievalSandbox() {
                     {evaluationRun.cancelled
                       ? `已在 ${evaluationRun.summary.completedCases} 条用例后停止。`
                       : `已完成 ${evaluationRun.summary.completedCases} 条用例。`}
+                    {' · '}
+                    {evaluationRun.strategy === 'hybrid' ? '混合检索' : '纯向量'}
                   </p>
                 </div>
                 {report && (
@@ -618,6 +647,19 @@ export default function LocalRetrievalSandbox() {
                                   </p>
                                   <p className="mt-1 break-all font-mono text-[11px]">
                                     来源 ID：{source.sourceId}
+                                  </p>
+                                  <p className="mt-1 font-mono text-[11px]">
+                                    向量：
+                                    {source.vectorRank
+                                      ? `#${source.vectorRank} / ${source.vectorScore?.toFixed(4)}`
+                                      : '-'}
+                                    {' · '}关键词：
+                                    {source.lexicalRank
+                                      ? `#${source.lexicalRank} / ${source.lexicalScore?.toFixed(4)}`
+                                      : '-'}
+                                    {source.matchedTerms?.length
+                                      ? ` · 命中词：${source.matchedTerms.join('、')}`
+                                      : ''}
                                   </p>
                                   {source.headingPath.length > 0 && (
                                     <p className="mt-1">章节：{source.headingPath.join(' / ')}</p>

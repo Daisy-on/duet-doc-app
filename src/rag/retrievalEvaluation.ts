@@ -1,10 +1,16 @@
 import { db } from '../db';
 import { ensureEmbeddingModelReady } from './embeddingClient';
-import { searchLocalKnowledge } from './localRetriever';
+import { MAX_CHUNKS_PER_SOURCE, RRF_RANK_CONSTANT } from './hybridRanker';
+import {
+  HYBRID_CANDIDATE_MULTIPLIER,
+  MIN_HYBRID_CANDIDATES,
+  searchLocalKnowledge,
+} from './localRetriever';
 import {
   DOCUMENT_CHUNKER_VERSION,
   LOCAL_EMBEDDING_DIMENSION,
   LOCAL_EMBEDDING_MODEL,
+  type LocalRetrievalStrategy,
   type RetrievedChunk,
 } from './types';
 
@@ -25,6 +31,12 @@ export interface RetrievalEvaluationSource {
   headingPath: string[];
   content: string;
   score: number;
+  vectorRank?: number;
+  vectorScore?: number;
+  lexicalRank?: number;
+  lexicalScore?: number;
+  fusionScore?: number;
+  matchedTerms?: string[];
 }
 
 export interface RetrievalEvaluationCaseResult {
@@ -73,6 +85,7 @@ export interface RetrievalEvaluationRun {
   cases: RetrievalEvaluationCaseResult[];
   summary: RetrievalEvaluationSummary;
   cancelled: boolean;
+  strategy: LocalRetrievalStrategy;
 }
 
 export interface RetrievalEvaluationCorpusStats {
@@ -88,6 +101,13 @@ export interface RetrievalEvaluationReport {
   embeddingDimension: number;
   chunkerVersion: string;
   topK: number;
+  retrievalStrategy: LocalRetrievalStrategy;
+  hybridConfig: {
+    minimumCandidates: number;
+    candidateMultiplier: number;
+    rrfRankConstant: number;
+    maxChunksPerSource: number;
+  } | null;
   warmupMs: number | null;
   corpus: RetrievalEvaluationCorpusStats;
   summary: RetrievalEvaluationSummary;
@@ -96,6 +116,7 @@ export interface RetrievalEvaluationReport {
 
 type EvaluationRunOptions = {
   limit?: number;
+  strategy?: LocalRetrievalStrategy;
   shouldContinue?: () => boolean;
   onProgress?: (completedCases: number, totalCases: number) => void;
 };
@@ -234,6 +255,12 @@ function toSource(chunk: RetrievedChunk): RetrievalEvaluationSource {
     headingPath: chunk.headingPath,
     content: chunk.content,
     score: chunk.score,
+    vectorRank: chunk.vectorRank,
+    vectorScore: chunk.vectorScore,
+    lexicalRank: chunk.lexicalRank,
+    lexicalScore: chunk.lexicalScore,
+    fusionScore: chunk.fusionScore,
+    matchedTerms: chunk.matchedTerms,
   };
 }
 
@@ -354,13 +381,14 @@ export async function runRetrievalEvaluation(
   options: EvaluationRunOptions = {},
 ): Promise<RetrievalEvaluationRun> {
   const limit = options.limit ?? DEFAULT_LIMIT;
+  const strategy = options.strategy ?? 'vector';
   const results: RetrievalEvaluationCaseResult[] = [];
 
   for (const evaluationCase of cases) {
     if (options.shouldContinue && !options.shouldContinue()) break;
 
     const startedAt = performance.now();
-    const retrievedChunks = await searchLocalKnowledge(evaluationCase.query, { limit });
+    const retrievedChunks = await searchLocalKnowledge(evaluationCase.query, { limit, strategy });
     results.push(evaluateCase(evaluationCase, retrievedChunks, performance.now() - startedAt));
     options.onProgress?.(results.length, cases.length);
   }
@@ -405,6 +433,7 @@ export async function runRetrievalEvaluation(
     cases: results,
     summary,
     cancelled: results.length < cases.length,
+    strategy,
   };
 }
 
@@ -421,6 +450,16 @@ export function createRetrievalEvaluationReport(
     embeddingDimension: LOCAL_EMBEDDING_DIMENSION,
     chunkerVersion: DOCUMENT_CHUNKER_VERSION,
     topK: DEFAULT_LIMIT,
+    retrievalStrategy: run.strategy,
+    hybridConfig:
+      run.strategy === 'hybrid'
+        ? {
+            minimumCandidates: MIN_HYBRID_CANDIDATES,
+            candidateMultiplier: HYBRID_CANDIDATE_MULTIPLIER,
+            rrfRankConstant: RRF_RANK_CONSTANT,
+            maxChunksPerSource: MAX_CHUNKS_PER_SOURCE,
+          }
+        : null,
     warmupMs,
     corpus,
     summary: run.summary,

@@ -1,17 +1,43 @@
 import { listIndexedChunks } from './chunkRepository';
 import { rankLocalCandidates } from './embeddingClient';
-import type { LocalSearchOptions, RetrievedChunk } from './types';
+import { fuseRankings, MAX_CHUNKS_PER_SOURCE } from './hybridRanker';
+import { rankLexicalCandidates } from './lexicalRetriever';
+import type {
+  DocumentChunk,
+  LocalRetrievalStrategy,
+  LocalSearchOptions,
+  RetrievedChunk,
+} from './types';
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 12;
+export const MIN_HYBRID_CANDIDATES = 20;
+export const HYBRID_CANDIDATE_MULTIPLIER = 4;
+
+interface VectorRankingMatch {
+  id: string;
+  score: number;
+}
+
+type RetrievalDiagnostics = Pick<
+  RetrievedChunk,
+  | 'retrievalStrategy'
+  | 'vectorRank'
+  | 'vectorScore'
+  | 'lexicalRank'
+  | 'lexicalScore'
+  | 'fusionScore'
+  | 'matchedTerms'
+>;
 
 function normalizeQuery(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
 function toRetrievedChunk(
-  chunk: Awaited<ReturnType<typeof listIndexedChunks>>[number],
+  chunk: DocumentChunk,
   score: number,
+  diagnostics: Partial<RetrievalDiagnostics> = {},
 ): RetrievedChunk {
   return {
     id: chunk.id,
@@ -24,7 +50,100 @@ function toRetrievedChunk(
     content: chunk.content,
     score,
     sourceUpdatedAt: chunk.sourceUpdatedAt,
+    ...diagnostics,
   };
+}
+
+async function rankVectorMatches(
+  query: string,
+  chunks: DocumentChunk[],
+  limit: number,
+): Promise<VectorRankingMatch[]> {
+  const ranking = await rankLocalCandidates(
+    `query: ${query.trim()}`,
+    chunks.map((chunk) => ({ id: chunk.id, embedding: chunk.embedding })),
+    limit,
+  );
+  const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+  const normalizedQuery = normalizeQuery(query);
+
+  return ranking.matches
+    .map((match): VectorRankingMatch | null => {
+      const chunk = chunksById.get(match.id);
+      if (!chunk) return null;
+      const titleBoost =
+        normalizedQuery && normalizeQuery(chunk.title).includes(normalizedQuery) ? 0.1 : 0;
+      return { id: match.id, score: match.score + titleBoost };
+    })
+    .filter((match): match is VectorRankingMatch => match !== null)
+    .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
+}
+
+function takeDiverseResults(results: RetrievedChunk[], limit: number): RetrievedChunk[] {
+  const sourceCounts = new Map<string, number>();
+  const selected: RetrievedChunk[] = [];
+
+  for (const result of results) {
+    const sourceCount = sourceCounts.get(result.sourceId) ?? 0;
+    if (sourceCount >= MAX_CHUNKS_PER_SOURCE) continue;
+
+    selected.push(result);
+    sourceCounts.set(result.sourceId, sourceCount + 1);
+    if (selected.length === limit) break;
+  }
+
+  return selected;
+}
+
+async function searchByVector(
+  query: string,
+  chunks: DocumentChunk[],
+  limit: number,
+): Promise<RetrievedChunk[]> {
+  const vectorMatches = await rankVectorMatches(query, chunks, Math.min(chunks.length, limit * 3));
+  const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+
+  return vectorMatches.slice(0, limit).map((match, index) =>
+    toRetrievedChunk(chunksById.get(match.id)!, match.score, {
+      retrievalStrategy: 'vector',
+      vectorRank: index + 1,
+      vectorScore: match.score,
+    }),
+  );
+}
+
+async function searchByHybrid(
+  query: string,
+  chunks: DocumentChunk[],
+  limit: number,
+): Promise<RetrievedChunk[]> {
+  const candidateLimit = Math.min(
+    chunks.length,
+    Math.max(MIN_HYBRID_CANDIDATES, limit * HYBRID_CANDIDATE_MULTIPLIER),
+  );
+  const vectorRankingPromise = rankVectorMatches(query, chunks, candidateLimit);
+  const lexicalMatches = rankLexicalCandidates(query, chunks, candidateLimit);
+  const vectorMatches = await vectorRankingPromise;
+  const fusedMatches = fuseRankings(vectorMatches, lexicalMatches);
+  const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+
+  const results = fusedMatches
+    .map((match): RetrievedChunk | null => {
+      const chunk = chunksById.get(match.id);
+      if (!chunk) return null;
+      return toRetrievedChunk(chunk, match.score, {
+        retrievalStrategy: 'hybrid',
+        vectorRank: match.vectorRank,
+        vectorScore: match.vectorScore,
+        lexicalRank: match.lexicalRank,
+        lexicalScore: match.lexicalScore,
+        fusionScore: match.score,
+        matchedTerms: match.matchedTerms,
+      });
+    })
+    .filter((result): result is RetrievedChunk => result !== null);
+
+  return takeDiverseResults(results, limit);
 }
 
 export async function searchLocalKnowledge(
@@ -32,6 +151,7 @@ export async function searchLocalKnowledge(
   options: LocalSearchOptions = {},
 ): Promise<RetrievedChunk[]> {
   const limit = Math.min(Math.max(1, options.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
+  const strategy: LocalRetrievalStrategy = options.strategy ?? 'vector';
   const chunks = await listIndexedChunks({
     kbId: options.kbId,
     sourceTypes: options.sourceTypes,
@@ -51,23 +171,7 @@ export async function searchLocalKnowledge(
       .map((chunk) => toRetrievedChunk(chunk, 1));
   }
 
-  const ranking = await rankLocalCandidates(
-    `query: ${query.trim()}`,
-    chunks.map((chunk) => ({ id: chunk.id, embedding: chunk.embedding })),
-    Math.min(chunks.length, limit * 3),
-  );
-  const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
-  const normalizedQuery = normalizeQuery(query);
-
-  return ranking.matches
-    .map((match) => {
-      const chunk = chunksById.get(match.id);
-      if (!chunk) return null;
-      const titleBoost =
-        normalizedQuery && normalizeQuery(chunk.title).includes(normalizedQuery) ? 0.1 : 0;
-      return toRetrievedChunk(chunk, match.score + titleBoost);
-    })
-    .filter((chunk): chunk is RetrievedChunk => chunk !== null)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, limit);
+  return strategy === 'hybrid'
+    ? searchByHybrid(query, chunks, limit)
+    : searchByVector(query, chunks, limit);
 }

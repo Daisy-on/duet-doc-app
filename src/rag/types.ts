@@ -4,6 +4,7 @@ export const DOCUMENT_CHUNKER_VERSION = 'v2';
 
 export type DocumentSourceType = 'document' | 'memo';
 export type DocumentIndexStatus = 'indexed' | 'indexing' | 'error';
+export type LocalRetrievalStrategy = 'vector' | 'hybrid';
 
 export interface IndexableDocument {
   id: string;
@@ -60,6 +61,13 @@ export interface RetrievedChunk {
   content: string;
   score: number;
   sourceUpdatedAt: number;
+  retrievalStrategy?: LocalRetrievalStrategy;
+  vectorRank?: number;
+  vectorScore?: number;
+  lexicalRank?: number;
+  lexicalScore?: number;
+  fusionScore?: number;
+  matchedTerms?: string[];
 }
 
 export interface LocalSearchOptions {
@@ -67,6 +75,7 @@ export interface LocalSearchOptions {
   sourceTypes?: DocumentSourceType[];
   limit?: number;
   sortBy?: 'relevance' | 'updatedAt';
+  strategy?: LocalRetrievalStrategy;
 }
 
 export interface IndexProgress {
