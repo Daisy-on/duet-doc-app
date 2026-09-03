@@ -8,6 +8,13 @@ const BM25_B = 0.75;
 
 const STOP_WORDS = new Set([
   '我',
+  '我的',
+  '我有',
+  '我在',
+  '有没有',
+  '没有',
+  '曾经',
+  '是否',
   '的',
   '了',
   '吗',
@@ -16,16 +23,20 @@ const STOP_WORDS = new Set([
   '哪',
   '篇',
   '一篇',
-  '文档',
-  '笔记',
-  '记录',
+  '哪篇',
   '找到',
   '告诉',
   '什么',
   '关于',
+  '名为',
+  '和',
+  '与',
+  '及',
+  '或',
 ]);
 
 const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' });
+const SINGLE_HAN_CHARACTER = /^\p{Script=Han}$/u;
 
 export interface LexicalMatch {
   id: string;
@@ -44,11 +55,49 @@ function normalizeText(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase();
 }
 
+function shouldKeepTerm(term: string): boolean {
+  return Boolean(term) && !STOP_WORDS.has(term) && !SINGLE_HAN_CHARACTER.test(term);
+}
+
+function addHanNgrams(target: string[], characters: string[]): void {
+  if (characters.length < 2) return;
+
+  const text = characters.join('');
+  for (const size of [2, 3]) {
+    for (let index = 0; index <= text.length - size; index += 1) {
+      const term = text.slice(index, index + size);
+      if (shouldKeepTerm(term)) target.push(term);
+    }
+  }
+}
+
 function tokenize(value: string): string[] {
-  return [...segmenter.segment(normalizeText(value))]
-    .filter((segment) => segment.isWordLike)
-    .map((segment) => segment.segment.trim())
-    .filter((term) => term && !STOP_WORDS.has(term));
+  const terms: string[] = [];
+  let adjacentHanCharacters: string[] = [];
+
+  const flushAdjacentHanCharacters = () => {
+    addHanNgrams(terms, adjacentHanCharacters);
+    adjacentHanCharacters = [];
+  };
+
+  for (const segment of segmenter.segment(normalizeText(value))) {
+    const term = segment.segment.trim();
+
+    if (segment.isWordLike && SINGLE_HAN_CHARACTER.test(term)) {
+      if (STOP_WORDS.has(term)) {
+        flushAdjacentHanCharacters();
+      } else {
+        adjacentHanCharacters.push(term);
+      }
+      continue;
+    }
+
+    flushAdjacentHanCharacters();
+    if (segment.isWordLike && shouldKeepTerm(term)) terms.push(term);
+  }
+
+  flushAdjacentHanCharacters();
+  return terms;
 }
 
 function addTerms(target: Map<string, number>, terms: string[], weight: number): void {

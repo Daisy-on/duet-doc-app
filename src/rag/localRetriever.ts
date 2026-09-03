@@ -1,6 +1,6 @@
 import { listIndexedChunks } from './chunkRepository';
 import { rankLocalCandidates } from './embeddingClient';
-import { fuseRankings, MAX_CHUNKS_PER_SOURCE } from './hybridRanker';
+import { DIVERSE_SOURCE_TARGET, fuseRankings, MAX_CHUNKS_PER_SOURCE } from './hybridRanker';
 import { rankLexicalCandidates } from './lexicalRetriever';
 import type {
   DocumentChunk,
@@ -81,13 +81,29 @@ async function rankVectorMatches(
 
 function takeDiverseResults(results: RetrievedChunk[], limit: number): RetrievedChunk[] {
   const sourceCounts = new Map<string, number>();
+  const selectedIds = new Set<string>();
   const selected: RetrievedChunk[] = [];
+  const uniqueSourceTarget = Math.min(DIVERSE_SOURCE_TARGET, limit);
 
   for (const result of results) {
+    if (sourceCounts.has(result.sourceId)) continue;
+
+    selected.push(result);
+    selectedIds.add(result.id);
+    sourceCounts.set(result.sourceId, 1);
+    if (selected.length === uniqueSourceTarget) break;
+  }
+
+  if (selected.length === limit) return selected;
+
+  for (const result of results) {
+    if (selectedIds.has(result.id)) continue;
+
     const sourceCount = sourceCounts.get(result.sourceId) ?? 0;
     if (sourceCount >= MAX_CHUNKS_PER_SOURCE) continue;
 
     selected.push(result);
+    selectedIds.add(result.id);
     sourceCounts.set(result.sourceId, sourceCount + 1);
     if (selected.length === limit) break;
   }

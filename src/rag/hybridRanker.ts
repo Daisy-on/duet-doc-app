@@ -1,7 +1,10 @@
 import type { LexicalMatch } from './lexicalRetriever';
 
 export const RRF_RANK_CONSTANT = 60;
+export const VECTOR_RRF_WEIGHT = 1;
+export const LEXICAL_RRF_WEIGHT = 1;
 export const MAX_CHUNKS_PER_SOURCE = 2;
+export const DIVERSE_SOURCE_TARGET = 3;
 
 export interface VectorMatch {
   id: string;
@@ -28,7 +31,7 @@ export function fuseRankings(
     const vectorRank = index + 1;
     matches.set(match.id, {
       id: match.id,
-      score: 1 / (RRF_RANK_CONSTANT + vectorRank),
+      score: VECTOR_RRF_WEIGHT / (RRF_RANK_CONSTANT + vectorRank),
       vectorRank,
       vectorScore: match.score,
     });
@@ -37,7 +40,7 @@ export function fuseRankings(
   lexicalMatches.forEach((match, index) => {
     const lexicalRank = index + 1;
     const existing = matches.get(match.id);
-    const lexicalScore = 1 / (RRF_RANK_CONSTANT + lexicalRank);
+    const lexicalScore = LEXICAL_RRF_WEIGHT / (RRF_RANK_CONSTANT + lexicalRank);
 
     matches.set(match.id, {
       ...existing,

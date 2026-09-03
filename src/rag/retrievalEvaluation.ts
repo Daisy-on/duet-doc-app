@@ -1,6 +1,12 @@
 import { db } from '../db';
 import { ensureEmbeddingModelReady } from './embeddingClient';
-import { MAX_CHUNKS_PER_SOURCE, RRF_RANK_CONSTANT } from './hybridRanker';
+import {
+  DIVERSE_SOURCE_TARGET,
+  LEXICAL_RRF_WEIGHT,
+  MAX_CHUNKS_PER_SOURCE,
+  RRF_RANK_CONSTANT,
+  VECTOR_RRF_WEIGHT,
+} from './hybridRanker';
 import {
   HYBRID_CANDIDATE_MULTIPLIER,
   MIN_HYBRID_CANDIDATES,
@@ -106,7 +112,10 @@ export interface RetrievalEvaluationReport {
     minimumCandidates: number;
     candidateMultiplier: number;
     rrfRankConstant: number;
+    vectorWeight: number;
+    lexicalWeight: number;
     maxChunksPerSource: number;
+    uniqueSourceTarget: number;
   } | null;
   warmupMs: number | null;
   corpus: RetrievalEvaluationCorpusStats;
@@ -457,7 +466,10 @@ export function createRetrievalEvaluationReport(
             minimumCandidates: MIN_HYBRID_CANDIDATES,
             candidateMultiplier: HYBRID_CANDIDATE_MULTIPLIER,
             rrfRankConstant: RRF_RANK_CONSTANT,
+            vectorWeight: VECTOR_RRF_WEIGHT,
+            lexicalWeight: LEXICAL_RRF_WEIGHT,
             maxChunksPerSource: MAX_CHUNKS_PER_SOURCE,
+            uniqueSourceTarget: DIVERSE_SOURCE_TARGET,
           }
         : null,
     warmupMs,
