@@ -4,7 +4,10 @@ import type { DocumentChunkDraft, DocumentSourceType, IndexableDocument } from '
 const TARGET_CHUNK_CHARS = 320;
 const MAX_CHUNK_CHARS = 480;
 const OVERLAP_CHARS = 60;
+const MIN_DOCUMENT_TEXT_CHARS = 30;
+const MIN_MEMO_TEXT_CHARS = 8;
 const MEMO_KB_ID = 'kb-memo-system';
+const DEFAULT_PLACEHOLDER_PATTERN = /开始书写你的内容(?:\.{3}|…)?/g;
 
 interface TiptapNode {
   type?: string;
@@ -20,6 +23,14 @@ interface TextBlock {
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function removeDefaultPlaceholder(value: string): string {
+  return normalizeText(value.replace(DEFAULT_PLACEHOLDER_PATTERN, ' '));
+}
+
+function countMeaningfulCharacters(value: string): number {
+  return value.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
 }
 
 function nodeText(node: TiptapNode): string {
@@ -155,7 +166,19 @@ export function getDocumentFingerprint(document: IndexableDocument): string {
 export function chunkDocument(document: IndexableDocument): DocumentChunkDraft[] {
   const sourceType = getDocumentSourceType(document);
   const sourceFingerprint = getDocumentFingerprint(document);
-  const chunks = packBlocks(extractBlocks(document.content));
+  const blocks = extractBlocks(document.content)
+    .map((block) => ({ ...block, text: removeDefaultPlaceholder(block.text) }))
+    .filter((block) => block.text.length > 0);
+  const minimumTextCharacters =
+    sourceType === 'memo' ? MIN_MEMO_TEXT_CHARS : MIN_DOCUMENT_TEXT_CHARS;
+
+  if (
+    countMeaningfulCharacters(blocks.map((block) => block.text).join('')) < minimumTextCharacters
+  ) {
+    return [];
+  }
+
+  const chunks = packBlocks(blocks);
 
   return chunks.map((chunk, chunkIndex) => {
     const contentHash = stableHash(chunk.text);

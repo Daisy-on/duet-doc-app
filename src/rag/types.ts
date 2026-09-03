@@ -1,6 +1,6 @@
 export const LOCAL_EMBEDDING_MODEL = 'multilingual-e5-base';
 export const LOCAL_EMBEDDING_DIMENSION = 768;
-export const DOCUMENT_CHUNKER_VERSION = 'v1';
+export const DOCUMENT_CHUNKER_VERSION = 'v2';
 
 export type DocumentSourceType = 'document' | 'memo';
 export type DocumentIndexStatus = 'indexed' | 'indexing' | 'error';

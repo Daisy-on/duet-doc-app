@@ -1,18 +1,102 @@
-import { useState } from 'react';
-import { ArrowLeft, Database, Search } from 'lucide-react';
+import { useRef, useState } from 'react';
+import {
+  ArrowLeft,
+  ClipboardList,
+  Database,
+  Download,
+  FileJson,
+  Play,
+  RefreshCw,
+  Search,
+  Square,
+  Upload,
+  Zap,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { rebuildLocalDocumentIndex } from '../rag/documentIndexer';
+import {
+  createRetrievalEvaluationReport,
+  getRetrievalEvaluationCorpusStats,
+  listRetrievalEvaluationSources,
+  parseRetrievalEvaluationCases,
+  runRetrievalEvaluation,
+  validateRetrievalEvaluationSources,
+  warmupRetrievalEvaluation,
+  type RetrievalEvaluationCase,
+  type RetrievalEvaluationCorpusStats,
+  type RetrievalEvaluationReport,
+  type RetrievalEvaluationRun,
+} from '../rag/retrievalEvaluation';
 import { searchLocalKnowledge } from '../rag/localRetriever';
 import type { IndexProgress, IndexRunResult, RetrievedChunk } from '../rag/types';
+
+const EVALUATION_CASES_STORAGE_KEY = 'duet-doc:local-rag:evaluation-cases';
+const DEFAULT_EVALUATION_LABEL = 'V0-vector-baseline';
+
+function getStoredEvaluationCases(): string {
+  return window.localStorage.getItem(EVALUATION_CASES_STORAGE_KEY) ?? '';
+}
+
+function getStoredEvaluationCaseDefinitions(): RetrievalEvaluationCase[] {
+  const raw = getStoredEvaluationCases();
+  if (!raw) return [];
+
+  try {
+    return parseRetrievalEvaluationCases(raw);
+  } catch {
+    return [];
+  }
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatDuration(value: number): string {
+  return `${Math.round(value)} ms`;
+}
+
+function getErrorMessage(caughtError: unknown, fallback: string): string {
+  return caughtError instanceof Error ? caughtError.message : fallback;
+}
+
+function sanitizeFileName(value: string): string {
+  const withoutControlCharacters = Array.from(value, (character) =>
+    character.charCodeAt(0) < 32 ? '-' : character,
+  ).join('');
+  return withoutControlCharacters.replace(/[<>:"/\\|?*]/g, '-').trim() || 'local-rag-evaluation';
+}
 
 export default function LocalRetrievalSandbox() {
   const [isIndexing, setIsIndexing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isWarmingUp, setIsWarmingUp] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const [query, setQuery] = useState('浏览器中的本地 AI 模型推理');
   const [progress, setProgress] = useState<IndexProgress | null>(null);
   const [indexResult, setIndexResult] = useState<IndexRunResult | null>(null);
   const [results, setResults] = useState<RetrievedChunk[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [evaluationInput, setEvaluationInput] = useState(getStoredEvaluationCases);
+  const [evaluationCases, setEvaluationCases] = useState(getStoredEvaluationCaseDefinitions);
+  const [evaluationLabel, setEvaluationLabel] = useState(DEFAULT_EVALUATION_LABEL);
+  const [evaluationProgress, setEvaluationProgress] = useState<{
+    completed: number;
+    total: number;
+  } | null>(null);
+  const [warmupMs, setWarmupMs] = useState<number | null>(null);
+  const [corpusStats, setCorpusStats] = useState<RetrievalEvaluationCorpusStats | null>(null);
+  const [evaluationRun, setEvaluationRun] = useState<RetrievalEvaluationRun | null>(null);
+  const [report, setReport] = useState<RetrievalEvaluationReport | null>(null);
+  const [sources, setSources] = useState<Array<{ id: string; title: string }> | null>(null);
+  const stopEvaluationRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function refreshCorpusStats(): Promise<RetrievalEvaluationCorpusStats> {
+    const stats = await getRetrievalEvaluationCorpusStats();
+    setCorpusStats(stats);
+    return stats;
+  }
 
   async function handleBuildIndex() {
     setIsIndexing(true);
@@ -22,8 +106,9 @@ export default function LocalRetrievalSandbox() {
     try {
       const result = await rebuildLocalDocumentIndex(setProgress);
       setIndexResult(result);
+      await refreshCorpusStats();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : '本地索引建立失败。');
+      setError(getErrorMessage(caughtError, '本地索引建立失败。'));
     } finally {
       setIsIndexing(false);
     }
@@ -37,15 +122,130 @@ export default function LocalRetrievalSandbox() {
     try {
       setResults(await searchLocalKnowledge(query));
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : '本地检索失败。');
+      setError(getErrorMessage(caughtError, '本地检索失败。'));
     } finally {
       setIsSearching(false);
     }
   }
 
+  async function handleLoadEvaluationCases(raw = evaluationInput) {
+    try {
+      const parsedCases = parseRetrievalEvaluationCases(raw);
+      const availableSources = await listRetrievalEvaluationSources();
+      validateRetrievalEvaluationSources(parsedCases, availableSources);
+      window.localStorage.setItem(EVALUATION_CASES_STORAGE_KEY, raw);
+      setEvaluationInput(raw);
+      setEvaluationCases(parsedCases);
+      setSources(availableSources);
+      setEvaluationRun(null);
+      setReport(null);
+      setError(null);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '评测集载入失败。'));
+    }
+  }
+
+  async function handleUploadEvaluationCases(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await handleLoadEvaluationCases(await file.text());
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '无法读取评测集文件。'));
+    } finally {
+      event.target.value = '';
+    }
+  }
+
+  async function handleListSources() {
+    try {
+      setSources(await listRetrievalEvaluationSources());
+      await refreshCorpusStats();
+      setError(null);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '无法读取本地文档清单。'));
+    }
+  }
+
+  async function handleWarmup() {
+    setIsWarmingUp(true);
+    setError(null);
+
+    try {
+      const stats = await refreshCorpusStats();
+      if (stats.chunkCount === 0) {
+        throw new Error('当前没有已建立索引的文档，请先建立本地索引。');
+      }
+      setWarmupMs(await warmupRetrievalEvaluation());
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '模型预热失败。'));
+    } finally {
+      setIsWarmingUp(false);
+    }
+  }
+
+  async function handleRunEvaluation() {
+    if (evaluationCases.length === 0) {
+      setError('请先载入至少一条评测用例。');
+      return;
+    }
+
+    setIsEvaluating(true);
+    setError(null);
+    setEvaluationProgress({ completed: 0, total: evaluationCases.length });
+    stopEvaluationRef.current = false;
+
+    try {
+      const stats = await refreshCorpusStats();
+      if (stats.chunkCount === 0) {
+        throw new Error('当前没有已建立索引的文档，请先建立本地索引。');
+      }
+      const availableSources = await listRetrievalEvaluationSources();
+      validateRetrievalEvaluationSources(evaluationCases, availableSources);
+      setSources(availableSources);
+
+      let activeWarmupMs = warmupMs;
+      if (activeWarmupMs === null) {
+        setIsWarmingUp(true);
+        activeWarmupMs = await warmupRetrievalEvaluation();
+        setWarmupMs(activeWarmupMs);
+        setIsWarmingUp(false);
+      }
+
+      const run = await runRetrievalEvaluation(evaluationCases, {
+        shouldContinue: () => !stopEvaluationRef.current,
+        onProgress: (completed, total) => setEvaluationProgress({ completed, total }),
+      });
+      setEvaluationRun(run);
+      setReport(createRetrievalEvaluationReport(evaluationLabel, activeWarmupMs, stats, run));
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '批量评测失败。'));
+    } finally {
+      setIsWarmingUp(false);
+      setIsEvaluating(false);
+    }
+  }
+
+  function handleStopEvaluation() {
+    stopEvaluationRef.current = true;
+  }
+
+  function handleExportReport() {
+    if (!report) return;
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${sanitizeFileName(report.label)}-${report.createdAt.slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="min-h-screen bg-bg-panel px-5 py-8 text-text-primary sm:px-8">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-5xl">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
@@ -57,8 +257,9 @@ export default function LocalRetrievalSandbox() {
         <header className="mt-8 border-b border-border-color pb-6">
           <p className="text-sm font-medium text-accent">Developer sandbox</p>
           <h1 className="mt-2 text-2xl font-bold">本地知识库检索验证</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary">
-            使用浏览器端 FP16 Embedding 模型建立文档和小记索引；文档正文与向量均保留在 IndexedDB。
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-text-secondary">
+            使用浏览器端 FP16 Embedding
+            模型建立文档和小记索引，并对固定问题集进行可重复的本地检索评测。
           </p>
           <p className="mt-2 text-xs text-text-secondary">
             当前本地数据源：<code className="font-mono">{window.location.origin}</code>
@@ -106,10 +307,17 @@ export default function LocalRetrievalSandbox() {
               )}
             </div>
           )}
+          {corpusStats && (
+            <p className="mt-4 border-t border-border-color pt-3 text-xs text-text-secondary">
+              当前语料：{corpusStats.documentCount} 篇文档，{corpusStats.indexedSourceCount}{' '}
+              个已索引来源，
+              {corpusStats.chunkCount} 个分块。
+            </p>
+          )}
         </section>
 
         <section className="mt-6 border border-border-color bg-white p-5">
-          <h2 className="text-sm font-semibold">检索</h2>
+          <h2 className="text-sm font-semibold">单次检索</h2>
           <div className="mt-4 flex gap-2">
             <input
               value={query}
@@ -151,10 +359,305 @@ export default function LocalRetrievalSandbox() {
               ))}
             </ol>
           )}
-
-          {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
         </section>
+
+        <section className="mt-6 border border-border-color bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ClipboardList size={17} className="text-accent" />
+                <h2 className="text-sm font-semibold">批量评测</h2>
+              </div>
+              <p className="mt-1 text-xs text-text-secondary">
+                载入固定问题集后顺序执行本地检索，计算
+                Hit@K、MRR、来源召回率、关键词覆盖率和热查询耗时。
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleListSources()}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg"
+              >
+                <RefreshCw size={15} />
+                刷新来源 ID
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg"
+              >
+                <Upload size={15} />
+                导入 JSON
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => void handleUploadEvaluationCases(event)}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="text-xs font-medium text-text-secondary">
+              评测标签
+              <input
+                value={evaluationLabel}
+                onChange={(event) => setEvaluationLabel(event.target.value)}
+                className="mt-1 h-9 w-full border border-border-color px-3 text-sm text-text-primary outline-none focus:border-accent"
+              />
+            </label>
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => void handleWarmup()}
+                disabled={isWarmingUp || isEvaluating}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Zap size={15} />
+                {isWarmingUp ? '预热中' : '预热模型'}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportReport}
+                disabled={!report || isEvaluating}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download size={15} />
+                导出报告
+              </button>
+            </div>
+          </div>
+
+          <label className="mt-4 block text-xs font-medium text-text-secondary">
+            评测集 JSON
+            <span className="mt-1 block font-normal leading-5">
+              id 是用例编号；expectedSourceIds 必须填写下方“可用来源 ID”中的实际
+              ID，不能填写文档标题。
+            </span>
+            <textarea
+              value={evaluationInput}
+              onChange={(event) => setEvaluationInput(event.target.value)}
+              className="mt-1 min-h-56 w-full resize-y border border-border-color p-3 font-mono text-xs leading-5 text-text-primary outline-none focus:border-accent"
+              placeholder={
+                '[\n  {\n    "id": "semantic-001",\n    "category": "semantic",\n    "query": "我有没有写过浏览器运行 AI 的内容？",\n    "expectedSourceIds": ["你的文档 ID"],\n    "expectedChunkKeywords": ["WebGPU"]\n  }\n]'
+              }
+            />
+          </label>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleLoadEvaluationCases()}
+              disabled={isEvaluating}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FileJson size={15} />
+              载入评测集
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRunEvaluation()}
+              disabled={isEvaluating || isWarmingUp || evaluationCases.length === 0}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Play size={15} />
+              运行评测
+            </button>
+            {isEvaluating && (
+              <button
+                type="button"
+                onClick={handleStopEvaluation}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-rose-200 px-3 text-sm font-medium text-rose-700 hover:bg-rose-50"
+              >
+                <Square size={14} />
+                停止后续查询
+              </button>
+            )}
+            <span className="text-xs text-text-secondary">
+              已载入 {evaluationCases.length} 条用例
+              {warmupMs !== null ? ` · 预热 ${formatDuration(warmupMs)}` : ''}
+            </span>
+          </div>
+
+          {evaluationProgress && (
+            <p className="mt-4 text-sm text-text-secondary">
+              评测进度：{evaluationProgress.completed} / {evaluationProgress.total}
+              {isEvaluating ? '，正在执行当前批次。' : ''}
+            </p>
+          )}
+
+          {sources && (
+            <details className="mt-5 border-t border-border-color pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-text-primary">
+                可用来源 ID（{sources.length}）
+              </summary>
+              <div className="mt-3 max-h-56 overflow-y-auto border border-border-color">
+                {sources.map((source) => (
+                  <div
+                    key={source.id}
+                    className="grid gap-1 border-b border-border-color px-3 py-2 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+                  >
+                    <span className="truncate text-sm" title={source.title}>
+                      {source.title}
+                    </span>
+                    <code className="break-all font-mono text-xs text-text-secondary">
+                      {source.id}
+                    </code>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {evaluationRun && (
+            <div className="mt-6 border-t border-border-color pt-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">本轮结果</h3>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    {evaluationRun.cancelled
+                      ? `已在 ${evaluationRun.summary.completedCases} 条用例后停止。`
+                      : `已完成 ${evaluationRun.summary.completedCases} 条用例。`}
+                  </p>
+                </div>
+                {report && (
+                  <span className="text-xs text-text-secondary">报告已生成，可导出 JSON。</span>
+                )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 border border-border-color text-sm sm:grid-cols-4">
+                <Metric label="Hit@1" value={formatPercent(evaluationRun.summary.hitAt1)} />
+                <Metric label="Hit@3" value={formatPercent(evaluationRun.summary.hitAt3)} />
+                <Metric label="Hit@5" value={formatPercent(evaluationRun.summary.hitAt5)} />
+                <Metric label="MRR" value={evaluationRun.summary.mrr.toFixed(3)} />
+                <Metric
+                  label="Source Recall@1"
+                  value={formatPercent(evaluationRun.summary.sourceRecallAt1)}
+                />
+                <Metric
+                  label="Source Recall@3"
+                  value={formatPercent(evaluationRun.summary.sourceRecallAt3)}
+                />
+                <Metric
+                  label="Source Recall@5"
+                  value={formatPercent(evaluationRun.summary.sourceRecallAt5)}
+                />
+                <Metric
+                  label="关键词覆盖率"
+                  value={
+                    evaluationRun.summary.averageKeywordRecall === null
+                      ? '未标注'
+                      : formatPercent(evaluationRun.summary.averageKeywordRecall)
+                  }
+                />
+                <Metric
+                  label="平均耗时"
+                  value={formatDuration(evaluationRun.summary.averageDurationMs)}
+                />
+                <Metric label="P50" value={formatDuration(evaluationRun.summary.p50DurationMs)} />
+                <Metric label="P95" value={formatDuration(evaluationRun.summary.p95DurationMs)} />
+              </div>
+
+              <div className="mt-5 overflow-x-auto border border-border-color">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-bg-panel text-text-secondary">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">状态</th>
+                      <th className="px-3 py-2 font-medium">分类</th>
+                      <th className="min-w-64 px-3 py-2 font-medium">查询</th>
+                      <th className="px-3 py-2 font-medium">首个正确排名</th>
+                      <th className="min-w-32 px-3 py-2 font-medium">来源召回</th>
+                      <th className="min-w-48 px-3 py-2 font-medium">关键词覆盖</th>
+                      <th className="px-3 py-2 font-medium">耗时</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evaluationRun.cases.map((result) => (
+                      <tr key={result.caseId} className="border-t border-border-color align-top">
+                        <td className="px-3 py-3">
+                          <span className={result.hitAt5 ? 'text-success-color' : 'text-rose-600'}>
+                            {result.hitAt5 ? '命中' : '未命中'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-text-secondary">{result.category}</td>
+                        <td className="px-3 py-3">
+                          <p className="max-w-md leading-5">{result.query}</p>
+                          <p className="mt-1 max-w-md break-all text-text-secondary">
+                            期望来源：{result.expectedSourceIds.join(', ')}
+                          </p>
+                          <details className="mt-2 text-text-secondary">
+                            <summary className="cursor-pointer">查看 Top 5</summary>
+                            <ol className="mt-2 space-y-3">
+                              {result.topResults.map((source, index) => (
+                                <li
+                                  key={`${source.sourceId}-${source.chunkIndex}`}
+                                  className="border-l-2 border-border-color pl-3"
+                                >
+                                  <p className="font-medium text-text-primary">
+                                    #{index + 1} {source.title} · 分块 {source.chunkIndex} ·{' '}
+                                    {source.score.toFixed(4)}
+                                  </p>
+                                  <p className="mt-1 break-all font-mono text-[11px]">
+                                    来源 ID：{source.sourceId}
+                                  </p>
+                                  {source.headingPath.length > 0 && (
+                                    <p className="mt-1">章节：{source.headingPath.join(' / ')}</p>
+                                  )}
+                                  <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-sm bg-bg-panel p-2 leading-5 text-text-primary">
+                                    {source.content}
+                                  </p>
+                                </li>
+                              ))}
+                            </ol>
+                          </details>
+                        </td>
+                        <td className="px-3 py-3 font-mono">
+                          {result.firstRelevantRank === null ? '-' : `#${result.firstRelevantRank}`}
+                        </td>
+                        <td className="px-3 py-3 font-mono leading-5">
+                          <p>R@1 {formatPercent(result.sourceRecallAt1)}</p>
+                          <p>R@3 {formatPercent(result.sourceRecallAt3)}</p>
+                          <p>R@5 {formatPercent(result.sourceRecallAt5)}</p>
+                        </td>
+                        <td className="px-3 py-3 leading-5">
+                          {result.keywordRecall === undefined ? (
+                            '-'
+                          ) : (
+                            <>
+                              <p className="font-mono">{formatPercent(result.keywordRecall)}</p>
+                              <p className="mt-1 text-success-color">
+                                已命中：{result.matchedKeywords?.join('、') || '无'}
+                              </p>
+                              <p className="mt-1 text-rose-600">
+                                未命中：{result.missingKeywords?.join('、') || '无'}
+                              </p>
+                            </>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 font-mono">{formatDuration(result.durationMs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {error && <p className="mt-6 text-sm text-rose-600">{error}</p>}
       </div>
     </main>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-r border-border-color p-3 last:border-r-0 even:border-r-0 sm:even:border-r sm:nth-[4n]:border-r-0">
+      <p className="text-xs text-text-secondary">{label}</p>
+      <p className="mt-1 font-mono text-base font-semibold text-text-primary">{value}</p>
+    </div>
   );
 }
