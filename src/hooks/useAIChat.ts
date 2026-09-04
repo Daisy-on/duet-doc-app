@@ -473,6 +473,7 @@ export function useAIChat(sessionId: string | null) {
             sourceTypes: localSourceTypes,
             sortBy,
             limit: topK,
+            strategy: 'hybrid',
           });
           const retrievedContexts = retrievedChunks
             .filter((chunk) => !minimumUpdatedAt || chunk.sourceUpdatedAt >= minimumUpdatedAt)
