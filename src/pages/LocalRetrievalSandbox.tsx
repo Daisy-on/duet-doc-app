@@ -660,6 +660,9 @@ export default function LocalRetrievalSandbox() {
                                     {source.matchedTerms?.length
                                       ? ` · 命中词：${source.matchedTerms.join('、')}`
                                       : ''}
+                                    {source.matchedPhrase
+                                      ? ` · 完整短语：${source.matchedPhrase} (+${source.phraseBonus})`
+                                      : ''}
                                   </p>
                                   {source.headingPath.length > 0 && (
                                     <p className="mt-1">章节：{source.headingPath.join(' / ')}</p>

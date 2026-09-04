@@ -5,6 +5,10 @@ const HEADING_WEIGHT = 2;
 const CONTENT_WEIGHT = 1;
 const BM25_K1 = 1.2;
 const BM25_B = 0.75;
+export const TITLE_PHRASE_BONUS = 8;
+export const HEADING_PHRASE_BONUS = 4;
+export const CONTENT_PHRASE_BONUS = 2;
+export const MIN_PHRASE_LENGTH = 4;
 
 const STOP_WORDS = new Set([
   '我',
@@ -37,11 +41,14 @@ const STOP_WORDS = new Set([
 
 const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' });
 const SINGLE_HAN_CHARACTER = /^\p{Script=Han}$/u;
+const MULTI_CHARACTER_HAN_PHRASE = /^\p{Script=Han}{4,}$/u;
 
 export interface LexicalMatch {
   id: string;
   score: number;
   matchedTerms: string[];
+  matchedPhrase?: string;
+  phraseBonus?: number;
 }
 
 interface TokenizedCandidate {
@@ -49,10 +56,27 @@ interface TokenizedCandidate {
   weightedTermFrequency: Map<string, number>;
   terms: Set<string>;
   length: number;
+  normalizedTitle: string;
+  normalizedHeading: string;
+  normalizedContent: string;
 }
 
 function normalizeText(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase();
+}
+
+function normalizePhrase(value: string): string {
+  return normalizeText(value).replace(/[\p{P}\p{S}\s]+/gu, '');
+}
+
+function phraseLength(value: string): number {
+  return [...value].length;
+}
+
+function isEligiblePhrase(terms: string[], phrase: string): boolean {
+  if (phraseLength(phrase) < MIN_PHRASE_LENGTH) return false;
+
+  return terms.length >= 2 || MULTI_CHARACTER_HAN_PHRASE.test(terms[0]);
 }
 
 function shouldKeepTerm(term: string): boolean {
@@ -100,6 +124,54 @@ function tokenize(value: string): string[] {
   return terms;
 }
 
+function extractQueryPhrases(value: string): string[] {
+  const termGroups: string[][] = [];
+  let currentGroup: string[] = [];
+  let adjacentHanCharacters: string[] = [];
+
+  const flushAdjacentHanCharacters = () => {
+    if (adjacentHanCharacters.length >= 2) {
+      currentGroup.push(adjacentHanCharacters.join(''));
+    }
+    adjacentHanCharacters = [];
+  };
+  const flushGroup = () => {
+    flushAdjacentHanCharacters();
+    if (currentGroup.length > 0) termGroups.push(currentGroup);
+    currentGroup = [];
+  };
+
+  for (const segment of segmenter.segment(normalizeText(value))) {
+    if (!segment.isWordLike) continue;
+
+    const term = segment.segment.trim();
+    if (STOP_WORDS.has(term)) {
+      flushGroup();
+    } else if (SINGLE_HAN_CHARACTER.test(term)) {
+      adjacentHanCharacters.push(term);
+    } else if (shouldKeepTerm(term)) {
+      flushAdjacentHanCharacters();
+      currentGroup.push(term);
+    }
+  }
+  flushGroup();
+
+  const phrases = new Set<string>();
+  for (const terms of termGroups) {
+    for (let size = 1; size <= Math.min(4, terms.length); size += 1) {
+      for (let index = 0; index <= terms.length - size; index += 1) {
+        const phraseTerms = terms.slice(index, index + size);
+        const phrase = normalizePhrase(phraseTerms.join(''));
+        if (isEligiblePhrase(phraseTerms, phrase)) phrases.add(phrase);
+      }
+    }
+  }
+
+  return [...phrases].sort(
+    (left, right) => phraseLength(right) - phraseLength(left) || left.localeCompare(right),
+  );
+}
+
 function addTerms(target: Map<string, number>, terms: string[], weight: number): void {
   for (const term of terms) {
     target.set(term, (target.get(term) ?? 0) + weight);
@@ -111,6 +183,11 @@ function tokenizeCandidate(chunk: DocumentChunk): TokenizedCandidate {
   const headingTerms = tokenize(chunk.headingPath.join(' '));
   const contentTerms = tokenize(chunk.content);
   const weightedTermFrequency = new Map<string, number>();
+  const normalizedTitle = normalizePhrase(chunk.title);
+  const phraseHeadingPath =
+    normalizePhrase(chunk.headingPath[0] ?? '') === normalizedTitle
+      ? chunk.headingPath.slice(1)
+      : chunk.headingPath;
 
   addTerms(weightedTermFrequency, titleTerms, TITLE_WEIGHT);
   addTerms(weightedTermFrequency, headingTerms, HEADING_WEIGHT);
@@ -121,7 +198,29 @@ function tokenizeCandidate(chunk: DocumentChunk): TokenizedCandidate {
     weightedTermFrequency,
     terms: new Set(weightedTermFrequency.keys()),
     length: titleTerms.length + headingTerms.length + contentTerms.length,
+    normalizedTitle,
+    normalizedHeading: normalizePhrase(phraseHeadingPath.join(' ')),
+    normalizedContent: normalizePhrase(chunk.content),
   };
+}
+
+function findPhraseMatch(
+  candidate: TokenizedCandidate,
+  queryPhrases: string[],
+  normalizedQuery: string,
+): { phrase: string; bonus: number } | null {
+  if (
+    phraseLength(candidate.normalizedTitle) >= MIN_PHRASE_LENGTH &&
+    normalizedQuery.includes(candidate.normalizedTitle)
+  ) {
+    return { phrase: candidate.normalizedTitle, bonus: TITLE_PHRASE_BONUS };
+  }
+
+  const headingPhrase = queryPhrases.find((phrase) => candidate.normalizedHeading.includes(phrase));
+  if (headingPhrase) return { phrase: headingPhrase, bonus: HEADING_PHRASE_BONUS };
+
+  const contentPhrase = queryPhrases.find((phrase) => candidate.normalizedContent.includes(phrase));
+  return contentPhrase ? { phrase: contentPhrase, bonus: CONTENT_PHRASE_BONUS } : null;
 }
 
 export function rankLexicalCandidates(
@@ -130,9 +229,11 @@ export function rankLexicalCandidates(
   limit: number,
 ): LexicalMatch[] {
   const queryTerms = [...new Set(tokenize(query))];
-  if (queryTerms.length === 0 || chunks.length === 0) return [];
+  const queryPhrases = extractQueryPhrases(query);
+  if ((queryTerms.length === 0 && queryPhrases.length === 0) || chunks.length === 0) return [];
 
   const candidates = chunks.map(tokenizeCandidate);
+  const normalizedQuery = normalizePhrase(query);
   const averageLength =
     candidates.reduce((sum, candidate) => sum + candidate.length, 0) / candidates.length || 1;
   const documentFrequency = new Map<string, number>();
@@ -162,7 +263,18 @@ export function rankLexicalCandidates(
           ((termFrequency * (BM25_K1 + 1)) / (termFrequency + lengthNormalization));
       }
 
-      return score > 0 ? { id: candidate.id, score, matchedTerms } : null;
+      const phraseMatch = findPhraseMatch(candidate, queryPhrases, normalizedQuery);
+      score += phraseMatch?.bonus ?? 0;
+
+      return score > 0
+        ? {
+            id: candidate.id,
+            score,
+            matchedTerms,
+            matchedPhrase: phraseMatch?.phrase,
+            phraseBonus: phraseMatch?.bonus,
+          }
+        : null;
     })
     .filter((match): match is LexicalMatch => match !== null)
     .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))

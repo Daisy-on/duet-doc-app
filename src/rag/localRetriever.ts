@@ -28,6 +28,8 @@ type RetrievalDiagnostics = Pick<
   | 'lexicalScore'
   | 'fusionScore'
   | 'matchedTerms'
+  | 'matchedPhrase'
+  | 'phraseBonus'
 >;
 
 function normalizeQuery(value: string): string {
@@ -155,6 +157,8 @@ async function searchByHybrid(
         lexicalScore: match.lexicalScore,
         fusionScore: match.score,
         matchedTerms: match.matchedTerms,
+        matchedPhrase: match.matchedPhrase,
+        phraseBonus: match.phraseBonus,
       });
     })
     .filter((result): result is RetrievedChunk => result !== null);

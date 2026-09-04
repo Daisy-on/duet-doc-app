@@ -19,6 +19,8 @@ export interface HybridMatch {
   lexicalRank?: number;
   lexicalScore?: number;
   matchedTerms?: string[];
+  matchedPhrase?: string;
+  phraseBonus?: number;
 }
 
 export function fuseRankings(
@@ -49,6 +51,8 @@ export function fuseRankings(
       lexicalRank,
       lexicalScore: match.score,
       matchedTerms: match.matchedTerms,
+      matchedPhrase: match.matchedPhrase,
+      phraseBonus: match.phraseBonus,
     });
   });
 

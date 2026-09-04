@@ -68,6 +68,8 @@ export interface RetrievedChunk {
   lexicalScore?: number;
   fusionScore?: number;
   matchedTerms?: string[];
+  matchedPhrase?: string;
+  phraseBonus?: number;
 }
 
 export interface LocalSearchOptions {

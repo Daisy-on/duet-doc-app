@@ -8,6 +8,12 @@ import {
   VECTOR_RRF_WEIGHT,
 } from './hybridRanker';
 import {
+  CONTENT_PHRASE_BONUS,
+  HEADING_PHRASE_BONUS,
+  MIN_PHRASE_LENGTH,
+  TITLE_PHRASE_BONUS,
+} from './lexicalRetriever';
+import {
   HYBRID_CANDIDATE_MULTIPLIER,
   MIN_HYBRID_CANDIDATES,
   searchLocalKnowledge,
@@ -43,6 +49,8 @@ export interface RetrievalEvaluationSource {
   lexicalScore?: number;
   fusionScore?: number;
   matchedTerms?: string[];
+  matchedPhrase?: string;
+  phraseBonus?: number;
 }
 
 export interface RetrievalEvaluationCaseResult {
@@ -116,6 +124,12 @@ export interface RetrievalEvaluationReport {
     lexicalWeight: number;
     maxChunksPerSource: number;
     uniqueSourceTarget: number;
+    phraseBonus: {
+      title: number;
+      heading: number;
+      content: number;
+      minimumLength: number;
+    };
   } | null;
   warmupMs: number | null;
   corpus: RetrievalEvaluationCorpusStats;
@@ -270,6 +284,8 @@ function toSource(chunk: RetrievedChunk): RetrievalEvaluationSource {
     lexicalScore: chunk.lexicalScore,
     fusionScore: chunk.fusionScore,
     matchedTerms: chunk.matchedTerms,
+    matchedPhrase: chunk.matchedPhrase,
+    phraseBonus: chunk.phraseBonus,
   };
 }
 
@@ -470,6 +486,12 @@ export function createRetrievalEvaluationReport(
             lexicalWeight: LEXICAL_RRF_WEIGHT,
             maxChunksPerSource: MAX_CHUNKS_PER_SOURCE,
             uniqueSourceTarget: DIVERSE_SOURCE_TARGET,
+            phraseBonus: {
+              title: TITLE_PHRASE_BONUS,
+              heading: HEADING_PHRASE_BONUS,
+              content: CONTENT_PHRASE_BONUS,
+              minimumLength: MIN_PHRASE_LENGTH,
+            },
           }
         : null,
     warmupMs,
