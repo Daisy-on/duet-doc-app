@@ -8,11 +8,17 @@ import {
   Search,
   Plus,
   MoreHorizontal,
+  CloudUpload,
+  CloudOff,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID, type KnowledgeBase } from '../store/knowledgeBaseStore';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import { useLayoutStore } from '../store';
+import { useSyncStore } from '../store/syncStore';
 import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import KbActionMenu from './menus/KbActionMenu';
@@ -25,6 +31,14 @@ export default function Sidebar() {
   const updateKnowledgeBase = useKnowledgeBaseStore((state) => state.updateKnowledgeBase);
   const deleteKnowledgeBase = useKnowledgeBaseStore((state) => state.deleteKnowledgeBase);
   const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
+
+  const syncStatus = useSyncStore((state) => state.status);
+  const pendingCount = useSyncStore((state) => state.pendingCount);
+  const errorCount = useSyncStore((state) => state.errorCount);
+  const lastSyncAt = useSyncStore((state) => state.lastSyncAt);
+  const errorMessage = useSyncStore((state) => state.errorMessage);
+  const triggerPush = useSyncStore((state) => state.triggerPush);
+  const retryErrors = useSyncStore((state) => state.retryErrors);
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
 
@@ -285,6 +299,67 @@ export default function Sidebar() {
         }}
         anchorEl={menuAnchorEl}
       />
+
+      {/* Cloud Sync Footer */}
+      <div className="pt-3 mt-auto border-t border-border-color shrink-0">
+        <div className="flex items-center justify-between text-[12px] text-text-secondary mb-1.5 px-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {syncStatus === 'syncing' ? (
+              <Loader2 size={13} className="animate-spin text-accent shrink-0" />
+            ) : syncStatus === 'offline' ? (
+              <CloudOff size={13} className="text-text-secondary shrink-0" />
+            ) : errorCount > 0 || syncStatus === 'error' ? (
+              <AlertCircle size={13} className="text-red-500 shrink-0" />
+            ) : pendingCount > 0 ? (
+              <CloudUpload size={13} className="text-amber-500 shrink-0" />
+            ) : (
+              <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+            )}
+            <span className="font-medium truncate">
+              {syncStatus === 'syncing'
+                ? '正在上传...'
+                : syncStatus === 'offline'
+                  ? '云端暂不可用'
+                  : errorCount > 0
+                    ? `同步异常 (${errorCount} 项失败)`
+                    : syncStatus === 'error'
+                      ? '同步异常'
+                      : pendingCount > 0
+                        ? `待上传 (${pendingCount})`
+                        : '云端已对齐'}
+            </span>
+          </div>
+          {errorCount > 0 ? (
+            <button
+              onClick={() => void retryErrors()}
+              disabled={syncStatus === 'syncing'}
+              className="px-2 py-0.5 rounded text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
+              title="重新尝试失败的同步任务"
+            >
+              {syncStatus === 'syncing' ? '同步中' : '重试'}
+            </button>
+          ) : (
+            <button
+              onClick={() => void triggerPush()}
+              disabled={syncStatus === 'syncing'}
+              className="px-2 py-0.5 rounded text-[11px] font-medium bg-bg-main hover:bg-hover-bg border border-border-color transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
+              title="立即将本地修改推送到 PostgreSQL"
+            >
+              {syncStatus === 'syncing' ? '同步中' : '立即上传'}
+            </button>
+          )}
+        </div>
+        {errorMessage && (
+          <div className="text-[11px] text-red-500 truncate px-1" title={errorMessage}>
+            {errorMessage}
+          </div>
+        )}
+        {lastSyncAt && !errorMessage && errorCount === 0 && (
+          <div className="text-[10px] text-text-secondary/70 px-1 truncate">
+            上次上传: {new Date(lastSyncAt).toLocaleTimeString()}
+          </div>
+        )}
+      </div>
     </aside>
   );
 }

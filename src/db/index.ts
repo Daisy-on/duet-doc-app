@@ -27,6 +27,81 @@ export interface DocumentAsset {
   orphanedAt?: number;
 }
 
+export type SyncEntityType = 'knowledge_base' | 'group' | 'document';
+
+export interface KnowledgeBaseSyncData {
+  name: string;
+  description: string;
+  icon: string;
+  created_at: string;
+}
+
+export interface GroupSyncData {
+  kb_id: string;
+  parent_group_id: string | null;
+  name: string;
+  sort_order: number;
+  depth: number;
+  created_at: string;
+}
+
+export interface DocumentSyncData {
+  kb_id: string;
+  group_id: string | null;
+  title: string;
+  content: string;
+  content_format: 'html' | 'tiptap_json';
+  created_at: string;
+}
+
+export type SyncEntityData = KnowledgeBaseSyncData | GroupSyncData | DocumentSyncData;
+
+export interface SyncOperation {
+  entity_type: SyncEntityType;
+  entity_id: string;
+  operation: 'upsert' | 'delete';
+  base_revision: number;
+  data?: SyncEntityData;
+}
+
+export interface SyncState {
+  workspaceId: string;
+  pullCursor: number;
+  serverUrl: string;
+  userId: string;
+  lastSyncAt: number | null;
+  nextOutboxSequence?: number;
+}
+
+export interface SyncEntityState {
+  workspaceId: string;
+  entityId: string;
+  entityType: SyncEntityType;
+  serverRev: number;
+  localMutationSeq: number;
+  updatedAt: number;
+}
+
+export interface SyncEntityStateV2 {
+  workspaceId: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  serverRev: number;
+  localMutationSeq: number;
+  updatedAt: number;
+}
+
+export interface SyncOutboxEntry {
+  mutationId: string;
+  workspaceId: string;
+  queueSequence: number;
+  operations: SyncOperation[];
+  status: 'pending' | 'pushing' | 'error';
+  errorCode?: string;
+  errorReason?: string;
+  createdAt: number;
+}
+
 export class DuetDocDB extends Dexie {
   knowledgeBases!: Table<KnowledgeBase, string>;
   groups!: Table<Group, string>;
@@ -39,6 +114,10 @@ export class DuetDocDB extends Dexie {
   assets!: Table<DocumentAsset, string>;
   documentChunks!: Table<DocumentChunk, string>;
   documentIndexStates!: Table<DocumentIndexState, string>;
+  syncState!: Table<SyncState, string>;
+  syncEntityStates!: Table<SyncEntityState, [string, string]>;
+  syncEntityStatesV2!: Table<SyncEntityStateV2, [string, SyncEntityType, string]>;
+  syncOutbox!: Table<SyncOutboxEntry, string>;
 
   constructor() {
     super('DuetDocDB');
@@ -96,6 +175,69 @@ export class DuetDocDB extends Dexie {
         'id, sourceId, kbId, sourceType, contentHash, indexedAt, [sourceId+chunkIndex]',
       documentIndexStates: 'sourceId, kbId, status, sourceUpdatedAt',
     });
+    this.version(6).stores({
+      knowledgeBases: 'id, createdAt',
+      groups: 'id, kbId, parentGroupId, createdAt',
+      documents: 'id, kbId, groupId, createdAt',
+      favoriteFolders: 'id, createdAt',
+      favoriteItems: 'id, docId, favoritedAt',
+      chatSessions: 'id, createdAt',
+      chatMessages: 'id, sessionId, createdAt',
+      documentVersions: 'id, docId, createdAt, [docId+createdAt]',
+      assets: 'id, docId, createdAt',
+      documentChunks:
+        'id, sourceId, kbId, sourceType, contentHash, indexedAt, [sourceId+chunkIndex]',
+      documentIndexStates: 'sourceId, kbId, status, sourceUpdatedAt',
+      syncState: 'workspaceId',
+      syncEntityStates: '[workspaceId+entityId], workspaceId, entityId, entityType',
+      syncOutbox: 'mutationId, workspaceId, status, createdAt',
+    });
+    this.version(7)
+      .stores({
+        knowledgeBases: 'id, createdAt',
+        groups: 'id, kbId, parentGroupId, createdAt',
+        documents: 'id, kbId, groupId, createdAt',
+        favoriteFolders: 'id, createdAt',
+        favoriteItems: 'id, docId, favoritedAt',
+        chatSessions: 'id, createdAt',
+        chatMessages: 'id, sessionId, createdAt',
+        documentVersions: 'id, docId, createdAt, [docId+createdAt]',
+        assets: 'id, docId, createdAt',
+        documentChunks:
+          'id, sourceId, kbId, sourceType, contentHash, indexedAt, [sourceId+chunkIndex]',
+        documentIndexStates: 'sourceId, kbId, status, sourceUpdatedAt',
+        syncState: 'workspaceId',
+        syncEntityStates: '[workspaceId+entityId], workspaceId, entityId, entityType',
+        syncEntityStatesV2: '[workspaceId+entityType+entityId], workspaceId, entityType, entityId',
+        syncOutbox:
+          'mutationId, workspaceId, status, queueSequence, [workspaceId+status+queueSequence]',
+      })
+      .upgrade(async (tx) => {
+        // 1. 安全平滑迁移旧表数据至 syncEntityStatesV2
+        const oldRows = await tx.table<SyncEntityState>('syncEntityStates').toArray();
+        if (oldRows.length > 0) {
+          const v2Rows: SyncEntityStateV2[] = oldRows.map((r) => ({
+            workspaceId: r.workspaceId,
+            entityType: r.entityType,
+            entityId: r.entityId,
+            serverRev: r.serverRev,
+            localMutationSeq: r.localMutationSeq,
+            updatedAt: r.updatedAt,
+          }));
+          await tx.table('syncEntityStatesV2').bulkPut(v2Rows);
+        }
+
+        // 2. 为遗留的 syncOutbox 记录补齐 queueSequence
+        const outboxTable = tx.table<SyncOutboxEntry>('syncOutbox');
+        const outboxEntries = await outboxTable.toArray();
+        outboxEntries.sort((a, b) => a.createdAt - b.createdAt);
+        let seq = 1;
+        for (const entry of outboxEntries) {
+          if (typeof entry.queueSequence !== 'number') {
+            await outboxTable.update(entry.mutationId, { queueSequence: seq++ });
+          }
+        }
+      });
   }
 }
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { Transaction } from 'dexie';
-import { db, deleteDocumentsCascadeInTx, type DocumentVersion } from '../db';
+import { db, deleteDocumentsCascadeInTx, type DocumentVersion, type SyncOperation } from '../db';
 import { useFavoritesStore } from './favoritesStore';
 import { saveCoordinator, type SaveUpdates, type DeleteHandle } from '../utils/SaveCoordinator';
 import { extractAssetIds } from '../utils/assetUtils';
@@ -9,6 +9,8 @@ import { runAssetGC } from '../assets/runAssetGC';
 import { useEditorStore } from './index';
 import { scheduleDocumentIndex } from '../rag/documentIndexer';
 import { updateDocumentChunkScope } from '../rag/chunkRepository';
+import { enqueueMutationInTx, detectContentFormat } from '../sync/syncOutboxHelper';
+import { useSyncStore } from './syncStore';
 
 export const MEMO_KB_ID = 'kb-memo-system';
 
@@ -372,80 +374,109 @@ let games = reactive([
 const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
   const now = Date.now();
   let persistedDocument: Document | null = null;
-  await db.transaction('rw', [db.documents, db.documentVersions, db.assets], async (tx) => {
-    const docTable = tx.table<Document, string>('documents');
-    const verTable = tx.table<DocumentVersion, string>('documentVersions');
+  await db.transaction(
+    'rw',
+    [
+      db.documents,
+      db.documentVersions,
+      db.assets,
+      db.syncOutbox,
+      db.syncEntityStatesV2,
+      db.syncState,
+    ],
+    async (tx) => {
+      const docTable = tx.table<Document, string>('documents');
+      const verTable = tx.table<DocumentVersion, string>('documentVersions');
 
-    const existingDoc = await docTable.get(id);
-    if (!existingDoc) return;
+      const existingDoc = await docTable.get(id);
+      if (!existingDoc) return;
 
-    const oldContent = existingDoc.content || '';
-    const newContent = updates.content !== undefined ? updates.content : oldContent;
-    const newTitle = updates.title !== undefined ? updates.title : existingDoc.title;
+      const oldContent = existingDoc.content || '';
+      const newContent = updates.content !== undefined ? updates.content : oldContent;
+      const newTitle = updates.title !== undefined ? updates.title : existingDoc.title;
 
-    await docTable.update(id, {
-      title: newTitle,
-      content: newContent,
-      updatedAt: now,
-    });
-    persistedDocument = {
-      ...existingDoc,
-      title: newTitle,
-      content: newContent,
-      updatedAt: now,
-    };
+      await docTable.update(id, {
+        title: newTitle,
+        content: newContent,
+        updatedAt: now,
+      });
+      persistedDocument = {
+        ...existingDoc,
+        title: newTitle,
+        content: newContent,
+        updatedAt: now,
+      };
 
-    if (updates.content !== undefined) {
-      const oldAssets = extractAssetIds(oldContent);
-      const newAssets = extractAssetIds(newContent);
+      // 变更原子入队 syncOutbox，支持 pending 原地合并与智能格式嗅探
+      await enqueueMutationInTx(tx, [
+        {
+          entity_type: 'document',
+          entity_id: id,
+          operation: 'upsert',
+          base_revision: 0,
+          data: {
+            kb_id: existingDoc.kbId,
+            group_id: existingDoc.groupId,
+            title: newTitle,
+            content: newContent,
+            content_format: detectContentFormat(newContent),
+            created_at: new Date(existingDoc.createdAt).toISOString(),
+          },
+        },
+      ]);
 
-      let isStructuralDelete = false;
-      for (const assetId of oldAssets) {
-        if (!newAssets.has(assetId)) {
-          isStructuralDelete = true;
-          break;
+      if (updates.content !== undefined) {
+        const oldAssets = extractAssetIds(oldContent);
+        const newAssets = extractAssetIds(newContent);
+
+        let isStructuralDelete = false;
+        for (const assetId of oldAssets) {
+          if (!newAssets.has(assetId)) {
+            isStructuralDelete = true;
+            break;
+          }
         }
-      }
 
-      const versions = await verTable.where('docId').equals(id).toArray();
-      const autoVersions = versions
-        .filter((v) => v.saveType === 'auto')
-        .sort((a, b) => a.createdAt - b.createdAt);
-      const latestVersion = autoVersions[autoVersions.length - 1];
-      const FIVE_MINUTES = 5 * 60 * 1000;
+        const versions = await verTable.where('docId').equals(id).toArray();
+        const autoVersions = versions
+          .filter((v) => v.saveType === 'auto')
+          .sort((a, b) => a.createdAt - b.createdAt);
+        const latestVersion = autoVersions[autoVersions.length - 1];
+        const FIVE_MINUTES = 5 * 60 * 1000;
 
-      if (!isStructuralDelete && latestVersion && now - latestVersion.createdAt < FIVE_MINUTES) {
-        await verTable.update(latestVersion.id, {
-          content: newContent,
-          title: newTitle,
-        });
-      } else {
-        if (isStructuralDelete) {
-          const checkpointId = `ver-${nanoid(12)}`;
+        if (!isStructuralDelete && latestVersion && now - latestVersion.createdAt < FIVE_MINUTES) {
+          await verTable.update(latestVersion.id, {
+            content: newContent,
+            title: newTitle,
+          });
+        } else {
+          if (isStructuralDelete) {
+            const checkpointId = `ver-${nanoid(12)}`;
+            await verTable.add({
+              id: checkpointId,
+              docId: id,
+              title: existingDoc.title,
+              content: oldContent,
+              createdAt: now - 1,
+              saveType: 'auto',
+            });
+          }
+
+          const versionId = `ver-${nanoid(12)}`;
           await verTable.add({
-            id: checkpointId,
+            id: versionId,
             docId: id,
-            title: existingDoc.title,
-            content: oldContent,
-            createdAt: now - 1,
+            title: newTitle,
+            content: newContent,
+            createdAt: now,
             saveType: 'auto',
           });
+
+          await enforceVersionLimitInTx(tx, id);
         }
-
-        const versionId = `ver-${nanoid(12)}`;
-        await verTable.add({
-          id: versionId,
-          docId: id,
-          title: newTitle,
-          content: newContent,
-          createdAt: now,
-          saveType: 'auto',
-        });
-
-        await enforceVersionLimitInTx(tx, id);
       }
-    }
-  });
+    },
+  );
 
   if (updates.content !== undefined) {
     runAssetGC(id).catch((err) => console.error('Asset GC error:', err));
@@ -453,6 +484,7 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
   if (persistedDocument && (updates.content !== undefined || updates.title !== undefined)) {
     scheduleDocumentIndex(persistedDocument);
   }
+  void useSyncStore.getState().refreshCounts();
 };
 
 export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
@@ -463,7 +495,11 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
   initStore: async () => {
     try {
       const kbCount = await db.knowledgeBases.count();
-      if (kbCount === 0) {
+      const isCloudSyncSuppressed =
+        typeof window !== 'undefined' &&
+        window.localStorage.getItem('duet-doc:cloud-sync-enabled') === 'true';
+
+      if (kbCount === 0 && !isCloudSyncSuppressed) {
         await db.knowledgeBases.bulkAdd(initialKBs);
         await db.groups.bulkAdd(initialGroups);
         await db.documents.bulkAdd(initialDocs);
@@ -478,6 +514,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         groups: grps.sort((a, b) => a.order - b.order),
         documents: docs,
       });
+
+      // 初始化同步状态
+      void useSyncStore.getState().initSyncStore();
     } catch (error) {
       console.error('Failed to initialize KnowledgeBaseStore from Dexie:', error);
     }
@@ -494,7 +533,30 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    db.knowledgeBases.add(newKB).catch((err) => console.error('Dexie error:', err));
+    db.transaction(
+      'rw',
+      [db.knowledgeBases, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        await tx.table('knowledgeBases').add(newKB);
+        await enqueueMutationInTx(tx, [
+          {
+            entity_type: 'knowledge_base',
+            entity_id: id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              name: newKB.name,
+              description: newKB.description,
+              icon: newKB.icon,
+              created_at: new Date(newKB.createdAt).toISOString(),
+            },
+          },
+        ]);
+      },
+    )
+      .then(() => useSyncStore.getState().refreshCounts())
+      .catch((err) => console.error('Dexie error:', err));
+
     set((state) => ({
       knowledgeBases: [...state.knowledgeBases, newKB],
     }));
@@ -503,9 +565,34 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   updateKnowledgeBase: (id, data) => {
     const updatedAt = Date.now();
-    db.knowledgeBases
-      .update(id, { ...data, updatedAt })
+    db.transaction(
+      'rw',
+      [db.knowledgeBases, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        const kbTable = tx.table<KnowledgeBase, string>('knowledgeBases');
+        const existing = await kbTable.get(id);
+        if (!existing) return;
+        const updated = { ...existing, ...data, updatedAt };
+        await kbTable.put(updated);
+        await enqueueMutationInTx(tx, [
+          {
+            entity_type: 'knowledge_base',
+            entity_id: id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              name: updated.name,
+              description: updated.description,
+              icon: updated.icon,
+              created_at: new Date(updated.createdAt).toISOString(),
+            },
+          },
+        ]);
+      },
+    )
+      .then(() => useSyncStore.getState().refreshCounts())
       .catch((err) => console.error('Dexie error:', err));
+
     set((state) => ({
       knowledgeBases: state.knowledgeBases.map((kb) =>
         kb.id === id ? { ...kb, ...data, updatedAt } : kb,
@@ -538,12 +625,53 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
           db.favoriteItems,
           db.documentChunks,
           db.documentIndexStates,
+          db.syncOutbox,
+          db.syncEntityStatesV2,
+          db.syncState,
         ],
         async (tx) => {
-          const dbDocs = await tx.table('documents').where('kbId').equals(id).toArray();
-          const dbGroups = await tx.table('groups').where('kbId').equals(id).toArray();
+          const dbDocs = await tx
+            .table<Document, string>('documents')
+            .where('kbId')
+            .equals(id)
+            .toArray();
+          const dbGroups = await tx
+            .table<Group, string>('groups')
+            .where('kbId')
+            .equals(id)
+            .toArray();
           docIds = dbDocs.map((d) => d.id);
           const groupIds = dbGroups.map((g) => g.id);
+
+          // 构造原子变更组：按文档 -> 子分组 -> 父分组 -> 知识库的级联顺序删除
+          const operations: SyncOperation[] = [];
+          for (const doc of dbDocs) {
+            operations.push({
+              entity_type: 'document',
+              entity_id: doc.id,
+              operation: 'delete',
+              base_revision: 0,
+            });
+          }
+
+          const sortedGroups = [...dbGroups].sort((a, b) => b.depth - a.depth);
+          for (const g of sortedGroups) {
+            operations.push({
+              entity_type: 'group',
+              entity_id: g.id,
+              operation: 'delete',
+              base_revision: 0,
+            });
+          }
+
+          operations.push({
+            entity_type: 'knowledge_base',
+            entity_id: id,
+            operation: 'delete',
+            base_revision: 0,
+          });
+
+          await enqueueMutationInTx(tx, operations);
 
           await tx.table('knowledgeBases').delete(id);
           if (groupIds.length > 0) {
@@ -564,6 +692,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     // 数据库物理删除成功后，提交屏障并更新内存状态
     const h = handle as DeleteHandle | null;
     if (h) h.commit();
+    void useSyncStore.getState().refreshCounts();
 
     try {
       if (docIds.length > 0) {
@@ -614,7 +743,33 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    db.groups.add(newGroup).catch((err) => console.error('Dexie error:', err));
+
+    db.transaction(
+      'rw',
+      [db.groups, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        await tx.table('groups').add(newGroup);
+        await enqueueMutationInTx(tx, [
+          {
+            entity_type: 'group',
+            entity_id: id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              kb_id: newGroup.kbId,
+              parent_group_id: newGroup.parentGroupId,
+              name: newGroup.name,
+              sort_order: newGroup.order,
+              depth: newGroup.depth,
+              created_at: new Date(newGroup.createdAt).toISOString(),
+            },
+          },
+        ]);
+      },
+    )
+      .then(() => useSyncStore.getState().refreshCounts())
+      .catch((err) => console.error('Dexie error:', err));
+
     set((state) => ({
       groups: [...state.groups, newGroup],
     }));
@@ -623,7 +778,36 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   updateGroup: (id, data) => {
     const updatedAt = Date.now();
-    db.groups.update(id, { ...data, updatedAt }).catch((err) => console.error('Dexie error:', err));
+    db.transaction(
+      'rw',
+      [db.groups, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        const grpTable = tx.table<Group, string>('groups');
+        const existing = await grpTable.get(id);
+        if (!existing) return;
+        const updated = { ...existing, ...data, updatedAt };
+        await grpTable.put(updated);
+        await enqueueMutationInTx(tx, [
+          {
+            entity_type: 'group',
+            entity_id: id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              kb_id: updated.kbId,
+              parent_group_id: updated.parentGroupId,
+              name: updated.name,
+              sort_order: updated.order,
+              depth: updated.depth,
+              created_at: new Date(updated.createdAt).toISOString(),
+            },
+          },
+        ]);
+      },
+    )
+      .then(() => useSyncStore.getState().refreshCounts())
+      .catch((err) => console.error('Dexie error:', err));
+
     set((state) => ({
       groups: state.groups.map((g) => (g.id === id ? { ...g, ...data, updatedAt } : g)),
     }));
@@ -672,9 +856,12 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
           db.favoriteItems,
           db.documentChunks,
           db.documentIndexStates,
+          db.syncOutbox,
+          db.syncEntityStatesV2,
+          db.syncState,
         ],
         async (tx) => {
-          const allGroups = await tx.table('groups').toArray();
+          const allGroups = await tx.table<Group, string>('groups').toArray();
           deleteGroupIdsSet = new Set<string>([id]);
 
           let added = true;
@@ -692,11 +879,35 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
             }
           }
 
-          const deleteGroupIds = Array.from(deleteGroupIdsSet);
-          const dbDocs = await tx.table('documents').toArray();
-          docIds = dbDocs
-            .filter((d) => d.groupId && deleteGroupIdsSet.has(d.groupId))
-            .map((d) => d.id);
+          const deleteGroupsList = allGroups.filter((g) => deleteGroupIdsSet.has(g.id));
+          // 按深度从深到浅排序分组（子先父后）
+          deleteGroupsList.sort((a, b) => b.depth - a.depth);
+          const deleteGroupIds = deleteGroupsList.map((g) => g.id);
+
+          const dbDocs = await tx.table<Document, string>('documents').toArray();
+          const targetDocs = dbDocs.filter((d) => d.groupId && deleteGroupIdsSet.has(d.groupId));
+          docIds = targetDocs.map((d) => d.id);
+
+          // 构造原子变更组：先文档，后子分组，最后根级被删分组
+          const operations: SyncOperation[] = [];
+          for (const doc of targetDocs) {
+            operations.push({
+              entity_type: 'document',
+              entity_id: doc.id,
+              operation: 'delete',
+              base_revision: 0,
+            });
+          }
+          for (const g of deleteGroupsList) {
+            operations.push({
+              entity_type: 'group',
+              entity_id: g.id,
+              operation: 'delete',
+              base_revision: 0,
+            });
+          }
+
+          await enqueueMutationInTx(tx, operations);
 
           await tx.table('groups').bulkDelete(deleteGroupIds);
           if (docIds.length > 0) {
@@ -713,6 +924,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
     const h = handle as DeleteHandle | null;
     if (h) h.commit();
+    void useSyncStore.getState().refreshCounts();
 
     try {
       if (docIds.length > 0) {
@@ -747,9 +959,33 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    db.documents
-      .add(newDoc)
-      .then(() => scheduleDocumentIndex(newDoc))
+    db.transaction(
+      'rw',
+      [db.documents, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        await tx.table('documents').add(newDoc);
+        await enqueueMutationInTx(tx, [
+          {
+            entity_type: 'document',
+            entity_id: id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              kb_id: newDoc.kbId,
+              group_id: newDoc.groupId,
+              title: newDoc.title,
+              content: newDoc.content,
+              content_format: detectContentFormat(newDoc.content),
+              created_at: new Date(newDoc.createdAt).toISOString(),
+            },
+          },
+        ]);
+      },
+    )
+      .then(() => {
+        scheduleDocumentIndex(newDoc);
+        void useSyncStore.getState().refreshCounts();
+      })
       .catch((err) => console.error('Dexie error:', err));
     set((state) => ({
       documents: [...state.documents, newDoc],
@@ -840,10 +1076,17 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         // 3. Perform ALL operations inside a single atomic Dexie transaction!
         const result = await db.transaction(
           'rw',
-          [db.documents, db.documentVersions, db.assets],
+          [
+            db.documents,
+            db.documentVersions,
+            db.assets,
+            db.syncOutbox,
+            db.syncEntityStatesV2,
+            db.syncState,
+          ],
           async (tx) => {
-            const docTable = tx.table('documents');
-            const verTable = tx.table('documentVersions');
+            const docTable = tx.table<Document, string>('documents');
+            const verTable = tx.table<DocumentVersion, string>('documentVersions');
             const assetTable = tx.table('assets');
 
             const targetVer = await verTable.get(versionId);
@@ -888,6 +1131,24 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
               updatedAt: now,
             });
 
+            // 恢复版本入队 syncOutbox
+            await enqueueMutationInTx(tx, [
+              {
+                entity_type: 'document',
+                entity_id: docId,
+                operation: 'upsert',
+                base_revision: 0,
+                data: {
+                  kb_id: latestDbDoc.kbId,
+                  group_id: latestDbDoc.groupId,
+                  title: targetVer.title,
+                  content: targetVer.content,
+                  content_format: detectContentFormat(targetVer.content),
+                  created_at: new Date(latestDbDoc.createdAt).toISOString(),
+                },
+              },
+            ]);
+
             return {
               restored: true,
               title: targetVer.title,
@@ -925,6 +1186,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         runAssetGC(docId).catch((err) => console.error('Asset GC error after restore:', err));
         const restoredDocument = await db.documents.get(docId);
         if (restoredDocument) scheduleDocumentIndex(restoredDocument);
+        void useSyncStore.getState().refreshCounts();
 
         return { restored: true };
       } finally {
@@ -949,8 +1211,19 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
           db.favoriteItems,
           db.documentChunks,
           db.documentIndexStates,
+          db.syncOutbox,
+          db.syncEntityStatesV2,
+          db.syncState,
         ],
         async (tx) => {
+          await enqueueMutationInTx(tx, [
+            {
+              entity_type: 'document',
+              entity_id: id,
+              operation: 'delete',
+              base_revision: 0,
+            },
+          ]);
           await deleteDocumentsCascadeInTx(tx, [id]);
         },
       );
@@ -963,6 +1236,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
     const h = handle as DeleteHandle | null;
     if (h) h.commit();
+    void useSyncStore.getState().refreshCounts();
 
     try {
       useFavoritesStore.setState((state) => ({
@@ -1055,12 +1329,39 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   moveDocument: (id, targetKbId, targetGroupId) => {
     const updatedAt = Date.now();
-    db.documents
-      .update(id, { kbId: targetKbId, groupId: targetGroupId, updatedAt })
-      .then(() =>
-        updateDocumentChunkScope(id, targetKbId, targetKbId === MEMO_KB_ID ? 'memo' : 'document'),
-      )
+    db.transaction(
+      'rw',
+      [db.documents, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        const docTable = tx.table<Document, string>('documents');
+        const existing = await docTable.get(id);
+        if (!existing) return;
+        const updated = { ...existing, kbId: targetKbId, groupId: targetGroupId, updatedAt };
+        await docTable.put(updated);
+        await enqueueMutationInTx(tx, [
+          {
+            entity_type: 'document',
+            entity_id: id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              kb_id: targetKbId,
+              group_id: targetGroupId,
+              title: updated.title,
+              content: updated.content,
+              content_format: detectContentFormat(updated.content),
+              created_at: new Date(updated.createdAt).toISOString(),
+            },
+          },
+        ]);
+      },
+    )
+      .then(() => {
+        updateDocumentChunkScope(id, targetKbId, targetKbId === MEMO_KB_ID ? 'memo' : 'document');
+        void useSyncStore.getState().refreshCounts();
+      })
       .catch((err) => console.error('Dexie error:', err));
+
     set((state) => ({
       documents: state.documents.map((doc) =>
         doc.id === id ? { ...doc, kbId: targetKbId, groupId: targetGroupId, updatedAt } : doc,
@@ -1107,46 +1408,105 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       .documents.filter((doc) => doc.groupId && allGroupIds.includes(doc.groupId))
       .map((doc) => doc.id);
 
-    // Save updates in Dexie
-    db.groups
-      .update(groupId, {
-        kbId: targetKbId,
-        parentGroupId: targetParentGroupId,
-        depth: newDepthOfG,
-        updatedAt: Date.now(),
-      })
-      .catch((err) => console.error(err));
-    void Promise.all(
-      movedDocumentIds.map((docId) =>
-        updateDocumentChunkScope(
-          docId,
-          targetKbId,
-          targetKbId === MEMO_KB_ID ? 'memo' : 'document',
-        ),
-      ),
-    ).catch((err) =>
-      console.error('[LocalRAG] Failed to update moved document index metadata:', err),
-    );
-    descendantIds.forEach((descId) => {
-      const descG = get().groups.find((g) => g.id === descId);
-      if (descG) {
-        db.groups
-          .update(descId, {
+    const now = Date.now();
+
+    // 在同一个事务中原子更新 DB 并写入 syncOutbox 变更组
+    db.transaction(
+      'rw',
+      [db.groups, db.documents, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        const grpTable = tx.table<Group, string>('groups');
+        const docTable = tx.table<Document, string>('documents');
+
+        // 更新并构造移动分组的变更
+        const updatedGroupList: Group[] = [];
+        const movedG: Group = {
+          ...G,
+          kbId: targetKbId,
+          parentGroupId: targetParentGroupId,
+          depth: newDepthOfG,
+          updatedAt: now,
+        };
+        await grpTable.put(movedG);
+        updatedGroupList.push(movedG);
+
+        for (const descId of descendantIds) {
+          const descG = get().groups.find((g) => g.id === descId);
+          if (descG) {
+            const updatedDescG: Group = {
+              ...descG,
+              kbId: targetKbId,
+              depth: newDepthOfG + (descG.depth - oldDepthOfG),
+              updatedAt: now,
+            };
+            await grpTable.put(updatedDescG);
+            updatedGroupList.push(updatedDescG);
+          }
+        }
+
+        // 按深度递增排序（父先子后）构造 operations
+        updatedGroupList.sort((a, b) => a.depth - b.depth);
+        const operations: SyncOperation[] = updatedGroupList.map((g) => ({
+          entity_type: 'group',
+          entity_id: g.id,
+          operation: 'upsert',
+          base_revision: 0,
+          data: {
+            kb_id: g.kbId,
+            parent_group_id: g.parentGroupId,
+            name: g.name,
+            sort_order: g.order,
+            depth: g.depth,
+            created_at: new Date(g.createdAt).toISOString(),
+          },
+        }));
+
+        // 更新并构造所属文档变更
+        const affectedDocs = await docTable.where('groupId').anyOf(allGroupIds).toArray();
+        for (const doc of affectedDocs) {
+          const updatedDoc: Document = {
+            ...doc,
             kbId: targetKbId,
-            depth: newDepthOfG + (descG.depth - oldDepthOfG),
-            updatedAt: Date.now(),
-          })
-          .catch((err) => console.error(err));
-      }
-    });
-    db.documents
-      .where('groupId')
-      .anyOf(allGroupIds)
-      .modify({ kbId: targetKbId, updatedAt: Date.now() })
-      .catch((err) => console.error(err));
+            updatedAt: now,
+          };
+          await docTable.put(updatedDoc);
+          operations.push({
+            entity_type: 'document',
+            entity_id: doc.id,
+            operation: 'upsert',
+            base_revision: 0,
+            data: {
+              kb_id: updatedDoc.kbId,
+              group_id: updatedDoc.groupId,
+              title: updatedDoc.title,
+              content: updatedDoc.content,
+              content_format: detectContentFormat(updatedDoc.content),
+              created_at: new Date(updatedDoc.createdAt).toISOString(),
+            },
+          });
+        }
+
+        await enqueueMutationInTx(tx, operations);
+      },
+    )
+      .then(() => {
+        void Promise.all(
+          movedDocumentIds.map((docId) =>
+            updateDocumentChunkScope(
+              docId,
+              targetKbId,
+              targetKbId === MEMO_KB_ID ? 'memo' : 'document',
+            ),
+          ),
+        ).catch((err) =>
+          console.error('[LocalRAG] Failed to update moved document index metadata:', err),
+        );
+        void useSyncStore.getState().refreshCounts();
+      })
+      .catch((err) => console.error('Move group transaction failed:', err));
 
     set((state) => {
-      // Update groups
+      // Update groups in memory
       const updatedGroups = state.groups.map((g) => {
         if (g.id === groupId) {
           return {
@@ -1154,26 +1514,26 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
             kbId: targetKbId,
             parentGroupId: targetParentGroupId,
             depth: newDepthOfG,
-            updatedAt: Date.now(),
+            updatedAt: now,
           };
         } else if (descendantIds.includes(g.id)) {
           return {
             ...g,
             kbId: targetKbId,
             depth: newDepthOfG + (g.depth - oldDepthOfG),
-            updatedAt: Date.now(),
+            updatedAt: now,
           };
         }
         return g;
       });
 
-      // Update documents
+      // Update documents in memory
       const updatedDocs = state.documents.map((doc) => {
         if (doc.groupId && allGroupIds.includes(doc.groupId)) {
           return {
             ...doc,
             kbId: targetKbId,
-            updatedAt: Date.now(),
+            updatedAt: now,
           };
         }
         return doc;
