@@ -118,6 +118,12 @@ export default function AIWriting() {
   );
 
   useEffect(() => {
+    if (sessionId && !sessions.some((session) => session.id === sessionId)) {
+      navigate('/ai-writing', { replace: true });
+    }
+  }, [navigate, sessionId, sessions]);
+
+  useEffect(() => {
     let isMounted = true;
     const checkHealth = async () => {
       try {

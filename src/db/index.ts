@@ -27,7 +27,8 @@ export interface DocumentAsset {
   orphanedAt?: number;
 }
 
-export type SyncEntityType = 'knowledge_base' | 'group' | 'document';
+export type SyncEntityType =
+  'knowledge_base' | 'group' | 'document' | 'chat_session' | 'chat_message';
 
 export interface KnowledgeBaseSyncData {
   name: string;
@@ -54,7 +55,37 @@ export interface DocumentSyncData {
   created_at: string;
 }
 
-export type SyncEntityData = KnowledgeBaseSyncData | GroupSyncData | DocumentSyncData;
+export interface ChatSessionSyncData {
+  title: string;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessageSyncData {
+  session_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status: 'complete' | 'stopped' | 'error';
+  web_search_urls: Array<{ title: string; url: string }>;
+  referenced_docs: Array<{ id: string; title: string }>;
+  knowledge_sources: Array<{
+    source_id: string;
+    source_type: 'document' | 'memo';
+    title: string;
+    chunk_index: number;
+    heading_path: string[];
+  }>;
+  ai_metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type SyncEntityData =
+  | KnowledgeBaseSyncData
+  | GroupSyncData
+  | DocumentSyncData
+  | ChatSessionSyncData
+  | ChatMessageSyncData;
 
 export interface SyncOperation {
   entity_type: SyncEntityType;
@@ -71,6 +102,7 @@ export interface SyncState {
   userId: string;
   lastSyncAt: number | null;
   nextOutboxSequence?: number;
+  chatBackfillVersion?: number;
 }
 
 export interface SyncEntityState {

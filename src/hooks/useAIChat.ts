@@ -217,12 +217,9 @@ export function useAIChat(sessionId: string | null) {
               .slice(0, 30);
             if (cleanTitle) {
               const updatedAt = Date.now();
-              await db.chatSessions.update(targetSessionId, { title: cleanTitle, updatedAt });
-              useAIWritingStore.setState((state) => ({
-                sessions: state.sessions.map((s) =>
-                  s.id === targetSessionId ? { ...s, title: cleanTitle, updatedAt } : s,
-                ),
-              }));
+              await useAIWritingStore
+                .getState()
+                .updateSession(targetSessionId, { title: cleanTitle, updatedAt });
             }
           },
         },

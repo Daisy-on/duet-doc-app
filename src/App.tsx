@@ -34,8 +34,8 @@ function App() {
   useEffect(() => {
     async function loadData() {
       try {
+        await useKnowledgeBaseStore.getState().initStore();
         await Promise.all([
-          useKnowledgeBaseStore.getState().initStore(),
           useFavoritesStore.getState().initStore(),
           useAIWritingStore.getState().initStore(),
         ]);

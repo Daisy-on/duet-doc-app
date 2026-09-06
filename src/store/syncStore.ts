@@ -8,10 +8,16 @@ import {
   DEFAULT_USER_ID,
 } from '../sync/syncOutboxHelper';
 import type { SyncEntityStateV2, SyncEntityType, SyncOperation } from '../db';
+import { toChatMessageSyncData, toChatSessionSyncData } from '../sync/chatSyncMapper';
 
 export { DEFAULT_WORKSPACE_ID, DEFAULT_USER_ID };
 
 export type SyncUiStatus = 'idle' | 'syncing' | 'error' | 'offline';
+
+// Version 4 normalizes legacy session activity time from the latest message
+// and sends it to the server instead of using the migration upload time.
+const CHAT_BACKFILL_VERSION = 4;
+const MISSING_CHAT_SESSION_ERROR = 'Chat message has no active session';
 
 interface SyncStore {
   workspaceId: string;
@@ -30,6 +36,7 @@ interface SyncStore {
   checkRemoteUpdates: () => Promise<void>;
   refreshCounts: () => Promise<{ pending: number; error: number }>;
   enqueueExistingLocalDataIfNeeded: () => Promise<number>;
+  enqueueExistingChatsIfNeeded: () => Promise<number>;
   triggerSync: () => Promise<{ success: boolean; error?: string }>;
   retryErrors: () => Promise<void>;
   resolveConflict: (
@@ -83,6 +90,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
       // 检查并对未登记过的本地存量数据执行入队
       await get().enqueueExistingLocalDataIfNeeded();
+      await get().enqueueExistingChatsIfNeeded();
       void get()
         .checkRemoteUpdates()
         .catch(() => undefined);
@@ -245,6 +253,190 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     return 0;
   },
 
+  enqueueExistingChatsIfNeeded: async () => {
+    const workspaceId = get().workspaceId;
+    const syncState = await db.syncState.get(workspaceId);
+    if ((syncState?.chatBackfillVersion ?? 0) >= CHAT_BACKFILL_VERSION) return 0;
+
+    const [sessions, messages, initialOutboxEntries] = await Promise.all([
+      db.chatSessions.toArray(),
+      db.chatMessages.orderBy('createdAt').toArray(),
+      db.syncOutbox.where('workspaceId').equals(workspaceId).toArray(),
+    ]);
+    const existingSessionIds = new Set(sessions.map((session) => session.id));
+    const orphanMessageIds = new Set(
+      messages
+        .filter((message) => !existingSessionIds.has(message.sessionId))
+        .map((message) => message.id),
+    );
+    const messageData = new Map(
+      messages
+        .filter((message) => existingSessionIds.has(message.sessionId))
+        .map((message) => [message, toChatMessageSyncData(message)] as const)
+        .filter((entry) => entry[1] !== null),
+    );
+    const latestMessageAt = new Map<string, number>();
+    for (const message of messageData.keys()) {
+      latestMessageAt.set(
+        message.sessionId,
+        Math.max(latestMessageAt.get(message.sessionId) ?? 0, message.createdAt),
+      );
+    }
+    const validSessionIds = new Set([...messageData.keys()].map((message) => message.sessionId));
+    const validSessions = sessions
+      .filter((session) => validSessionIds.has(session.id))
+      .map((session) => ({
+        ...session,
+        updatedAt: Math.max(
+          session.createdAt,
+          latestMessageAt.get(session.id) ?? session.createdAt,
+        ),
+      }));
+
+    let repairedOutboxEntries = false;
+    if (orphanMessageIds.size > 0) {
+      await db.transaction('rw', [db.syncOutbox, db.syncEntityStatesV2], async (tx) => {
+        const outbox = tx.table('syncOutbox');
+        const states = tx.table('syncEntityStatesV2');
+
+        for (const entry of initialOutboxEntries) {
+          const operations = entry.operations.filter(
+            (operation) =>
+              operation.entity_type !== 'chat_message' ||
+              operation.operation !== 'upsert' ||
+              !orphanMessageIds.has(operation.entity_id),
+          );
+          if (operations.length === entry.operations.length) continue;
+
+          repairedOutboxEntries = true;
+          if (operations.length === 0) {
+            await outbox.delete(entry.mutationId);
+          } else {
+            const repairsMissingParentError =
+              entry.status === 'error' && entry.errorReason === MISSING_CHAT_SESSION_ERROR;
+            await outbox.update(entry.mutationId, {
+              operations,
+              status: repairsMissingParentError ? 'pending' : entry.status,
+              errorCode: repairsMissingParentError ? undefined : entry.errorCode,
+              errorReason: repairsMissingParentError ? undefined : entry.errorReason,
+            });
+          }
+        }
+
+        await states.bulkDelete(
+          [...orphanMessageIds].map((messageId) => [workspaceId, 'chat_message', messageId]),
+        );
+      });
+
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[CloudSync] Skipped ${orphanMessageIds.size} legacy chat messages without a parent session.`,
+        );
+      }
+    }
+
+    const outboxEntries = repairedOutboxEntries
+      ? await db.syncOutbox.where('workspaceId').equals(workspaceId).toArray()
+      : initialOutboxEntries;
+    const queuedEntities = new Set(
+      outboxEntries
+        .filter((entry) => entry.workspaceId === workspaceId)
+        .flatMap((entry) =>
+          entry.operations.map((operation) => `${operation.entity_type}:${operation.entity_id}`),
+        ),
+    );
+    const sessionsToCheck = validSessions.filter(
+      (session) => !queuedEntities.has(`chat_session:${session.id}`),
+    );
+    const messagesToCheck = [...messageData.keys()].filter(
+      (message) => !queuedEntities.has(`chat_message:${message.id}`),
+    );
+    const hasEntitiesToCheck = sessionsToCheck.length > 0 || messagesToCheck.length > 0;
+    const remoteRevisions = hasEntitiesToCheck
+      ? await cloudSyncService.loadRemoteRevisions(workspaceId)
+      : new Map<string, number>();
+
+    await db.transaction(
+      'rw',
+      [db.chatSessions, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+      async (tx) => {
+        const states = tx.table<SyncEntityStateV2, [string, SyncEntityType, string]>(
+          'syncEntityStatesV2',
+        );
+        const stateTable = tx.table('syncState');
+        const current = await stateTable.get(workspaceId);
+        if (!current) {
+          await stateTable.put({
+            workspaceId,
+            pullCursor: 0,
+            serverUrl: window.location.origin,
+            userId: get().userId,
+            lastSyncAt: null,
+            nextOutboxSequence: 1,
+          });
+        }
+
+        await tx.table('chatSessions').bulkPut(validSessions);
+
+        const operations: SyncOperation[] = [];
+        for (const session of sessionsToCheck) {
+          const entityKey = `chat_session:${session.id}`;
+          const remoteRevision = remoteRevisions.get(entityKey);
+          await states.put({
+            workspaceId,
+            entityType: 'chat_session',
+            entityId: session.id,
+            serverRev: remoteRevision ?? 0,
+            localMutationSeq: 0,
+            updatedAt: Date.now(),
+          });
+          operations.push({
+            entity_type: 'chat_session',
+            entity_id: session.id,
+            operation: 'upsert',
+            base_revision: remoteRevision ?? 0,
+            data: toChatSessionSyncData(session),
+          });
+        }
+        for (const message of messagesToCheck) {
+          const entityKey = `chat_message:${message.id}`;
+          const remoteRevision = remoteRevisions.get(entityKey);
+          await states.put({
+            workspaceId,
+            entityType: 'chat_message',
+            entityId: message.id,
+            serverRev: remoteRevision ?? 0,
+            localMutationSeq: 0,
+            updatedAt: Date.now(),
+          });
+          if (remoteRevision === undefined) {
+            operations.push({
+              entity_type: 'chat_message',
+              entity_id: message.id,
+              operation: 'upsert',
+              base_revision: 0,
+              data: messageData.get(message)!,
+            });
+          }
+        }
+
+        await enqueueMutationInTx(tx, operations, workspaceId);
+        const latest = await stateTable.get(workspaceId);
+        await stateTable.put({
+          ...latest,
+          workspaceId,
+          chatBackfillVersion: CHAT_BACKFILL_VERSION,
+        });
+      },
+    );
+
+    const counts = await get().refreshCounts();
+    if (repairedOutboxEntries && counts.error === 0) {
+      set({ status: 'idle', errorMessage: null });
+    }
+    return counts.pending;
+  },
+
   triggerSync: async () => {
     if (get().status === 'syncing') {
       return { success: false, error: '正在同步中' };
@@ -254,9 +446,16 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
     try {
       await get().enqueueExistingLocalDataIfNeeded();
+      await get().enqueueExistingChatsIfNeeded();
       const res = await cloudSyncService.synchronize(get().workspaceId);
-      const { useKnowledgeBaseStore } = await import('./knowledgeBaseStore');
-      await useKnowledgeBaseStore.getState().reloadFromDb();
+      const [{ useKnowledgeBaseStore }, { useAIWritingStore }] = await Promise.all([
+        import('./knowledgeBaseStore'),
+        import('./aiWritingStore'),
+      ]);
+      await Promise.all([
+        useKnowledgeBaseStore.getState().reloadFromDb(),
+        useAIWritingStore.getState().reloadFromDb(),
+      ]);
       const counts = await get().refreshCounts();
       const conflicts = await cloudSyncService.listConflicts(get().workspaceId);
       const now = Date.now();
@@ -319,8 +518,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     try {
       set({ status: 'syncing', errorMessage: null });
       await cloudSyncService.resolveConflict(conflict, resolution);
-      const { useKnowledgeBaseStore } = await import('./knowledgeBaseStore');
-      await useKnowledgeBaseStore.getState().reloadFromDb();
+      const [{ useKnowledgeBaseStore }, { useAIWritingStore }] = await Promise.all([
+        import('./knowledgeBaseStore'),
+        import('./aiWritingStore'),
+      ]);
+      await Promise.all([
+        useKnowledgeBaseStore.getState().reloadFromDb(),
+        useAIWritingStore.getState().reloadFromDb(),
+      ]);
       const conflicts = await cloudSyncService.listConflicts(get().workspaceId);
       set({
         conflicts,

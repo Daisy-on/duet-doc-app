@@ -11,8 +11,9 @@ interface SyncConflictModalProps {
 
 function conflictLabel(conflict: SyncConflict): string {
   const snapshot = conflict.data.snapshot;
-  const value = snapshot.title ?? snapshot.name;
-  return typeof value === 'string' && value.trim() ? value : conflict.entityId;
+  const value = snapshot.title ?? snapshot.name ?? snapshot.content;
+  if (typeof value !== 'string' || !value.trim()) return conflict.entityId;
+  return value.length > 40 ? `${value.slice(0, 40)}...` : value;
 }
 
 export default function SyncConflictModal({

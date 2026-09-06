@@ -9,6 +9,13 @@ import type {
   SyncState,
 } from '../db';
 import type { Document, Group, KnowledgeBase } from '../store/knowledgeBaseStore';
+import type {
+  ChatMessage,
+  ChatSession,
+  KnowledgeSource,
+  ReferencedDoc,
+} from '../store/aiWritingStore';
+import type { AIResponseMetadata } from '../ai/types';
 import { scheduleDocumentIndex } from '../rag/documentIndexer';
 
 export interface PushResult {
@@ -66,24 +73,61 @@ function readConflictCode(entry: SyncOutboxEntry): string | undefined {
   }
 }
 
-function requiredString(snapshot: SyncRemoteSnapshot, field: string): string {
+function requiredString(snapshot: Record<string, unknown>, field: string): string {
   const value = snapshot[field];
   if (typeof value !== 'string') throw new Error(`云端快照缺少字段：${field}`);
   return value;
 }
 
-function nullableString(snapshot: SyncRemoteSnapshot, field: string): string | null {
+function nullableString(snapshot: Record<string, unknown>, field: string): string | null {
   const value = snapshot[field];
   if (value === null) return null;
   if (typeof value !== 'string') throw new Error(`云端快照字段格式错误：${field}`);
   return value;
 }
 
-function timestamp(snapshot: SyncRemoteSnapshot, field: string): number {
+function timestamp(snapshot: Record<string, unknown>, field: string): number {
   const value = requiredString(snapshot, field);
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) throw new Error(`云端时间字段格式错误：${field}`);
   return parsed;
+}
+
+function requiredBoolean(snapshot: Record<string, unknown>, field: string): boolean {
+  const value = snapshot[field];
+  if (typeof value !== 'boolean') throw new Error(`云端快照字段格式错误：${field}`);
+  return value;
+}
+
+function objectArray(snapshot: Record<string, unknown>, field: string): Record<string, unknown>[] {
+  const value = snapshot[field];
+  if (!Array.isArray(value) || value.some((item) => !item || typeof item !== 'object')) {
+    throw new Error(`云端快照字段格式错误：${field}`);
+  }
+  return value as Record<string, unknown>[];
+}
+
+function parseKnowledgeSources(snapshot: SyncRemoteSnapshot): KnowledgeSource[] {
+  return objectArray(snapshot, 'knowledge_sources').map((source) => {
+    const sourceType = requiredString(source, 'source_type');
+    const chunkIndex = source.chunk_index;
+    const headingPath = source.heading_path;
+    if (
+      (sourceType !== 'document' && sourceType !== 'memo') ||
+      typeof chunkIndex !== 'number' ||
+      !Array.isArray(headingPath) ||
+      headingPath.some((heading) => typeof heading !== 'string')
+    ) {
+      throw new Error('云端知识来源格式错误');
+    }
+    return {
+      sourceId: requiredString(source, 'source_id'),
+      sourceType,
+      title: requiredString(source, 'title'),
+      chunkIndex,
+      headingPath,
+    };
+  });
 }
 
 async function applyRemoteSnapshot(
@@ -96,8 +140,22 @@ async function applyRemoteSnapshot(
       await deleteDocumentsCascadeInTx(tx, [entityId]);
     } else if (entityType === 'group') {
       await tx.table('groups').delete(entityId);
-    } else {
+    } else if (entityType === 'knowledge_base') {
       await tx.table('knowledgeBases').delete(entityId);
+    } else if (entityType === 'chat_message') {
+      await tx.table('chatMessages').delete(entityId);
+    } else {
+      const messageIds = await tx
+        .table('chatMessages')
+        .where('sessionId')
+        .equals(entityId)
+        .primaryKeys();
+      await tx.table('chatSessions').delete(entityId);
+      await tx.table('chatMessages').where('sessionId').equals(entityId).delete();
+      const workspaceId = requiredString(snapshot, 'workspace_id');
+      await tx
+        .table('syncEntityStatesV2')
+        .bulkDelete(messageIds.map((id) => [workspaceId, 'chat_message', id]));
     }
     return 'other';
   }
@@ -132,6 +190,61 @@ async function applyRemoteSnapshot(
       updatedAt: timestamp(snapshot, 'updated_at'),
     };
     await tx.table('groups').put(row);
+    return 'other';
+  }
+
+  if (entityType === 'chat_session') {
+    const row: ChatSession = {
+      id: entityId,
+      title: requiredString(snapshot, 'title'),
+      isPinned: requiredBoolean(snapshot, 'is_pinned'),
+      createdAt: timestamp(snapshot, 'created_at'),
+      updatedAt: timestamp(snapshot, 'updated_at'),
+    };
+    await tx.table('chatSessions').put(row);
+    return 'other';
+  }
+
+  if (entityType === 'chat_message') {
+    const role = requiredString(snapshot, 'role');
+    const status = requiredString(snapshot, 'status');
+    if (role !== 'user' && role !== 'assistant') throw new Error('云端聊天角色格式错误');
+    if (status !== 'complete' && status !== 'stopped' && status !== 'error') {
+      throw new Error('云端聊天状态格式错误');
+    }
+
+    const webSearchUrls = objectArray(snapshot, 'web_search_urls').map((item) => ({
+      title: requiredString(item, 'title'),
+      url: requiredString(item, 'url'),
+    }));
+    const referencedDocs: ReferencedDoc[] = objectArray(snapshot, 'referenced_docs').map(
+      (item) => ({
+        id: requiredString(item, 'id'),
+        title: requiredString(item, 'title'),
+      }),
+    );
+    const rawMetadata = snapshot.ai_metadata;
+    if (rawMetadata !== null && (typeof rawMetadata !== 'object' || Array.isArray(rawMetadata))) {
+      throw new Error('云端 AI 元数据格式错误');
+    }
+    const row: ChatMessage = {
+      id: entityId,
+      sessionId: requiredString(snapshot, 'session_id'),
+      role,
+      content: requiredString(snapshot, 'content'),
+      status,
+      webSearchUrls,
+      referencedDocs,
+      knowledgeSources: parseKnowledgeSources(snapshot),
+      aiMetadata: (rawMetadata as AIResponseMetadata | null) ?? undefined,
+      createdAt: timestamp(snapshot, 'created_at'),
+    };
+    const sessions = tx.table<ChatSession, string>('chatSessions');
+    await tx.table('chatMessages').put(row);
+    const parent = await sessions.get(row.sessionId);
+    if (parent && row.createdAt > parent.updatedAt) {
+      await sessions.update(row.sessionId, { updatedAt: row.createdAt });
+    }
     return 'other';
   }
 
@@ -225,6 +338,8 @@ export class CloudSyncService {
           db.favoriteItems,
           db.documentChunks,
           db.documentIndexStates,
+          db.chatSessions,
+          db.chatMessages,
           db.syncOutbox,
           db.syncEntityStatesV2,
           db.syncState,
@@ -290,6 +405,7 @@ export class CloudSyncService {
             userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
             lastSyncAt: Date.now(),
             nextOutboxSequence: current?.nextOutboxSequence,
+            chatBackfillVersion: current?.chatBackfillVersion,
           });
         },
       );
@@ -447,6 +563,7 @@ export class CloudSyncService {
               userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
               lastSyncAt: now,
               nextOutboxSequence: current?.nextOutboxSequence,
+              chatBackfillVersion: current?.chatBackfillVersion,
             });
           },
         );
@@ -672,6 +789,8 @@ export class CloudSyncService {
       db.favoriteItems,
       db.documentChunks,
       db.documentIndexStates,
+      db.chatSessions,
+      db.chatMessages,
       db.syncOutbox,
       db.syncEntityStatesV2,
     ];
