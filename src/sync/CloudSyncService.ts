@@ -1,5 +1,15 @@
-import { db } from '../db';
-import type { SyncEntityStateV2, SyncEntityType, SyncOutboxEntry, SyncState } from '../db';
+import type { Transaction } from 'dexie';
+import { db, deleteDocumentsCascadeInTx } from '../db';
+import type {
+  SyncConflictData,
+  SyncEntityStateV2,
+  SyncEntityType,
+  SyncOutboxEntry,
+  SyncRemoteSnapshot,
+  SyncState,
+} from '../db';
+import type { Document, Group, KnowledgeBase } from '../store/knowledgeBaseStore';
+import { scheduleDocumentIndex } from '../rag/documentIndexer';
 
 export interface PushResult {
   success: boolean;
@@ -8,16 +18,40 @@ export interface PushResult {
   conflict?: boolean;
 }
 
+export interface SyncResult extends PushResult {
+  pulledCount?: number;
+  conflictCount?: number;
+}
+
 interface PullChange {
+  sequence: number;
   entity_type: SyncEntityType;
   entity_id: string;
-  snapshot: { revision: number };
+  snapshot: SyncRemoteSnapshot;
+}
+
+export interface SyncConflict {
+  workspaceId: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  data: SyncConflictData;
+}
+
+export interface PullResult {
+  appliedCount: number;
+  conflictCount: number;
+  changedDocumentIds: string[];
 }
 
 interface PullResponse {
   changes: PullChange[];
   next_cursor: number;
   has_more: boolean;
+}
+
+interface SyncStatusResponse {
+  workspace_id: string;
+  current_sequence: number;
 }
 
 const entityKey = (entityType: SyncEntityType, entityId: string) => `${entityType}:${entityId}`;
@@ -32,7 +66,101 @@ function readConflictCode(entry: SyncOutboxEntry): string | undefined {
   }
 }
 
+function requiredString(snapshot: SyncRemoteSnapshot, field: string): string {
+  const value = snapshot[field];
+  if (typeof value !== 'string') throw new Error(`云端快照缺少字段：${field}`);
+  return value;
+}
+
+function nullableString(snapshot: SyncRemoteSnapshot, field: string): string | null {
+  const value = snapshot[field];
+  if (value === null) return null;
+  if (typeof value !== 'string') throw new Error(`云端快照字段格式错误：${field}`);
+  return value;
+}
+
+function timestamp(snapshot: SyncRemoteSnapshot, field: string): number {
+  const value = requiredString(snapshot, field);
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) throw new Error(`云端时间字段格式错误：${field}`);
+  return parsed;
+}
+
+async function applyRemoteSnapshot(
+  tx: Transaction,
+  change: PullChange,
+): Promise<'upserted-document' | 'other'> {
+  const { entity_type: entityType, entity_id: entityId, snapshot } = change;
+  if (snapshot.deleted_at !== null) {
+    if (entityType === 'document') {
+      await deleteDocumentsCascadeInTx(tx, [entityId]);
+    } else if (entityType === 'group') {
+      await tx.table('groups').delete(entityId);
+    } else {
+      await tx.table('knowledgeBases').delete(entityId);
+    }
+    return 'other';
+  }
+
+  if (entityType === 'knowledge_base') {
+    const row: KnowledgeBase = {
+      id: entityId,
+      name: requiredString(snapshot, 'name'),
+      description: requiredString(snapshot, 'description'),
+      icon: requiredString(snapshot, 'icon'),
+      createdAt: timestamp(snapshot, 'created_at'),
+      updatedAt: timestamp(snapshot, 'updated_at'),
+    };
+    await tx.table('knowledgeBases').put(row);
+    return 'other';
+  }
+
+  if (entityType === 'group') {
+    const order = snapshot.sort_order;
+    const depth = snapshot.depth;
+    if (typeof order !== 'number' || typeof depth !== 'number') {
+      throw new Error('云端分组排序字段格式错误');
+    }
+    const row: Group = {
+      id: entityId,
+      kbId: requiredString(snapshot, 'kb_id'),
+      parentGroupId: nullableString(snapshot, 'parent_group_id'),
+      name: requiredString(snapshot, 'name'),
+      order,
+      depth,
+      createdAt: timestamp(snapshot, 'created_at'),
+      updatedAt: timestamp(snapshot, 'updated_at'),
+    };
+    await tx.table('groups').put(row);
+    return 'other';
+  }
+
+  const row: Document = {
+    id: entityId,
+    kbId: requiredString(snapshot, 'kb_id'),
+    groupId: nullableString(snapshot, 'group_id'),
+    title: requiredString(snapshot, 'title'),
+    content: requiredString(snapshot, 'content'),
+    createdAt: timestamp(snapshot, 'created_at'),
+    updatedAt: timestamp(snapshot, 'updated_at'),
+  };
+  await tx.table('documents').put(row);
+  return 'upserted-document';
+}
+
 export class CloudSyncService {
+  async getRemoteSequence(workspaceId: string): Promise<number> {
+    const params = new URLSearchParams({ workspace_id: workspaceId });
+    const response = await fetch(`/api/v1/sync/status?${params.toString()}`);
+    if (!response.ok) throw new Error(`读取云端同步状态失败（HTTP ${response.status}）`);
+
+    const data = (await response.json()) as SyncStatusResponse;
+    if (data.workspace_id !== workspaceId || !Number.isSafeInteger(data.current_sequence)) {
+      throw new Error('云端同步状态格式错误');
+    }
+    return data.current_sequence;
+  }
+
   async loadRemoteRevisions(workspaceId: string): Promise<Map<string, number>> {
     const revisions = new Map<string, number>();
     let cursor = 0;
@@ -56,6 +184,140 @@ export class CloudSyncService {
     }
 
     return revisions;
+  }
+
+  async listConflicts(workspaceId: string): Promise<SyncConflict[]> {
+    const states = await db.syncEntityStatesV2.where('workspaceId').equals(workspaceId).toArray();
+    return states
+      .filter((state) => state.conflict !== undefined)
+      .map((state) => ({
+        workspaceId: state.workspaceId,
+        entityType: state.entityType,
+        entityId: state.entityId,
+        data: state.conflict!,
+      }));
+  }
+
+  private async pullAllUnlocked(workspaceId: string): Promise<PullResult> {
+    const syncState = await db.syncState.get(workspaceId);
+    let cursor = syncState?.pullCursor ?? 0;
+    let appliedCount = 0;
+    const changedDocumentIds = new Set<string>();
+
+    while (true) {
+      const params = new URLSearchParams({
+        workspace_id: workspaceId,
+        cursor: String(cursor),
+        limit: '200',
+      });
+      const response = await fetch(`/api/v1/sync/pull?${params.toString()}`);
+      if (!response.ok) throw new Error(`拉取云端数据失败（HTTP ${response.status}）`);
+      const page = (await response.json()) as PullResponse;
+
+      await db.transaction(
+        'rw',
+        [
+          db.knowledgeBases,
+          db.groups,
+          db.documents,
+          db.documentVersions,
+          db.assets,
+          db.favoriteItems,
+          db.documentChunks,
+          db.documentIndexStates,
+          db.syncOutbox,
+          db.syncEntityStatesV2,
+          db.syncState,
+        ],
+        async (tx) => {
+          const outbox = tx.table<SyncOutboxEntry, string>('syncOutbox');
+          const entityStates = tx.table<SyncEntityStateV2, [string, string, string]>(
+            'syncEntityStatesV2',
+          );
+          const pendingEntries = await outbox.toArray();
+
+          for (const change of page.changes) {
+            const stateKey: [string, SyncEntityType, string] = [
+              workspaceId,
+              change.entity_type,
+              change.entity_id,
+            ];
+            const state = await entityStates.get(stateKey);
+            if (change.snapshot.revision <= (state?.serverRev ?? 0)) continue;
+
+            const hasLocalMutation = pendingEntries.some((entry) =>
+              entry.operations.some(
+                (operation) =>
+                  operation.entity_type === change.entity_type &&
+                  operation.entity_id === change.entity_id,
+              ),
+            );
+            if (hasLocalMutation) {
+              await entityStates.put({
+                workspaceId,
+                entityType: change.entity_type,
+                entityId: change.entity_id,
+                serverRev: state?.serverRev ?? 0,
+                localMutationSeq: state?.localMutationSeq ?? 1,
+                updatedAt: Date.now(),
+                conflict: {
+                  remoteRevision: change.snapshot.revision,
+                  snapshot: change.snapshot,
+                  detectedAt: Date.now(),
+                },
+              });
+              continue;
+            }
+
+            const applied = await applyRemoteSnapshot(tx, change);
+            if (applied === 'upserted-document') changedDocumentIds.add(change.entity_id);
+            await entityStates.put({
+              workspaceId,
+              entityType: change.entity_type,
+              entityId: change.entity_id,
+              serverRev: change.snapshot.revision,
+              localMutationSeq: state?.localMutationSeq ?? 0,
+              updatedAt: Date.now(),
+            });
+            appliedCount += 1;
+          }
+
+          const current = await tx.table<SyncState, string>('syncState').get(workspaceId);
+          await tx.table<SyncState, string>('syncState').put({
+            workspaceId,
+            pullCursor: page.next_cursor,
+            serverUrl: current?.serverUrl ?? window.location.origin,
+            userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
+            lastSyncAt: Date.now(),
+            nextOutboxSequence: current?.nextOutboxSequence,
+          });
+        },
+      );
+
+      if (!page.has_more) break;
+      if (page.next_cursor <= cursor) throw new Error('云端同步游标没有继续前进');
+      cursor = page.next_cursor;
+    }
+
+    for (const documentId of changedDocumentIds) {
+      const document = await db.documents.get(documentId);
+      if (document) scheduleDocumentIndex(document);
+    }
+    const conflicts = await this.listConflicts(workspaceId);
+    return {
+      appliedCount,
+      conflictCount: conflicts.length,
+      changedDocumentIds: [...changedDocumentIds],
+    };
+  }
+
+  async pullAll(workspaceId: string): Promise<PullResult> {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return navigator.locks.request('duet-doc:sync-lock', async () =>
+        this.pullAllUnlocked(workspaceId),
+      );
+    }
+    return this.pullAllUnlocked(workspaceId);
   }
 
   private async claimNext(): Promise<SyncOutboxEntry | null> {
@@ -254,6 +516,51 @@ export class CloudSyncService {
     return this.drainOutbox(onProgress);
   }
 
+  async synchronize(
+    workspaceId: string,
+    onProgress?: (pushedCount: number, remainingCount: number) => void,
+  ): Promise<SyncResult> {
+    const run = async (): Promise<SyncResult> => {
+      await db.syncOutbox.where('status').equals('pushing').modify({ status: 'pending' });
+      const beforePush = await this.pullAllUnlocked(workspaceId);
+      if (beforePush.conflictCount > 0) {
+        return {
+          success: false,
+          conflict: true,
+          pulledCount: beforePush.appliedCount,
+          conflictCount: beforePush.conflictCount,
+          error: `检测到 ${beforePush.conflictCount} 项云端冲突，请先选择保留版本。`,
+        };
+      }
+
+      const pushed = await this.drainOutbox(onProgress);
+      if (!pushed.success) {
+        if (!pushed.conflict) return pushed;
+        const afterConflict = await this.pullAllUnlocked(workspaceId);
+        return {
+          ...pushed,
+          pulledCount: beforePush.appliedCount + afterConflict.appliedCount,
+          conflictCount: afterConflict.conflictCount,
+        };
+      }
+
+      const afterPush = await this.pullAllUnlocked(workspaceId);
+      return {
+        ...pushed,
+        pulledCount: beforePush.appliedCount + afterPush.appliedCount,
+        conflictCount: afterPush.conflictCount,
+      };
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return navigator.locks.request('duet-doc:sync-lock', { ifAvailable: true }, async (lock) => {
+        if (!lock) return { success: false, error: '其他标签页正在同步，请稍后再试。' };
+        return run();
+      });
+    }
+    return run();
+  }
+
   private async drainOutbox(
     onProgress?: (pushedCount: number, remainingCount: number) => void,
   ): Promise<PushResult> {
@@ -350,6 +657,115 @@ export class CloudSyncService {
       }
     });
     return { retried, unresolved: errors.length - retried };
+  }
+
+  private async resolveConflictUnlocked(
+    conflict: SyncConflict,
+    resolution: 'keep-local' | 'use-cloud',
+  ): Promise<void> {
+    const tables = [
+      db.knowledgeBases,
+      db.groups,
+      db.documents,
+      db.documentVersions,
+      db.assets,
+      db.favoriteItems,
+      db.documentChunks,
+      db.documentIndexStates,
+      db.syncOutbox,
+      db.syncEntityStatesV2,
+    ];
+    await db.transaction('rw', tables, async (tx) => {
+      const outbox = tx.table<SyncOutboxEntry, string>('syncOutbox');
+      const entityStates = tx.table<SyncEntityStateV2, [string, string, string]>(
+        'syncEntityStatesV2',
+      );
+      const stateKey: [string, SyncEntityType, string] = [
+        conflict.workspaceId,
+        conflict.entityType,
+        conflict.entityId,
+      ];
+      const state = await entityStates.get(stateKey);
+      if (!state?.conflict) return;
+
+      if (resolution === 'keep-local') {
+        const entries = await outbox.orderBy('queueSequence').toArray();
+        let rebased = false;
+        for (const entry of entries) {
+          const operations = entry.operations.map((operation) => {
+            if (
+              !rebased &&
+              operation.entity_type === conflict.entityType &&
+              operation.entity_id === conflict.entityId
+            ) {
+              rebased = true;
+              return { ...operation, base_revision: state.conflict!.remoteRevision };
+            }
+            return operation;
+          });
+          if (rebased) {
+            await outbox.update(entry.mutationId, {
+              operations,
+              status: 'pending',
+              errorCode: undefined,
+              errorReason: undefined,
+            });
+            break;
+          }
+        }
+        if (!rebased) throw new Error('没有找到与冲突对应的本地变更');
+      } else {
+        const entries = await outbox.toArray();
+        for (const entry of entries) {
+          const operations = entry.operations.filter(
+            (operation) =>
+              !(
+                operation.entity_type === conflict.entityType &&
+                operation.entity_id === conflict.entityId
+              ),
+          );
+          if (operations.length === 0) await outbox.delete(entry.mutationId);
+          else if (operations.length !== entry.operations.length) {
+            await outbox.update(entry.mutationId, {
+              operations,
+              status: 'pending',
+              errorCode: undefined,
+              errorReason: undefined,
+            });
+          }
+        }
+        await applyRemoteSnapshot(tx, {
+          sequence: 0,
+          entity_type: conflict.entityType,
+          entity_id: conflict.entityId,
+          snapshot: state.conflict.snapshot,
+        });
+      }
+
+      await entityStates.put({
+        ...state,
+        serverRev: state.conflict.remoteRevision,
+        updatedAt: Date.now(),
+        conflict: undefined,
+      });
+    });
+
+    if (resolution === 'use-cloud' && conflict.entityType === 'document') {
+      const document = await db.documents.get(conflict.entityId);
+      if (document) scheduleDocumentIndex(document);
+    }
+  }
+
+  async resolveConflict(
+    conflict: SyncConflict,
+    resolution: 'keep-local' | 'use-cloud',
+  ): Promise<void> {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return navigator.locks.request('duet-doc:sync-lock', async () =>
+        this.resolveConflictUnlocked(conflict, resolution),
+      );
+    }
+    return this.resolveConflictUnlocked(conflict, resolution);
   }
 }
 

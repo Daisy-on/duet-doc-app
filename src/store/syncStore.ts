@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db } from '../db';
-import { cloudSyncService } from '../sync/CloudSyncService';
+import { cloudSyncService, type SyncConflict } from '../sync/CloudSyncService';
 import {
   enqueueMutationInTx,
   detectContentFormat,
@@ -22,13 +22,23 @@ interface SyncStore {
   errorCount: number;
   lastSyncAt: number | null;
   errorMessage: string | null;
+  conflicts: SyncConflict[];
+  remoteSequence: number | null;
+  hasRemoteUpdates: boolean;
 
   initSyncStore: () => Promise<void>;
+  checkRemoteUpdates: () => Promise<void>;
   refreshCounts: () => Promise<{ pending: number; error: number }>;
   enqueueExistingLocalDataIfNeeded: () => Promise<number>;
-  triggerPush: () => Promise<{ success: boolean; error?: string }>;
+  triggerSync: () => Promise<{ success: boolean; error?: string }>;
   retryErrors: () => Promise<void>;
+  resolveConflict: (
+    conflict: SyncConflict,
+    resolution: 'keep-local' | 'use-cloud',
+  ) => Promise<void>;
 }
+
+let remoteStatusRequest: Promise<void> | null = null;
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
   workspaceId: DEFAULT_WORKSPACE_ID,
@@ -39,14 +49,18 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   errorCount: 0,
   lastSyncAt: null,
   errorMessage: null,
+  conflicts: [],
+  remoteSequence: null,
+  hasRemoteUpdates: false,
 
   initSyncStore: async () => {
     try {
       const wid = get().workspaceId;
       const state = await db.syncState.get(wid);
-      const [pending, errors] = await Promise.all([
+      const [pending, errors, conflicts] = await Promise.all([
         db.syncOutbox.where('status').equals('pending').count(),
         db.syncOutbox.where('status').equals('error').count(),
+        cloudSyncService.listConflicts(wid),
       ]);
 
       const firstError =
@@ -56,18 +70,50 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         lastSyncAt: state?.lastSyncAt ?? null,
         pendingCount: pending,
         errorCount: errors,
-        status: errors > 0 ? 'error' : 'idle',
-        errorMessage: firstError?.errorReason || (errors > 0 ? '存在未解决的同步异常' : null),
+        conflicts,
+        status: errors > 0 || conflicts.length > 0 ? 'error' : 'idle',
+        errorMessage:
+          firstError?.errorReason ||
+          (errors > 0
+            ? '存在未解决的同步异常'
+            : conflicts.length > 0
+              ? `存在 ${conflicts.length} 项云端冲突`
+              : null),
       });
 
       // 检查并对未登记过的本地存量数据执行入队
       await get().enqueueExistingLocalDataIfNeeded();
+      void get()
+        .checkRemoteUpdates()
+        .catch(() => undefined);
     } catch (err) {
       console.error('[SyncStore] Failed to initialize sync store:', err);
       set({
         status: 'offline',
         errorMessage: err instanceof Error ? err.message : '无法连接云端同步服务',
       });
+    }
+  },
+
+  checkRemoteUpdates: async () => {
+    if (remoteStatusRequest) return remoteStatusRequest;
+
+    remoteStatusRequest = (async () => {
+      const workspaceId = get().workspaceId;
+      const [remoteSequence, state] = await Promise.all([
+        cloudSyncService.getRemoteSequence(workspaceId),
+        db.syncState.get(workspaceId),
+      ]);
+      set({
+        remoteSequence,
+        hasRemoteUpdates: remoteSequence > (state?.pullCursor ?? 0),
+      });
+    })();
+
+    try {
+      await remoteStatusRequest;
+    } finally {
+      remoteStatusRequest = null;
     }
   },
 
@@ -199,7 +245,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     return 0;
   },
 
-  triggerPush: async () => {
+  triggerSync: async () => {
     if (get().status === 'syncing') {
       return { success: false, error: '正在同步中' };
     }
@@ -208,18 +254,27 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
     try {
       await get().enqueueExistingLocalDataIfNeeded();
-      const res = await cloudSyncService.pushAll();
+      const res = await cloudSyncService.synchronize(get().workspaceId);
+      const { useKnowledgeBaseStore } = await import('./knowledgeBaseStore');
+      await useKnowledgeBaseStore.getState().reloadFromDb();
       const counts = await get().refreshCounts();
+      const conflicts = await cloudSyncService.listConflicts(get().workspaceId);
       const now = Date.now();
 
       if (res.success) {
+        window.localStorage.setItem('duet-doc:cloud-sync-enabled', 'true');
         set({
-          status: counts.error > 0 ? 'error' : 'idle',
+          status: counts.error > 0 || conflicts.length > 0 ? 'error' : 'idle',
           pendingCount: counts.pending,
           errorCount: counts.error,
+          conflicts,
           lastSyncAt: now,
           errorMessage: null,
+          hasRemoteUpdates: false,
         });
+        void get()
+          .checkRemoteUpdates()
+          .catch(() => undefined);
         return { success: true };
       }
 
@@ -227,6 +282,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         status: 'error',
         pendingCount: counts.pending,
         errorCount: counts.error,
+        conflicts,
         errorMessage: res.error || '同步失败',
       });
       return { success: false, error: res.error };
@@ -251,11 +307,31 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         return;
       }
       set({ status: 'idle' });
-      await get().triggerPush();
+      await get().triggerSync();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       set({ status: 'error', errorMessage: message });
       await get().refreshCounts();
+    }
+  },
+
+  resolveConflict: async (conflict, resolution) => {
+    try {
+      set({ status: 'syncing', errorMessage: null });
+      await cloudSyncService.resolveConflict(conflict, resolution);
+      const { useKnowledgeBaseStore } = await import('./knowledgeBaseStore');
+      await useKnowledgeBaseStore.getState().reloadFromDb();
+      const conflicts = await cloudSyncService.listConflicts(get().workspaceId);
+      set({
+        conflicts,
+        status: conflicts.length > 0 ? 'error' : 'idle',
+        errorMessage: conflicts.length > 0 ? `仍有 ${conflicts.length} 项云端冲突` : null,
+      });
+      await get().refreshCounts();
+      if (conflicts.length === 0) await get().triggerSync();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      set({ status: 'error', errorMessage: message });
     }
   },
 }));

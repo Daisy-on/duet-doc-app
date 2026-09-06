@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Home,
   Sparkles,
@@ -9,6 +9,7 @@ import {
   Plus,
   MoreHorizontal,
   CloudUpload,
+  CloudDownload,
   CloudOff,
   CheckCircle2,
   AlertCircle,
@@ -17,10 +18,11 @@ import {
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID, type KnowledgeBase } from '../store/knowledgeBaseStore';
 import { useAIWritingStore } from '../store/aiWritingStore';
-import { useLayoutStore } from '../store';
+import { useEditorStore, useLayoutStore } from '../store';
 import { useSyncStore } from '../store/syncStore';
 import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
+import SyncConflictModal from './modals/SyncConflictModal';
 import KbActionMenu from './menus/KbActionMenu';
 
 export default function Sidebar() {
@@ -37,8 +39,11 @@ export default function Sidebar() {
   const errorCount = useSyncStore((state) => state.errorCount);
   const lastSyncAt = useSyncStore((state) => state.lastSyncAt);
   const errorMessage = useSyncStore((state) => state.errorMessage);
-  const triggerPush = useSyncStore((state) => state.triggerPush);
+  const conflicts = useSyncStore((state) => state.conflicts);
+  const hasRemoteUpdates = useSyncStore((state) => state.hasRemoteUpdates);
+  const triggerSync = useSyncStore((state) => state.triggerSync);
   const retryErrors = useSyncStore((state) => state.retryErrors);
+  const resolveConflict = useSyncStore((state) => state.resolveConflict);
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
 
@@ -46,10 +51,38 @@ export default function Sidebar() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteTargetKb, setDeleteTargetKb] = useState<KnowledgeBase | null>(null);
+  const [isConflictOpen, setIsConflictOpen] = useState(false);
+
+  useEffect(() => {
+    const checkRemoteStatus = () => {
+      const sync = useSyncStore.getState();
+      if (document.visibilityState === 'visible' && navigator.onLine && sync.status !== 'syncing') {
+        void sync.checkRemoteUpdates().catch(() => {
+          // A background status check must not replace the last known sync state.
+        });
+      }
+    };
+
+    checkRemoteStatus();
+    const intervalId = window.setInterval(checkRemoteStatus, 45_000);
+    document.addEventListener('visibilitychange', checkRemoteStatus);
+    window.addEventListener('online', checkRemoteStatus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', checkRemoteStatus);
+      window.removeEventListener('online', checkRemoteStatus);
+    };
+  }, []);
 
   // Rename states
   const [renamingKbId, setRenamingKbId] = useState<string | null>(null);
   const [renamingKbName, setRenamingKbName] = useState('');
+
+  const handleSync = () => {
+    useEditorStore.getState().flushPendingDocumentUpdate();
+    void triggerSync();
+  };
 
   // Dropdown states
   const [activeMenuKbId, setActiveMenuKbId] = useState<string | null>(null);
@@ -308,8 +341,10 @@ export default function Sidebar() {
               <Loader2 size={13} className="animate-spin text-accent shrink-0" />
             ) : syncStatus === 'offline' ? (
               <CloudOff size={13} className="text-text-secondary shrink-0" />
-            ) : errorCount > 0 || syncStatus === 'error' ? (
+            ) : conflicts.length > 0 || errorCount > 0 || syncStatus === 'error' ? (
               <AlertCircle size={13} className="text-red-500 shrink-0" />
+            ) : hasRemoteUpdates ? (
+              <CloudDownload size={13} className="text-accent shrink-0" />
             ) : pendingCount > 0 ? (
               <CloudUpload size={13} className="text-amber-500 shrink-0" />
             ) : (
@@ -317,19 +352,31 @@ export default function Sidebar() {
             )}
             <span className="font-medium truncate">
               {syncStatus === 'syncing'
-                ? '正在上传...'
+                ? '正在同步...'
                 : syncStatus === 'offline'
                   ? '云端暂不可用'
-                  : errorCount > 0
-                    ? `同步异常 (${errorCount} 项失败)`
-                    : syncStatus === 'error'
-                      ? '同步异常'
-                      : pendingCount > 0
-                        ? `待上传 (${pendingCount})`
-                        : '云端已对齐'}
+                  : conflicts.length > 0
+                    ? `存在冲突 (${conflicts.length})`
+                    : errorCount > 0
+                      ? `同步异常 (${errorCount} 项失败)`
+                      : syncStatus === 'error'
+                        ? '同步异常'
+                        : hasRemoteUpdates
+                          ? '云端有更新'
+                          : pendingCount > 0
+                            ? `待上传 (${pendingCount})`
+                            : '云端已对齐'}
             </span>
           </div>
-          {errorCount > 0 ? (
+          {conflicts.length > 0 ? (
+            <button
+              onClick={() => setIsConflictOpen(true)}
+              disabled={syncStatus === 'syncing'}
+              className="px-2 py-0.5 rounded text-[11px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
+            >
+              处理冲突
+            </button>
+          ) : errorCount > 0 ? (
             <button
               onClick={() => void retryErrors()}
               disabled={syncStatus === 'syncing'}
@@ -340,12 +387,12 @@ export default function Sidebar() {
             </button>
           ) : (
             <button
-              onClick={() => void triggerPush()}
+              onClick={handleSync}
               disabled={syncStatus === 'syncing'}
               className="px-2 py-0.5 rounded text-[11px] font-medium bg-bg-main hover:bg-hover-bg border border-border-color transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
-              title="立即将本地修改推送到 PostgreSQL"
+              title="拉取云端更新并上传本地修改"
             >
-              {syncStatus === 'syncing' ? '同步中' : '立即上传'}
+              {syncStatus === 'syncing' ? '同步中' : '立即同步'}
             </button>
           )}
         </div>
@@ -356,10 +403,16 @@ export default function Sidebar() {
         )}
         {lastSyncAt && !errorMessage && errorCount === 0 && (
           <div className="text-[10px] text-text-secondary/70 px-1 truncate">
-            上次上传: {new Date(lastSyncAt).toLocaleTimeString()}
+            上次同步: {new Date(lastSyncAt).toLocaleTimeString()}
           </div>
         )}
       </div>
+      <SyncConflictModal
+        conflict={isConflictOpen ? (conflicts[0] ?? null) : null}
+        remainingCount={conflicts.length}
+        onClose={() => setIsConflictOpen(false)}
+        onResolve={(resolution) => resolveConflict(conflicts[0], resolution)}
+      />
     </aside>
   );
 }

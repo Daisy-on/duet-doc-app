@@ -89,6 +89,18 @@ export interface SyncEntityStateV2 {
   serverRev: number;
   localMutationSeq: number;
   updatedAt: number;
+  conflict?: SyncConflictData;
+}
+
+export interface SyncRemoteSnapshot extends Record<string, unknown> {
+  revision: number;
+  deleted_at: string | null;
+}
+
+export interface SyncConflictData {
+  remoteRevision: number;
+  snapshot: SyncRemoteSnapshot;
+  detectedAt: number;
 }
 
 export interface SyncOutboxEntry {

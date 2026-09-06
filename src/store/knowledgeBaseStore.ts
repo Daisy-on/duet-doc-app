@@ -10,6 +10,7 @@ import { useEditorStore } from './index';
 import { scheduleDocumentIndex } from '../rag/documentIndexer';
 import { updateDocumentChunkScope } from '../rag/chunkRepository';
 import { enqueueMutationInTx, detectContentFormat } from '../sync/syncOutboxHelper';
+import { cloudSyncService } from '../sync/CloudSyncService';
 import { useSyncStore } from './syncStore';
 
 export const MEMO_KB_ID = 'kb-memo-system';
@@ -50,6 +51,7 @@ interface KnowledgeBaseStore {
   documents: Document[];
 
   initStore: () => Promise<void>;
+  reloadFromDb: () => Promise<void>;
 
   // Knowledge Base CRUD
   createKnowledgeBase: (name: string, description: string, icon?: string) => string;
@@ -494,7 +496,18 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   initStore: async () => {
     try {
-      const kbCount = await db.knowledgeBases.count();
+      let kbCount = await db.knowledgeBases.count();
+      if (kbCount === 0) {
+        try {
+          await cloudSyncService.pullAll(useSyncStore.getState().workspaceId);
+          kbCount = await db.knowledgeBases.count();
+          if (kbCount > 0) {
+            window.localStorage.setItem('duet-doc:cloud-sync-enabled', 'true');
+          }
+        } catch (error) {
+          console.info('[CloudSync] Cloud restore unavailable, continuing locally.', error);
+        }
+      }
       const isCloudSyncSuppressed =
         typeof window !== 'undefined' &&
         window.localStorage.getItem('duet-doc:cloud-sync-enabled') === 'true';
@@ -505,21 +518,26 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         await db.documents.bulkAdd(initialDocs);
       }
 
-      const kbs = await db.knowledgeBases.toArray();
-      const grps = await db.groups.toArray();
-      const docs = await db.documents.toArray();
-
-      set({
-        knowledgeBases: kbs,
-        groups: grps.sort((a, b) => a.order - b.order),
-        documents: docs,
-      });
+      await get().reloadFromDb();
 
       // 初始化同步状态
       void useSyncStore.getState().initSyncStore();
     } catch (error) {
       console.error('Failed to initialize KnowledgeBaseStore from Dexie:', error);
     }
+  },
+
+  reloadFromDb: async () => {
+    const [knowledgeBases, groups, documents] = await Promise.all([
+      db.knowledgeBases.toArray(),
+      db.groups.toArray(),
+      db.documents.toArray(),
+    ]);
+    set({
+      knowledgeBases,
+      groups: groups.sort((a, b) => a.order - b.order),
+      documents,
+    });
   },
 
   // Knowledge Base CRUD
