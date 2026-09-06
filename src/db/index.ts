@@ -102,7 +102,6 @@ export interface SyncState {
   userId: string;
   lastSyncAt: number | null;
   nextOutboxSequence?: number;
-  chatBackfillVersion?: number;
 }
 
 export interface SyncEntityState {

@@ -405,7 +405,6 @@ export class CloudSyncService {
             userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
             lastSyncAt: Date.now(),
             nextOutboxSequence: current?.nextOutboxSequence,
-            chatBackfillVersion: current?.chatBackfillVersion,
           });
         },
       );
@@ -563,7 +562,6 @@ export class CloudSyncService {
               userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
               lastSyncAt: now,
               nextOutboxSequence: current?.nextOutboxSequence,
-              chatBackfillVersion: current?.chatBackfillVersion,
             });
           },
         );
