@@ -284,78 +284,17 @@ export class DuetDocDB extends Dexie {
   }
 }
 
-const LEGACY_DATABASE_NAME = 'DuetDocDB';
-const LEGACY_USER_ID = '00000000-0000-0000-0000-000000000001';
 const USER_DATABASE_PREFIX = 'DuetDocDB:';
-const MIGRATION_MARKER_PREFIX = 'duet-doc:legacy-db-migrated:';
-const ASSET_MIGRATION_MARKER_PREFIX = 'duet-doc:legacy-assets-migrated:v1:';
 
 export let db = new DuetDocDB();
 
-async function migrateLegacyDatabase(target: DuetDocDB, userId: string) {
-  if (userId !== LEGACY_USER_ID || !window.indexedDB) return;
-  const marker = `${MIGRATION_MARKER_PREFIX}${userId}`;
-  if (window.localStorage.getItem(marker) === 'true') return;
-  if (!(await Dexie.exists(LEGACY_DATABASE_NAME))) {
-    window.localStorage.setItem(marker, 'true');
-    return;
-  }
-
-  const legacy = new DuetDocDB(LEGACY_DATABASE_NAME);
-  await legacy.open();
-  try {
-    const tableNames = target.tables.map((table) => table.name);
-    const rowsByTable = await Promise.all(
-      tableNames.map((tableName) => legacy.table<Record<string, unknown>>(tableName).toArray()),
-    );
-    await target.transaction('rw', target.tables, async () => {
-      for (let index = 0; index < tableNames.length; index += 1) {
-        const rows = rowsByTable[index];
-        if (rows.length > 0) {
-          await target.table<Record<string, unknown>>(tableNames[index]).bulkPut(rows);
-        }
-      }
-    });
-    window.localStorage.setItem(marker, 'true');
-  } finally {
-    legacy.close();
-  }
-}
-
-async function migrateLegacyAssets(target: DuetDocDB, userId: string) {
-  if (userId !== LEGACY_USER_ID || !window.indexedDB) return;
-  const marker = `${ASSET_MIGRATION_MARKER_PREFIX}${userId}`;
-  if (window.localStorage.getItem(marker) === 'true') return;
-  if (!(await Dexie.exists(LEGACY_DATABASE_NAME))) {
-    window.localStorage.setItem(marker, 'true');
-    return;
-  }
-
-  const legacy = new DuetDocDB(LEGACY_DATABASE_NAME);
-  await legacy.open();
-  try {
-    const assets = await legacy.assets.toArray();
-    if (assets.length > 0) {
-      await target.assets.bulkPut(assets);
-    }
-    window.localStorage.setItem(marker, 'true');
-  } finally {
-    legacy.close();
-  }
-}
-
 export async function openUserDatabase(userId: string) {
   const databaseName = `${USER_DATABASE_PREFIX}${userId}`;
-  if (db.name === databaseName && db.isOpen()) {
-    await migrateLegacyAssets(db, userId);
-    return;
-  }
+  if (db.name === databaseName && db.isOpen()) return;
 
   db.close();
   const target = new DuetDocDB(databaseName);
   await target.open();
-  await migrateLegacyDatabase(target, userId);
-  await migrateLegacyAssets(target, userId);
   db = target;
 }
 
