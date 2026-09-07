@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   AuthApiError,
+  abortAuthenticatedRequests,
   clearAccessToken,
   getMe,
   login as loginRequest,
@@ -67,6 +68,7 @@ async function prepareLocalSession(user: AuthUser, workspaceId: string) {
 }
 
 function resetLocalSession() {
+  abortAuthenticatedRequests();
   useSyncStore.getState().clearIdentity();
   closeUserDatabase();
   useKnowledgeBaseStore.setState({ knowledgeBases: [], groups: [], documents: [] });
@@ -156,6 +158,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
     },
 
     logout: async () => {
+      abortAuthenticatedRequests();
       await logoutRequest();
       clearCachedSession();
       resetLocalSession();

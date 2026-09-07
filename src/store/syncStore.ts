@@ -36,6 +36,10 @@ interface SyncStore {
 
 let remoteStatusRequest: Promise<void> | null = null;
 
+async function getWorkspaceOutboxEntries(workspaceId: string) {
+  return db.syncOutbox.where('workspaceId').equals(workspaceId).toArray();
+}
+
 export const useSyncStore = create<SyncStore>((set, get) => ({
   workspaceId: '',
   userId: '',
@@ -88,14 +92,16 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       const wid = get().workspaceId;
       if (!wid) throw new Error('同步身份尚未初始化');
       const state = await db.syncState.get(wid);
-      const [pending, errors, conflicts] = await Promise.all([
-        db.syncOutbox.where('status').equals('pending').count(),
-        db.syncOutbox.where('status').equals('error').count(),
+      const [outboxEntries, conflicts] = await Promise.all([
+        getWorkspaceOutboxEntries(wid),
         cloudSyncService.listConflicts(wid),
       ]);
+      const pending = outboxEntries.filter((entry) => entry.status === 'pending').length;
+      const errorEntries = outboxEntries.filter((entry) => entry.status === 'error');
+      const errors = errorEntries.length;
+      if (get().workspaceId !== wid) return;
 
-      const firstError =
-        errors > 0 ? await db.syncOutbox.where('status').equals('error').first() : null;
+      const firstError = errorEntries.sort((a, b) => a.queueSequence - b.queueSequence)[0];
 
       set({
         lastSyncAt: state?.lastSyncAt ?? null,
@@ -135,6 +141,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         cloudSyncService.getRemoteSequence(workspaceId),
         db.syncState.get(workspaceId),
       ]);
+      if (get().workspaceId !== workspaceId) return;
       set({
         remoteSequence,
         hasRemoteUpdates: remoteSequence > (state?.pullCursor ?? 0),
@@ -149,11 +156,13 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   refreshCounts: async () => {
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return { pending: 0, error: 0 };
     try {
-      const [pending, errors] = await Promise.all([
-        db.syncOutbox.where('status').equals('pending').count(),
-        db.syncOutbox.where('status').equals('error').count(),
-      ]);
+      const entries = await getWorkspaceOutboxEntries(workspaceId);
+      const pending = entries.filter((entry) => entry.status === 'pending').length;
+      const errors = entries.filter((entry) => entry.status === 'error').length;
+      if (get().workspaceId !== workspaceId) return { pending, error: errors };
       set((state) => ({
         pendingCount: pending,
         errorCount: errors,
@@ -281,11 +290,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return { success: false, error: '正在同步中' };
     }
 
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return { success: false, error: '同步身份尚未初始化' };
     set({ status: 'syncing', errorMessage: null });
 
     try {
       await get().enqueueExistingLocalDataIfNeeded();
-      const res = await cloudSyncService.synchronize(get().workspaceId);
+      const res = await cloudSyncService.synchronize(workspaceId);
+      if (get().workspaceId !== workspaceId) return { success: false, error: '同步已取消' };
       const [{ useKnowledgeBaseStore }, { useAIWritingStore }] = await Promise.all([
         import('./knowledgeBaseStore'),
         import('./aiWritingStore'),
@@ -295,7 +307,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         useAIWritingStore.getState().reloadFromDb(),
       ]);
       const counts = await get().refreshCounts();
-      const conflicts = await cloudSyncService.listConflicts(get().workspaceId);
+      const conflicts = await cloudSyncService.listConflicts(workspaceId);
       const now = Date.now();
 
       if (res.success) {
@@ -325,6 +337,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return { success: false, error: res.error };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (get().workspaceId !== workspaceId) return { success: false, error: '同步已取消' };
       set({ status: 'error', errorMessage: msg });
       await get().refreshCounts();
       return { success: false, error: msg };
@@ -332,9 +345,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   retryErrors: async () => {
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return;
     try {
       set({ status: 'syncing', errorMessage: null });
-      const result = await cloudSyncService.retryErrors();
+      const result = await cloudSyncService.retryErrors(workspaceId);
+      if (get().workspaceId !== workspaceId) return;
       await get().refreshCounts();
       if (result.unresolved > 0) {
         set({
@@ -346,6 +362,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       set({ status: 'idle' });
       await get().triggerSync();
     } catch (error) {
+      if (get().workspaceId !== workspaceId) return;
       const message = error instanceof Error ? error.message : String(error);
       set({ status: 'error', errorMessage: message });
       await get().refreshCounts();
@@ -353,9 +370,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   resolveConflict: async (conflict, resolution) => {
+    const workspaceId = conflict.workspaceId;
+    if (get().workspaceId !== workspaceId) return;
     try {
       set({ status: 'syncing', errorMessage: null });
       await cloudSyncService.resolveConflict(conflict, resolution);
+      if (get().workspaceId !== workspaceId) return;
       const [{ useKnowledgeBaseStore }, { useAIWritingStore }] = await Promise.all([
         import('./knowledgeBaseStore'),
         import('./aiWritingStore'),
@@ -364,7 +384,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         useKnowledgeBaseStore.getState().reloadFromDb(),
         useAIWritingStore.getState().reloadFromDb(),
       ]);
-      const conflicts = await cloudSyncService.listConflicts(get().workspaceId);
+      const conflicts = await cloudSyncService.listConflicts(workspaceId);
       set({
         conflicts,
         status: conflicts.length > 0 ? 'error' : 'idle',
@@ -373,6 +393,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       await get().refreshCounts();
       if (conflicts.length === 0) await get().triggerSync();
     } catch (error) {
+      if (get().workspaceId !== workspaceId) return;
       const message = error instanceof Error ? error.message : String(error);
       set({ status: 'error', errorMessage: message });
     }

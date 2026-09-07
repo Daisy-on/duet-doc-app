@@ -64,6 +64,7 @@ interface SyncStatusResponse {
 }
 
 const entityKey = (entityType: SyncEntityType, entityId: string) => `${entityType}:${entityId}`;
+const syncLockName = (workspaceId: string) => `duet-doc:sync-lock:${workspaceId}`;
 
 function readConflictCode(entry: SyncOutboxEntry): string | undefined {
   if (entry.errorCode) return entry.errorCode;
@@ -351,7 +352,7 @@ export class CloudSyncService {
           const entityStates = tx.table<SyncEntityStateV2, [string, string, string]>(
             'syncEntityStatesV2',
           );
-          const pendingEntries = await outbox.toArray();
+          const pendingEntries = await outbox.where('workspaceId').equals(workspaceId).toArray();
 
           for (const change of page.changes) {
             const stateKey: [string, SyncEntityType, string] = [
@@ -430,17 +431,18 @@ export class CloudSyncService {
 
   async pullAll(workspaceId: string): Promise<PullResult> {
     if (typeof navigator !== 'undefined' && navigator.locks) {
-      return navigator.locks.request('duet-doc:sync-lock', async () =>
+      return navigator.locks.request(syncLockName(workspaceId), async () =>
         this.pullAllUnlocked(workspaceId),
       );
     }
     return this.pullAllUnlocked(workspaceId);
   }
 
-  private async claimNext(): Promise<SyncOutboxEntry | null> {
+  private async claimNext(workspaceId: string): Promise<SyncOutboxEntry | null> {
     return db.transaction('rw', db.syncOutbox, async (tx) => {
       const outbox = tx.table<SyncOutboxEntry, string>('syncOutbox');
-      const first = await outbox.orderBy('queueSequence').first();
+      const entries = await outbox.where('workspaceId').equals(workspaceId).toArray();
+      const first = entries.sort((a, b) => a.queueSequence - b.queueSequence)[0];
       if (!first) return null;
       if (first.status === 'error') throw new Error('SYNC_QUEUE_BLOCKED');
       if (first.status === 'pushing') throw new Error('SYNC_QUEUE_BUSY');
@@ -461,7 +463,7 @@ export class CloudSyncService {
     });
   }
 
-  async pushNext(): Promise<{
+  async pushNext(workspaceId: string): Promise<{
     hasMore: boolean;
     success: boolean;
     mutationId?: string;
@@ -470,7 +472,7 @@ export class CloudSyncService {
   }> {
     let entry: SyncOutboxEntry | null;
     try {
-      entry = await this.claimNext();
+      entry = await this.claimNext(workspaceId);
     } catch (error) {
       if (error instanceof Error && error.message === 'SYNC_QUEUE_BLOCKED') {
         return {
@@ -534,7 +536,9 @@ export class CloudSyncService {
                 updatedAt: now,
               });
 
-              const laterEntries = await outbox.orderBy('queueSequence').toArray();
+              const laterEntries = (
+                await outbox.where('workspaceId').equals(workspaceId).toArray()
+              ).sort((a, b) => a.queueSequence - b.queueSequence);
               for (const laterEntry of laterEntries) {
                 if (laterEntry.status !== 'pending') continue;
                 let updated = false;
@@ -622,15 +626,20 @@ export class CloudSyncService {
   }
 
   async pushAll(
+    workspaceId: string,
     onProgress?: (pushedCount: number, remainingCount: number) => void,
   ): Promise<PushResult> {
     if (typeof navigator !== 'undefined' && navigator.locks) {
-      return navigator.locks.request('duet-doc:sync-lock', { ifAvailable: true }, async (lock) => {
-        if (!lock) return { success: false, error: '其他标签页正在同步，请稍后再试。' };
-        return this.drainOutbox(onProgress);
-      });
+      return navigator.locks.request(
+        syncLockName(workspaceId),
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock) return { success: false, error: '其他标签页正在同步，请稍后再试。' };
+          return this.drainOutbox(workspaceId, onProgress);
+        },
+      );
     }
-    return this.drainOutbox(onProgress);
+    return this.drainOutbox(workspaceId, onProgress);
   }
 
   async synchronize(
@@ -638,7 +647,11 @@ export class CloudSyncService {
     onProgress?: (pushedCount: number, remainingCount: number) => void,
   ): Promise<SyncResult> {
     const run = async (): Promise<SyncResult> => {
-      await db.syncOutbox.where('status').equals('pushing').modify({ status: 'pending' });
+      await db.syncOutbox
+        .where('workspaceId')
+        .equals(workspaceId)
+        .filter((entry) => entry.status === 'pushing')
+        .modify({ status: 'pending' });
       const beforePush = await this.pullAllUnlocked(workspaceId);
       if (beforePush.conflictCount > 0) {
         return {
@@ -650,7 +663,7 @@ export class CloudSyncService {
         };
       }
 
-      const pushed = await this.drainOutbox(onProgress);
+      const pushed = await this.drainOutbox(workspaceId, onProgress);
       if (!pushed.success) {
         if (!pushed.conflict) return pushed;
         const afterConflict = await this.pullAllUnlocked(workspaceId);
@@ -670,24 +683,34 @@ export class CloudSyncService {
     };
 
     if (typeof navigator !== 'undefined' && navigator.locks) {
-      return navigator.locks.request('duet-doc:sync-lock', { ifAvailable: true }, async (lock) => {
-        if (!lock) return { success: false, error: '其他标签页正在同步，请稍后再试。' };
-        return run();
-      });
+      return navigator.locks.request(
+        syncLockName(workspaceId),
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock) return { success: false, error: '其他标签页正在同步，请稍后再试。' };
+          return run();
+        },
+      );
     }
     return run();
   }
 
   private async drainOutbox(
+    workspaceId: string,
     onProgress?: (pushedCount: number, remainingCount: number) => void,
   ): Promise<PushResult> {
-    await db.syncOutbox.where('status').equals('pushing').modify({ status: 'pending' });
+    await db.syncOutbox
+      .where('workspaceId')
+      .equals(workspaceId)
+      .filter((entry) => entry.status === 'pushing')
+      .modify({ status: 'pending' });
     let pushedCount = 0;
 
     while (true) {
-      const remaining = await db.syncOutbox.where('status').equals('pending').count();
+      const entries = await db.syncOutbox.where('workspaceId').equals(workspaceId).toArray();
+      const remaining = entries.filter((entry) => entry.status === 'pending').length;
       onProgress?.(pushedCount, remaining);
-      const first = await db.syncOutbox.orderBy('queueSequence').first();
+      const first = entries.sort((a, b) => a.queueSequence - b.queueSequence)[0];
       if (!first) return { success: true, pushedCount };
       if (first.status === 'error') {
         return {
@@ -698,7 +721,7 @@ export class CloudSyncService {
         };
       }
 
-      const step = await this.pushNext();
+      const step = await this.pushNext(workspaceId);
       if (!step.success) {
         return {
           success: false,
@@ -711,8 +734,10 @@ export class CloudSyncService {
     }
   }
 
-  async retryErrors(): Promise<{ retried: number; unresolved: number }> {
-    const errors = await db.syncOutbox.where('status').equals('error').sortBy('queueSequence');
+  async retryErrors(workspaceId: string): Promise<{ retried: number; unresolved: number }> {
+    const errors = (await db.syncOutbox.where('workspaceId').equals(workspaceId).toArray())
+      .filter((entry) => entry.status === 'error')
+      .sort((a, b) => a.queueSequence - b.queueSequence);
     if (errors.length === 0) return { retried: 0, unresolved: 0 };
 
     const bootstrapConflicts = errors.filter(
@@ -808,7 +833,9 @@ export class CloudSyncService {
       if (!state?.conflict) return;
 
       if (resolution === 'keep-local') {
-        const entries = await outbox.orderBy('queueSequence').toArray();
+        const entries = (
+          await outbox.where('workspaceId').equals(conflict.workspaceId).toArray()
+        ).sort((a, b) => a.queueSequence - b.queueSequence);
         let rebased = false;
         for (const entry of entries) {
           const operations = entry.operations.map((operation) => {
@@ -834,7 +861,7 @@ export class CloudSyncService {
         }
         if (!rebased) throw new Error('没有找到与冲突对应的本地变更');
       } else {
-        const entries = await outbox.toArray();
+        const entries = await outbox.where('workspaceId').equals(conflict.workspaceId).toArray();
         for (const entry of entries) {
           const operations = entry.operations.filter(
             (operation) =>
@@ -880,7 +907,7 @@ export class CloudSyncService {
     resolution: 'keep-local' | 'use-cloud',
   ): Promise<void> {
     if (typeof navigator !== 'undefined' && navigator.locks) {
-      return navigator.locks.request('duet-doc:sync-lock', async () =>
+      return navigator.locks.request(syncLockName(conflict.workspaceId), async () =>
         this.resolveConflictUnlocked(conflict, resolution),
       );
     }

@@ -32,7 +32,8 @@ export async function enqueueMutationInTx(
   // 若本次入队为单一 upsert，且队列末尾恰好存在同一实体的单体 pending 任务，直接原地更新
   if (operations.length === 1 && operations[0].operation === 'upsert') {
     const singleOp = operations[0];
-    const lastEntry = await outboxTable.orderBy('queueSequence').reverse().first();
+    const workspaceEntries = await outboxTable.where('workspaceId').equals(workspaceId).toArray();
+    const lastEntry = workspaceEntries.sort((a, b) => b.queueSequence - a.queueSequence)[0];
 
     if (
       lastEntry &&
@@ -152,7 +153,8 @@ export async function enqueueMutationInTx(
   }
 
   // 获取下一个单调递增的 queueSequence
-  const lastSeqEntry = await outboxTable.orderBy('queueSequence').reverse().first();
+  const workspaceEntries = await outboxTable.where('workspaceId').equals(workspaceId).toArray();
+  const lastSeqEntry = workspaceEntries.sort((a, b) => b.queueSequence - a.queueSequence)[0];
   const syncStateRec = await syncStateTable.get(workspaceId);
   let nextQueueSequence = Math.max(
     (lastSeqEntry?.queueSequence ?? 0) + 1,

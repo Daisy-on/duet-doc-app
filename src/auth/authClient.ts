@@ -14,6 +14,7 @@ export class AuthApiError extends Error {
 let accessToken: string | null = null;
 let refreshRequest: Promise<AuthResponse> | null = null;
 let authFailureHandler: (() => void) | null = null;
+let authenticatedRequestController = new AbortController();
 
 function apiUrl(input: RequestInfo | URL): RequestInfo | URL {
   if (typeof input !== 'string' || /^https?:\/\//.test(input)) return input;
@@ -62,6 +63,11 @@ export function clearAccessToken() {
   accessToken = null;
 }
 
+export function abortAuthenticatedRequests() {
+  authenticatedRequestController.abort();
+  authenticatedRequestController = new AbortController();
+}
+
 export function setAuthFailureHandler(handler: (() => void) | null) {
   authFailureHandler = handler;
 }
@@ -86,7 +92,10 @@ export async function login(input: LoginInput) {
 
 export async function refreshSession(): Promise<AuthResponse> {
   if (!refreshRequest) {
-    refreshRequest = authRequest<AuthResponse>('/api/v1/auth/refresh', { method: 'POST' })
+    refreshRequest = authRequest<AuthResponse>('/api/v1/auth/refresh', {
+      method: 'POST',
+      signal: authenticatedRequestController.signal,
+    })
       .then(storeAccessToken)
       .finally(() => {
         refreshRequest = null;
@@ -117,7 +126,10 @@ export async function authFetch(
   const requestToken = accessToken;
   const headers = new Headers(init.headers);
   if (requestToken) headers.set('Authorization', `Bearer ${requestToken}`);
-  const response = await fetch(apiUrl(input), { ...init, headers, credentials: 'include' });
+  const signal = init.signal
+    ? AbortSignal.any([init.signal, authenticatedRequestController.signal])
+    : authenticatedRequestController.signal;
+  const response = await fetch(apiUrl(input), { ...init, headers, signal, credentials: 'include' });
   if (response.status !== 401 || !allowRefresh) return response;
 
   try {
@@ -135,6 +147,7 @@ export async function authFetch(
   const retry = await fetch(apiUrl(input), {
     ...init,
     headers: retryHeaders,
+    signal,
     credentials: 'include',
   });
   if (retry.status === 401) {
