@@ -144,6 +144,10 @@ class SaveCoordinator {
     }
   }
 
+  async flushAll(saveFn: SaveFn): Promise<void> {
+    await Promise.all([...this.docStates.keys()].map((docId) => this.flushPending(docId, saveFn)));
+  }
+
   resume(docId: string, saveFn?: SaveFn): void {
     const state = this.getOrCreateState(docId);
     if (state.isDeleting) return;

@@ -17,6 +17,8 @@ import type {
 } from '../store/aiWritingStore';
 import type { AIResponseMetadata } from '../ai/types';
 import { scheduleDocumentIndex } from '../rag/documentIndexer';
+import { authFetch } from '../auth/authClient';
+import { getActiveSyncIdentity } from './syncIdentity';
 
 export interface PushResult {
   success: boolean;
@@ -264,7 +266,7 @@ async function applyRemoteSnapshot(
 export class CloudSyncService {
   async getRemoteSequence(workspaceId: string): Promise<number> {
     const params = new URLSearchParams({ workspace_id: workspaceId });
-    const response = await fetch(`/api/v1/sync/status?${params.toString()}`);
+    const response = await authFetch(`/api/v1/sync/status?${params.toString()}`);
     if (!response.ok) throw new Error(`读取云端同步状态失败（HTTP ${response.status}）`);
 
     const data = (await response.json()) as SyncStatusResponse;
@@ -284,7 +286,7 @@ export class CloudSyncService {
         cursor: String(cursor),
         limit: '200',
       });
-      const response = await fetch(`/api/v1/sync/pull?${params.toString()}`);
+      const response = await authFetch(`/api/v1/sync/pull?${params.toString()}`);
       if (!response.ok) throw new Error(`读取云端版本失败（HTTP ${response.status}）`);
 
       const page = (await response.json()) as PullResponse;
@@ -323,7 +325,7 @@ export class CloudSyncService {
         cursor: String(cursor),
         limit: '200',
       });
-      const response = await fetch(`/api/v1/sync/pull?${params.toString()}`);
+      const response = await authFetch(`/api/v1/sync/pull?${params.toString()}`);
       if (!response.ok) throw new Error(`拉取云端数据失败（HTTP ${response.status}）`);
       const page = (await response.json()) as PullResponse;
 
@@ -402,7 +404,7 @@ export class CloudSyncService {
             workspaceId,
             pullCursor: page.next_cursor,
             serverUrl: current?.serverUrl ?? window.location.origin,
-            userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
+            userId: current?.userId ?? getActiveSyncIdentity().userId,
             lastSyncAt: Date.now(),
             nextOutboxSequence: current?.nextOutboxSequence,
           });
@@ -483,7 +485,7 @@ export class CloudSyncService {
     if (!entry) return { hasMore: false, success: true };
 
     try {
-      const response = await fetch('/api/v1/sync/push', {
+      const response = await authFetch('/api/v1/sync/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -559,7 +561,7 @@ export class CloudSyncService {
               workspaceId: entry.workspaceId,
               pullCursor: current?.pullCursor ?? 0,
               serverUrl: current?.serverUrl ?? window.location.origin,
-              userId: current?.userId ?? '00000000-0000-0000-0000-000000000001',
+              userId: current?.userId ?? getActiveSyncIdentity().userId,
               lastSyncAt: now,
               nextOutboxSequence: current?.nextOutboxSequence,
             });

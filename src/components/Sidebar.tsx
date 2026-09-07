@@ -14,12 +14,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  LogOut,
 } from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID, type KnowledgeBase } from '../store/knowledgeBaseStore';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import { useEditorStore, useLayoutStore } from '../store';
 import { useSyncStore } from '../store/syncStore';
+import { useAuthStore } from '../store/authStore';
 import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import SyncConflictModal from './modals/SyncConflictModal';
@@ -32,6 +34,9 @@ export default function Sidebar() {
   const knowledgeBases = useKnowledgeBaseStore((state) => state.knowledgeBases);
   const updateKnowledgeBase = useKnowledgeBaseStore((state) => state.updateKnowledgeBase);
   const deleteKnowledgeBase = useKnowledgeBaseStore((state) => state.deleteKnowledgeBase);
+  const flushAllDocumentAutosaves = useKnowledgeBaseStore(
+    (state) => state.flushAllDocumentAutosaves,
+  );
   const setIsCatalogCollapsed = useLayoutStore((state) => state.setIsCatalogCollapsed);
 
   const syncStatus = useSyncStore((state) => state.status);
@@ -44,6 +49,9 @@ export default function Sidebar() {
   const triggerSync = useSyncStore((state) => state.triggerSync);
   const retryErrors = useSyncStore((state) => state.retryErrors);
   const resolveConflict = useSyncStore((state) => state.resolveConflict);
+  const currentUser = useAuthStore((state) => state.user);
+  const authStatus = useAuthStore((state) => state.status);
+  const logout = useAuthStore((state) => state.logout);
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
 
@@ -82,6 +90,18 @@ export default function Sidebar() {
   const handleSync = () => {
     useEditorStore.getState().flushPendingDocumentUpdate();
     void triggerSync();
+  };
+
+  const handleLogout = async () => {
+    useEditorStore.getState().flushPendingDocumentUpdate();
+    try {
+      await flushAllDocumentAutosaves();
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+      alert('退出登录失败，请检查网络后重试');
+    }
   };
 
   // Dropdown states
@@ -333,8 +353,31 @@ export default function Sidebar() {
         anchorEl={menuAnchorEl}
       />
 
+      <div className="mt-auto mb-3 flex items-center gap-2 border-t border-border-color px-1 pt-3">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-accent">
+          {(currentUser?.display_name || currentUser?.username || 'D').slice(0, 1).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium text-text-primary">
+            {currentUser?.display_name || currentUser?.username}
+          </div>
+          {authStatus === 'offline-authenticated' && (
+            <div className="text-[10px] text-text-secondary">离线模式</div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary hover:bg-hover-bg hover:text-text-primary"
+          title="退出登录"
+          aria-label="退出登录"
+        >
+          <LogOut size={14} />
+        </button>
+      </div>
+
       {/* Cloud Sync Footer */}
-      <div className="pt-3 mt-auto border-t border-border-color shrink-0">
+      <div className="shrink-0 border-t border-border-color pt-3">
         <div className="flex items-center justify-between text-[12px] text-text-secondary mb-1.5 px-1">
           <div className="flex items-center gap-1.5 min-w-0">
             {syncStatus === 'syncing' ? (

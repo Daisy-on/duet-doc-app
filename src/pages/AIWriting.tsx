@@ -300,13 +300,13 @@ export default function AIWriting() {
   };
 
   // 一键保存到小记
-  const handleSaveToMemo = (content: string) => {
+  const handleSaveToMemo = async (content: string) => {
     const rawTitle =
       currentSession?.title && currentSession.title !== '新对话'
         ? `AI 小记: ${currentSession.title}`
         : undefined;
     const memoTitle = getSmartTitle(content, rawTitle || 'AI 对话摘录');
-    const memoId = createMemo(memoTitle);
+    const memoId = await createMemo(memoTitle);
     const htmlContent = markdownToHtml(content);
     updateDocument(memoId, { content: htmlContent });
     setToastText(`已成功保存到轻量小记「${memoTitle}」`);

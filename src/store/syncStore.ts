@@ -1,15 +1,9 @@
 import { create } from 'zustand';
 import { db } from '../db';
 import { cloudSyncService, type SyncConflict } from '../sync/CloudSyncService';
-import {
-  enqueueMutationInTx,
-  detectContentFormat,
-  DEFAULT_WORKSPACE_ID,
-  DEFAULT_USER_ID,
-} from '../sync/syncOutboxHelper';
+import { enqueueMutationInTx, detectContentFormat } from '../sync/syncOutboxHelper';
 import type { SyncEntityStateV2, SyncEntityType, SyncOperation } from '../db';
-
-export { DEFAULT_WORKSPACE_ID, DEFAULT_USER_ID };
+import { setActiveSyncIdentity } from '../sync/syncIdentity';
 
 export type SyncUiStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
@@ -26,6 +20,8 @@ interface SyncStore {
   remoteSequence: number | null;
   hasRemoteUpdates: boolean;
 
+  setIdentity: (userId: string, workspaceId: string) => void;
+  clearIdentity: () => void;
   initSyncStore: () => Promise<void>;
   checkRemoteUpdates: () => Promise<void>;
   refreshCounts: () => Promise<{ pending: number; error: number }>;
@@ -41,8 +37,8 @@ interface SyncStore {
 let remoteStatusRequest: Promise<void> | null = null;
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
-  workspaceId: DEFAULT_WORKSPACE_ID,
-  userId: DEFAULT_USER_ID,
+  workspaceId: '',
+  userId: '',
   serverUrl: '',
   status: 'idle',
   pendingCount: 0,
@@ -53,9 +49,44 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   remoteSequence: null,
   hasRemoteUpdates: false,
 
+  setIdentity: (userId, workspaceId) => {
+    setActiveSyncIdentity({ userId, workspaceId });
+    remoteStatusRequest = null;
+    set({
+      userId,
+      workspaceId,
+      status: 'idle',
+      pendingCount: 0,
+      errorCount: 0,
+      lastSyncAt: null,
+      errorMessage: null,
+      conflicts: [],
+      remoteSequence: null,
+      hasRemoteUpdates: false,
+    });
+  },
+
+  clearIdentity: () => {
+    setActiveSyncIdentity(null);
+    remoteStatusRequest = null;
+    set({
+      userId: '',
+      workspaceId: '',
+      status: 'idle',
+      pendingCount: 0,
+      errorCount: 0,
+      lastSyncAt: null,
+      errorMessage: null,
+      conflicts: [],
+      remoteSequence: null,
+      hasRemoteUpdates: false,
+    });
+  },
+
   initSyncStore: async () => {
     try {
       const wid = get().workspaceId;
+      if (!wid) throw new Error('同步身份尚未初始化');
       const state = await db.syncState.get(wid);
       const [pending, errors, conflicts] = await Promise.all([
         db.syncOutbox.where('status').equals('pending').count(),

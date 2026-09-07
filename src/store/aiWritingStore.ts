@@ -5,7 +5,8 @@ import { db } from '../db';
 import type { SyncEntityStateV2, SyncOutboxEntry, SyncOperation } from '../db';
 import type { AIResponseMetadata } from '../ai/types';
 import { toChatMessageSyncData, toChatSessionSyncData } from '../sync/chatSyncMapper';
-import { DEFAULT_WORKSPACE_ID, enqueueMutationInTx } from '../sync/syncOutboxHelper';
+import { enqueueMutationInTx } from '../sync/syncOutboxHelper';
+import { getActiveWorkspaceId } from '../sync/syncIdentity';
 
 export interface ReferencedDoc {
   id: string;
@@ -84,6 +85,7 @@ function refreshSyncCounts() {
 }
 
 async function removePendingSessionTree(tx: Transaction, sessionId: string, messageIds: string[]) {
+  const workspaceId = getActiveWorkspaceId();
   const entityKeys = new Set([
     `chat_session:${sessionId}`,
     ...messageIds.map((messageId) => `chat_message:${messageId}`),
@@ -92,7 +94,7 @@ async function removePendingSessionTree(tx: Transaction, sessionId: string, mess
   const pendingEntries = await outbox.where('status').equals('pending').toArray();
 
   for (const entry of pendingEntries) {
-    if (entry.workspaceId !== DEFAULT_WORKSPACE_ID) continue;
+    if (entry.workspaceId !== workspaceId) continue;
     const operations = entry.operations.filter(
       (operation) =>
         !(
@@ -108,7 +110,7 @@ async function removePendingSessionTree(tx: Transaction, sessionId: string, mess
 
   const entityStates = tx.table<SyncEntityStateV2, [string, string, string]>('syncEntityStatesV2');
   for (const messageId of messageIds) {
-    const key: [string, 'chat_message', string] = [DEFAULT_WORKSPACE_ID, 'chat_message', messageId];
+    const key: [string, 'chat_message', string] = [workspaceId, 'chat_message', messageId];
     const state = await entityStates.get(key);
     if (!state || state.serverRev === 0) await entityStates.delete(key);
   }
@@ -256,7 +258,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
         tx.table<ChatMessage, string>('chatMessages').where('sessionId').equals(id).count(),
         tx
           .table<SyncEntityStateV2, [string, string, string]>('syncEntityStatesV2')
-          .get([DEFAULT_WORKSPACE_ID, 'chat_session', id]),
+          .get([getActiveWorkspaceId(), 'chat_session', id]),
       ]);
       if (messageCount > 0 || syncState) {
         await enqueueMutationInTx(tx, [
@@ -338,7 +340,7 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
 
       const sessionState = await tx
         .table<SyncEntityStateV2, [string, string, string]>('syncEntityStatesV2')
-        .get([DEFAULT_WORKSPACE_ID, 'chat_session', session.id]);
+        .get([getActiveWorkspaceId(), 'chat_session', session.id]);
       const operations: SyncOperation[] = [
         {
           entity_type: 'chat_session',

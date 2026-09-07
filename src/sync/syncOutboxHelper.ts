@@ -1,11 +1,9 @@
 import type { Transaction } from 'dexie';
 import type { SyncOperation, SyncOutboxEntry, SyncEntityStateV2, SyncState } from '../db';
 import { detectContentFormat } from '../utils/formatUtils';
+import { getActiveWorkspaceId } from './syncIdentity';
 
 export { detectContentFormat };
-
-export const DEFAULT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000002';
-export const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 /**
  * 在给定的 Dexie 事务中将变更操作原子写入 syncOutbox 与 syncEntityStatesV2。
@@ -19,7 +17,7 @@ export const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000001';
 export async function enqueueMutationInTx(
   tx: Transaction,
   operations: SyncOperation[],
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string = getActiveWorkspaceId(),
 ): Promise<string | null> {
   if (!operations || operations.length === 0) return null;
 

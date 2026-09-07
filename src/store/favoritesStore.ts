@@ -46,39 +46,14 @@ interface FavoritesStore {
 
 const generateId = () => nanoid(12);
 
-// ── Demo initial data ───────────────────────────────────────────────────────
+// ── System data ───────────────────────────────────────────────────────────
 
-const initialFolders: FavoriteFolder[] = [
+const systemFolders: FavoriteFolder[] = [
   {
     id: FOLDER_ALL_ID,
     name: '全部收藏',
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 7,
     updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 7,
-  },
-  {
-    id: 'folder-tech',
-    name: '技术文档',
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-  },
-];
-
-const initialItems: FavoriteItem[] = [
-  {
-    id: 'fav-demo-1',
-    docId: 'doc-vite-analysis',
-    folderIds: [FOLDER_ALL_ID, 'folder-tech'],
-    favoritedAt: Date.now() - 1000 * 60 * 60 * 5,
-    createdAt: Date.now() - 1000 * 60 * 60 * 5,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 5,
-  },
-  {
-    id: 'fav-demo-2',
-    docId: 'doc-prd-ai',
-    folderIds: [FOLDER_ALL_ID],
-    favoritedAt: Date.now() - 1000 * 60 * 60 * 2,
-    createdAt: Date.now() - 1000 * 60 * 60 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
   },
 ];
 
@@ -92,8 +67,7 @@ export const useFavoritesStore = create<FavoritesStore>((set, get) => ({
     try {
       const folderCount = await db.favoriteFolders.count();
       if (folderCount === 0) {
-        await db.favoriteFolders.bulkAdd(initialFolders);
-        await db.favoriteItems.bulkAdd(initialItems);
+        await db.favoriteFolders.bulkAdd(systemFolders);
       }
       const folders = await db.favoriteFolders.toArray();
       const items = await db.favoriteItems.toArray();

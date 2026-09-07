@@ -1,10 +1,12 @@
-import { lazy, Suspense, useState, useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import AuthGuard from './components/auth/AuthGuard';
 import MainLayout from './layouts/MainLayout';
 import Workbench from './pages/Workbench';
-import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
-import { useFavoritesStore } from './store/favoritesStore';
 import { useAIWritingStore } from './store/aiWritingStore';
+import { useAuthStore } from './store/authStore';
+import { useFavoritesStore } from './store/favoritesStore';
+import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
 
 const KnowledgeBaseHome = lazy(() => import('./pages/KnowledgeBaseHome'));
 const DocEdit = lazy(() => import('./pages/DocEdit'));
@@ -15,6 +17,7 @@ const MemoHome = lazy(() => import('./pages/MemoHome'));
 const MemoEdit = lazy(() => import('./pages/MemoEdit'));
 const Favorites = lazy(() => import('./pages/Favorites'));
 const DocHistory = lazy(() => import('./pages/DocHistory'));
+const Login = lazy(() => import('./pages/Login'));
 
 function RouteLoadingFallback() {
   return (
@@ -28,67 +31,79 @@ function lazyRoute(element: ReactNode) {
   return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
 }
 
-function App() {
+function DataGuard() {
   const [loading, setLoading] = useState(true);
+  const userId = useAuthStore((state) => state.user?.id);
+  const workspaceId = useAuthStore((state) => state.workspaceId);
 
   useEffect(() => {
+    if (!userId || !workspaceId) return;
+    let cancelled = false;
+
     async function loadData() {
+      setLoading(true);
       try {
         await useKnowledgeBaseStore.getState().initStore();
         await Promise.all([
           useFavoritesStore.getState().initStore(),
           useAIWritingStore.getState().initStore(),
         ]);
-      } catch (err) {
-        console.error('Failed to load stores from IndexedDB:', err);
+      } catch (error) {
+        console.error('Failed to load stores from IndexedDB:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    loadData();
-  }, []);
+
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, workspaceId]);
 
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-bg-main">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-accent to-pink-500 flex items-center justify-center text-white shadow-lg animate-spin">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            </svg>
-          </div>
-          <div className="text-sm font-bold text-text-primary mt-2">系统初始化中...</div>
-          <div className="text-xs text-text-secondary">正在载入本地知识库与会话</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-indigo-100 border-t-accent" />
+          <div className="text-sm font-medium text-text-primary">正在加载个人空间...</div>
+          <div className="text-xs text-text-secondary">正在同步文档与对话</div>
         </div>
       </div>
     );
   }
 
+  return <Outlet />;
+}
+
+function App() {
+  const initializeAuth = useAuthStore((state) => state.initialize);
+
+  useEffect(() => {
+    void initializeAuth();
+  }, [initializeAuth]);
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Workbench />} />
-          <Route path="kb/:kbId" element={lazyRoute(<KnowledgeBaseHome />)} />
-          <Route path="kb/:kbId/doc/:docId" element={lazyRoute(<DocEdit />)} />
-          <Route path="ai-writing/*" element={lazyRoute(<AIWriting />)} />
-          <Route path="memo" element={lazyRoute(<MemoHome />)} />
-          <Route path="memo/:memoId" element={lazyRoute(<MemoEdit />)} />
-          <Route path="favorites" element={lazyRoute(<Favorites />)} />
+        <Route path="/login" element={lazyRoute(<Login />)} />
+        <Route element={<AuthGuard />}>
+          <Route element={<DataGuard />}>
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<Workbench />} />
+              <Route path="kb/:kbId" element={lazyRoute(<KnowledgeBaseHome />)} />
+              <Route path="kb/:kbId/doc/:docId" element={lazyRoute(<DocEdit />)} />
+              <Route path="ai-writing/*" element={lazyRoute(<AIWriting />)} />
+              <Route path="memo" element={lazyRoute(<MemoHome />)} />
+              <Route path="memo/:memoId" element={lazyRoute(<MemoEdit />)} />
+              <Route path="favorites" element={lazyRoute(<Favorites />)} />
+            </Route>
+            <Route path="kb/:kbId/doc/:docId/history" element={lazyRoute(<DocHistory />)} />
+            <Route path="dev/embedding-benchmark" element={lazyRoute(<EmbeddingBenchmark />)} />
+            <Route path="dev/local-retrieval" element={lazyRoute(<LocalRetrievalSandbox />)} />
+          </Route>
         </Route>
-        <Route path="kb/:kbId/doc/:docId/history" element={lazyRoute(<DocHistory />)} />
-        <Route path="dev/embedding-benchmark" element={lazyRoute(<EmbeddingBenchmark />)} />
-        <Route path="dev/local-retrieval" element={lazyRoute(<LocalRetrievalSandbox />)} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -41,8 +41,8 @@ export default function MemoCatalogPanel() {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [selectedMemo, setSelectedMemo] = useState<Document | null>(null);
 
-  const handleCreateMemo = () => {
-    const newId = createMemo('未命名小记');
+  const handleCreateMemo = async () => {
+    const newId = await createMemo('未命名小记');
     navigate(`/memo/${newId}`);
   };
 

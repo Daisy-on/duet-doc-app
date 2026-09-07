@@ -69,6 +69,7 @@ interface KnowledgeBaseStore {
   scheduleDocumentAutosave: (id: string, updates: SaveUpdates) => void;
   persistDocumentNow: (id: string, updates: SaveUpdates) => Promise<void>;
   flushDocumentAutosave: (id: string) => Promise<void>;
+  flushAllDocumentAutosaves: () => Promise<void>;
   createManualVersion: (docId: string) => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
 
@@ -87,7 +88,7 @@ interface KnowledgeBaseStore {
 
   // Memo operations
   getMemos: () => Document[];
-  createMemo: (title?: string) => string;
+  createMemo: (title?: string) => Promise<string>;
   moveDocument: (id: string, targetKbId: string, targetGroupId: string | null) => void;
   moveGroup: (
     id: string,
@@ -122,256 +123,6 @@ const enforceVersionLimitInTx = async (tx: Transaction, docId: string) => {
     throw err;
   }
 };
-
-// Preset Mock Data
-const initialKBs: KnowledgeBase[] = [
-  {
-    id: 'kb-frontend',
-    name: '大前端',
-    description:
-      '大前端技术积累与架构演进，包含 HTML, CSS, TS, Vue/React, Webpack/Vite 等工程化基建。',
-    icon: '#f97316', // Orange
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
-  },
-  {
-    id: 'kb-product',
-    name: '核心产品规划',
-    description: '核心产品的 PRD、路线图及年度规划文档。',
-    icon: '#3b82f6', // Blue
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 10,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
-  },
-  {
-    id: 'kb-arch',
-    name: '研发架构库',
-    description: '后端架构设计、微服务治理、前后端接口标准与协议规范。',
-    icon: '#10b981', // Emerald
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 8,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 20,
-  },
-  {
-    id: 'kb-inspiration',
-    name: '个人灵感收集',
-    description: '好玩的点子、交互参考、设计素材 and 日常碎片记录。',
-    icon: '#a855f7', // Purple
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 20,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 22,
-  },
-  {
-    id: MEMO_KB_ID,
-    name: '小记',
-    description: '轻量化小记知识库',
-    icon: '#ec4899', // Pink
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
-  },
-];
-
-const initialGroups: Group[] = [
-  {
-    id: 'group-basic',
-    kbId: 'kb-frontend',
-    parentGroupId: null,
-    depth: 0,
-    name: '01. 前端基础',
-    order: 1,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-  },
-  {
-    id: 'group-html',
-    kbId: 'kb-frontend',
-    parentGroupId: 'group-basic',
-    depth: 1,
-    name: 'HTML',
-    order: 1,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3.9,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3.9,
-  },
-  {
-    id: 'group-css',
-    kbId: 'kb-frontend',
-    parentGroupId: 'group-basic',
-    depth: 1,
-    name: 'CSS',
-    order: 2,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3.8,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3.8,
-  },
-  {
-    id: 'group-eng',
-    kbId: 'kb-frontend',
-    parentGroupId: null,
-    depth: 0,
-    name: '02. 工程化',
-    order: 2,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-  },
-  {
-    id: 'group-perf',
-    kbId: 'kb-frontend',
-    parentGroupId: null,
-    depth: 0,
-    name: '03. 性能优化',
-    order: 3,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-  },
-];
-
-const initialDocs: Document[] = [
-  {
-    id: 'doc-html-semantic',
-    kbId: 'kb-frontend',
-    groupId: 'group-html',
-    title: 'HTML 语义化总结',
-    content: `
-      <h1>HTML 语义化总结</h1>
-      <p>HTML 语义化是指根据内容的结构化（内容泥沙俱下），选择合适的标签（划分区域）。合理地选择标签能够让页面内容结构化，便于浏览器、搜索引擎解析，提高可访问性。</p>
-      <h2>一、语义化标签的优势</h2>
-      <ul>
-        <li><strong>利于 SEO</strong>：搜索引擎的爬虫依赖于标记来确定上下文和各个关键字的权重。</li>
-        <li><strong>便于团队开发与维护</strong>：语义化使得代码更具可读性，方便开发者阅读和理解。</li>
-        <li><strong>提升用户体验</strong>：例如在没有 CSS 样式时，页面也能呈现出清晰的结构。</li>
-      </ul>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-  },
-  {
-    id: 'doc-css-layout',
-    kbId: 'kb-frontend',
-    groupId: 'group-css',
-    title: 'CSS 布局指南',
-    content: `
-      <h1>CSS 布局指南</h1>
-      <p>CSS 布局是网页设计的基石。从传统的 Float 浮动布局，到主流的 Flexbox 弹性盒子布局，再到二维的 Grid 网格布局，CSS 提供了强大的排版能力。</p>
-      <h2>一、Flexbox 常用属性</h2>
-      <p>Flex 容器属性有：<code>flex-direction</code>, <code>justify-content</code>, <code>align-items</code> 等。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 1.5,
-  },
-  {
-    id: 'doc-vite-analysis',
-    kbId: 'kb-frontend',
-    groupId: 'group-eng',
-    title: 'Vite 原理解析',
-    content: `
-      <h1>Vite 原理解析</h1>
-      <p>Vite 是一种新型的前端构建工具，它利用浏览器原生 ES 模块导入的能力，提供了极快的冷启动和热更新体验。</p>
-      <h2>一、整体架构</h2>
-      <p>Vite 的核心思想是将开发服务器作为 ESM 的载体，在开发环境下直接返回原生 ES 模块，浏览器按需加载，从而跳过了打包这一耗时步骤。</p>
-      <h2>二、依赖预构建</h2>
-      <p>Vite 使用 esbuild 对依赖进行预构建，将 CommonJS 或 UMD 格式 of 依赖转换为 ESM 格式，缓存在 node_modules/.vite 中。</p>
-      <h2>三、代码示例</h2>
-      <pre><code class="language-javascript">&lt;script setup lang="ts" name="Category"&gt;
-import {reactive} from 'vue'
-let games = reactive([
-  {id:'asgdytsa01',name:'英雄联盟'},
-  {id:'asgdytsa02',name:'王者荣耀'},
-  {id:'asgdytsa03',name:'红色警戒'},
-  {id:'asgdytsa04',name:'斗罗大陆'}
-])
-&lt;/script&gt;</code></pre>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 10,
-  },
-  {
-    id: 'doc-webpack-vite',
-    kbId: 'kb-frontend',
-    groupId: 'group-eng',
-    title: 'Webpack 与 Vite 对比',
-    content: `
-      <h1>Webpack 与 Vite 对比</h1>
-      <p>Webpack 是一个传统的静态模块打包工具，需要先递归构建依赖图然后打包生成 bundle；而 Vite 利用原生 ESM 实现了按需编译，极大地加快了启动 and 更新速度。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 11,
-  },
-  {
-    id: 'doc-prd-ai',
-    kbId: 'kb-product',
-    groupId: null,
-    title: '智能批改模块 - PRD需求文档与 AI Prompt 联调记录',
-    content: `
-      <h1>智能批改模块 - PRD需求文档与 AI Prompt 联调记录</h1>
-      <p>本文档记录了智能批改模块的详细 PRD 规范，以及在与后端 LLM (Large Language Model) 联调过程中的 Prompt 版本迭代历史。</p>
-      <h2>一、需求背景</h2>
-      <p>通过 AI 对学生的实验报告、作业进行自动批改，指出错误并给出修改建议，降低教师批改负担。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 9,
-  },
-  {
-    id: 'doc-student-flow',
-    kbId: 'kb-arch',
-    groupId: null,
-    title: '学生实验模块 - 前后端交互与数据流转架构设计',
-    content: `
-      <h1>学生实验模块 - 前后端交互与数据流转架构设计</h1>
-      <p>详细规定了学生在实验过程中的实时步骤存档、数据同步策略、以及断网重连下的 LocalStorage 暂存机制。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 22,
-  },
-  {
-    id: 'doc-course-table',
-    kbId: 'kb-arch',
-    groupId: null,
-    title: '课程知识库模块 - 数据表结构定义 (V1.2)',
-    content: `
-      <h1>课程知识库模块 - 数据表结构定义 (V1.2)</h1>
-      <p>定义了 <code>course_kb</code>, <code>course_doc</code>, <code>doc_chunk</code>, <code>vector_index</code> 等数据表的关系以及主外键约束。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 25,
-  },
-  {
-    id: 'doc-bar-inspiration',
-    kbId: 'kb-inspiration',
-    groupId: null,
-    title: '共振酒吧 (Resonance Bar) - 视觉素材与海报排版',
-    content: `
-      <h1>共振酒吧 (Resonance Bar) - 视觉素材与海报排版</h1>
-      <p>一些关于共振酒吧 (Resonance Bar) 的视觉灵感。包含蒸汽波、赛博朋克霓虹色调以及网格排版系统参考。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 8,
-  },
-  {
-    id: 'memo-1',
-    kbId: MEMO_KB_ID,
-    groupId: null,
-    title: '今日待办与灵感',
-    content: `
-      <h1>今日待办与灵感</h1>
-      <p>这里记录了今天的一些灵感：</p>
-      <ul>
-        <li>调研 TipTap 扩展支持</li>
-        <li>梳理 AI 写作的界面交互流</li>
-        <li>下班买点水果</li>
-      </ul>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 4,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 4,
-  },
-  {
-    id: 'memo-2',
-    kbId: MEMO_KB_ID,
-    groupId: null,
-    title: 'React 19 Concurrent Features 笔记',
-    content: `
-      <h1>React 19 Concurrent Features 笔记</h1>
-      <p>主要是对 <code>useActionState</code> 和 <code>useOptimistic</code> 的使用场景进行对比。前者用于处理异步 Action 的 State 转换，后者用于处理乐观更新。</p>
-    `,
-    createdAt: Date.now() - 1000 * 60 * 60 * 20,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 18,
-  },
-];
 
 const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
   const now = Date.now();
@@ -496,26 +247,11 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   initStore: async () => {
     try {
-      let kbCount = await db.knowledgeBases.count();
-      if (kbCount === 0) {
-        try {
-          await cloudSyncService.pullAll(useSyncStore.getState().workspaceId);
-          kbCount = await db.knowledgeBases.count();
-          if (kbCount > 0) {
-            window.localStorage.setItem('duet-doc:cloud-sync-enabled', 'true');
-          }
-        } catch (error) {
-          console.info('[CloudSync] Cloud restore unavailable, continuing locally.', error);
-        }
-      }
-      const isCloudSyncSuppressed =
-        typeof window !== 'undefined' &&
-        window.localStorage.getItem('duet-doc:cloud-sync-enabled') === 'true';
-
-      if (kbCount === 0 && !isCloudSyncSuppressed) {
-        await db.knowledgeBases.bulkAdd(initialKBs);
-        await db.groups.bulkAdd(initialGroups);
-        await db.documents.bulkAdd(initialDocs);
+      try {
+        await cloudSyncService.pullAll(useSyncStore.getState().workspaceId);
+        window.localStorage.setItem('duet-doc:cloud-sync-enabled', 'true');
+      } catch (error) {
+        console.info('[CloudSync] Cloud restore unavailable, continuing locally.', error);
       }
 
       await get().reloadFromDb();
@@ -1025,6 +761,10 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     saveCoordinator.resume(id, internalPersistDocument);
   },
 
+  flushAllDocumentAutosaves: async () => {
+    await saveCoordinator.flushAll(internalPersistDocument);
+  },
+
   createManualVersion: async (docId) => {
     useEditorStore.getState().flushPendingDocumentUpdate(docId);
     await saveCoordinator.pauseAndFlush(docId, internalPersistDocument);
@@ -1341,8 +1081,80 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
     return get().documents.filter((d) => d.kbId === MEMO_KB_ID);
   },
 
-  createMemo: (title = '未命名小记') => {
-    return get().createDocument(MEMO_KB_ID, null, title);
+  createMemo: async (title = '未命名小记') => {
+    if (get().knowledgeBases.some((kb) => kb.id === MEMO_KB_ID)) {
+      return get().createDocument(MEMO_KB_ID, null, title);
+    }
+
+    const now = Date.now();
+    const memoKnowledgeBase: KnowledgeBase = {
+      id: MEMO_KB_ID,
+      name: '小记',
+      description: '轻量化小记知识库',
+      icon: '#ec4899',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const memo: Document = {
+      id: `doc-${generateId()}`,
+      kbId: MEMO_KB_ID,
+      groupId: null,
+      title,
+      content: `<h1>${title}</h1><p></p>`,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((state) => ({
+      knowledgeBases: [...state.knowledgeBases, memoKnowledgeBase],
+      documents: [...state.documents, memo],
+    }));
+
+    try {
+      await db.transaction(
+        'rw',
+        [db.knowledgeBases, db.documents, db.syncOutbox, db.syncEntityStatesV2, db.syncState],
+        async (tx) => {
+          await tx.table('knowledgeBases').add(memoKnowledgeBase);
+          await tx.table('documents').add(memo);
+          await enqueueMutationInTx(tx, [
+            {
+              entity_type: 'knowledge_base',
+              entity_id: MEMO_KB_ID,
+              operation: 'upsert',
+              base_revision: 0,
+              data: {
+                name: memoKnowledgeBase.name,
+                description: memoKnowledgeBase.description,
+                icon: memoKnowledgeBase.icon,
+                created_at: new Date(now).toISOString(),
+              },
+            },
+            {
+              entity_type: 'document',
+              entity_id: memo.id,
+              operation: 'upsert',
+              base_revision: 0,
+              data: {
+                kb_id: MEMO_KB_ID,
+                group_id: null,
+                title: memo.title,
+                content: memo.content,
+                content_format: detectContentFormat(memo.content),
+                created_at: new Date(now).toISOString(),
+              },
+            },
+          ]);
+        },
+      );
+    } catch (error) {
+      await get().reloadFromDb();
+      throw error;
+    }
+
+    scheduleDocumentIndex(memo);
+    void useSyncStore.getState().refreshCounts();
+    return memo.id;
   },
 
   moveDocument: (id, targetKbId, targetGroupId) => {

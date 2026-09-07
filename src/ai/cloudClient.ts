@@ -1,6 +1,7 @@
 import type { AIRequest, StreamCallbacks, AIStreamEventData, AIStreamError } from './types';
 import { buildApiUrl } from '../utils/apiUtils';
 import { logAITrace, type AITrace, type AITraceStatus } from './aiLogger';
+import { authFetch } from '../auth/authClient';
 
 export async function streamCloudAI(
   request: AIRequest,
@@ -46,7 +47,7 @@ export async function streamCloudAI(
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await authFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
