@@ -386,9 +386,9 @@ export default function AIWriting() {
             </span>
             <span className="font-medium">
               {backendStatus === 'connected'
-                ? '云端 AI 已接入'
+                ? '已连接云端'
                 : backendStatus === 'disconnected'
-                  ? '云端 AI 已离线'
+                  ? '离线模式'
                   : '检测连接中...'}
             </span>
           </div>

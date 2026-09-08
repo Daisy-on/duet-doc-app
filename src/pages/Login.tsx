@@ -12,6 +12,7 @@ export default function Login() {
   const errorMessage = useAuthStore((state) => state.errorMessage);
   const login = useAuthStore((state) => state.login);
   const register = useAuthStore((state) => state.register);
+
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -26,8 +27,8 @@ export default function Login() {
 
   if (status === 'initializing') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f8fa]">
-        <Loader2 size={28} className="animate-spin text-accent" />
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <Loader2 size={28} className="animate-spin text-gray-900" />
       </div>
     );
   }
@@ -61,16 +62,17 @@ export default function Login() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-5 py-10">
-      <section className="w-full max-w-[400px] rounded-xl border border-border-color bg-white px-9 py-10 shadow-[0_16px_48px_rgba(17,24,39,0.12)]">
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-accent">
-            <Sparkles size={21} />
+    <main className="flex min-h-screen flex-col items-center justify-center bg-white px-5 sm:bg-[#fbfbfd]">
+      <section className="w-full max-w-[380px] sm:rounded-2xl sm:bg-white sm:px-10 sm:py-12 sm:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300">
+        <div className="mb-10 flex flex-col items-center justify-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900 text-white shadow-sm">
+            <Sparkles size={24} />
           </div>
-          <h1 className="text-2xl font-bold text-text-primary">DuetDoc</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">DuetDoc</h1>
         </div>
 
-        <div className="mb-7 grid grid-cols-2 border-b border-border-color" role="tablist">
+        {/* Segmented Control */}
+        <div className="mb-8 flex rounded-full bg-gray-100/80 p-1" role="tablist">
           {(['login', 'register'] as const).map((item) => (
             <button
               key={item}
@@ -81,22 +83,21 @@ export default function Login() {
                 setMode(item);
                 setLocalError(null);
               }}
-              className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-full py-2 text-[13px] font-semibold transition-all duration-200 ${
                 mode === item
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {item === 'login' ? '登录' : '注册'}
+              {item === 'login' ? '登录' : '注册账号'}
             </button>
           ))}
         </div>
 
         <form className="space-y-4" onSubmit={submit}>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-text-primary">用户名</span>
-            <div className="flex items-center gap-2 rounded-md border border-border-color px-3 focus-within:border-accent focus-within:ring-2 focus-within:ring-indigo-100">
-              <UserRound size={17} className="shrink-0 text-text-secondary" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 px-4 py-3 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:shadow-sm">
+              <UserRound size={18} className="shrink-0 text-gray-400" />
               <input
                 required
                 minLength={3}
@@ -105,30 +106,30 @@ export default function Login() {
                 autoComplete="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                className="h-11 min-w-0 flex-1 border-0 bg-transparent text-sm text-text-primary outline-none"
-                placeholder="3-32 位字母、数字或下划线"
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-gray-900 placeholder:text-gray-400 placeholder:font-normal outline-none"
+                placeholder="用户名 (3-32位数字或字母)"
               />
             </div>
-          </label>
+          </div>
 
           {mode === 'register' && (
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-text-primary">显示名称</span>
-              <input
-                maxLength={50}
-                autoComplete="nickname"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                className="h-11 w-full rounded-md border border-border-color px-3 text-sm text-text-primary outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-                placeholder="可选，可使用中文"
-              />
-            </label>
+            <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 px-4 py-3 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:shadow-sm">
+                <input
+                  maxLength={50}
+                  autoComplete="nickname"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-gray-900 placeholder:text-gray-400 placeholder:font-normal outline-none"
+                  placeholder="显示名称 (可选)"
+                />
+              </div>
+            </div>
           )}
 
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-text-primary">密码</span>
-            <div className="flex items-center gap-2 rounded-md border border-border-color px-3 focus-within:border-accent focus-within:ring-2 focus-within:ring-indigo-100">
-              <LockKeyhole size={17} className="shrink-0 text-text-secondary" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 px-4 py-3 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:shadow-sm">
+              <LockKeyhole size={18} className="shrink-0 text-gray-400" />
               <input
                 required
                 minLength={mode === 'register' ? 8 : 1}
@@ -137,42 +138,50 @@ export default function Login() {
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="h-11 min-w-0 flex-1 border-0 bg-transparent text-sm text-text-primary outline-none"
-                placeholder={mode === 'register' ? '至少 8 位' : '请输入密码'}
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-gray-900 placeholder:text-gray-400 placeholder:font-normal outline-none"
+                placeholder={mode === 'register' ? '设置密码 (至少 8 位)' : '密码'}
               />
             </div>
-          </label>
+          </div>
 
           {mode === 'register' && (
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-text-primary">确认密码</span>
-              <input
-                required
-                minLength={8}
-                maxLength={128}
-                type="password"
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                className="h-11 w-full rounded-md border border-border-color px-3 text-sm text-text-primary outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-                placeholder="再次输入密码"
-              />
-            </label>
+            <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 px-4 py-3 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:shadow-sm">
+                <LockKeyhole size={18} className="shrink-0 text-gray-400" />
+                <input
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-gray-900 placeholder:text-gray-400 placeholder:font-normal outline-none"
+                  placeholder="确认密码"
+                />
+              </div>
+            </div>
           )}
 
           {(localError || errorMessage) && (
-            <p className="text-sm text-red-600" role="alert">
+            <div
+              className="rounded-lg bg-red-50 p-3 text-sm text-red-600 animate-in fade-in duration-300"
+              role="alert"
+            >
               {localError || errorMessage}
-            </p>
+            </div>
           )}
 
           <button
             type="submit"
             disabled={submitting}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent text-sm font-semibold text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="group mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98]"
           >
-            {submitting && <Loader2 size={17} className="animate-spin" />}
-            {mode === 'login' ? '登录' : '创建账号'}
+            {submitting ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <>{mode === 'login' ? '登录' : '继续'}</>
+            )}
           </button>
         </form>
       </section>

@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  LogOut,
 } from 'lucide-react';
 import { NavLink, useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBaseStore, MEMO_KB_ID, type KnowledgeBase } from '../store/knowledgeBaseStore';
@@ -26,6 +25,8 @@ import CreateKnowledgeBaseModal from './modals/CreateKnowledgeBaseModal';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import SyncConflictModal from './modals/SyncConflictModal';
 import KbActionMenu from './menus/KbActionMenu';
+import UserActionMenu from './menus/UserActionMenu';
+import SyncStatusPopover from './modals/SyncStatusPopover';
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
@@ -49,8 +50,8 @@ export default function Sidebar() {
   const triggerSync = useSyncStore((state) => state.triggerSync);
   const retryErrors = useSyncStore((state) => state.retryErrors);
   const resolveConflict = useSyncStore((state) => state.resolveConflict);
+
   const currentUser = useAuthStore((state) => state.user);
-  const authStatus = useAuthStore((state) => state.status);
   const logout = useAuthStore((state) => state.logout);
 
   const visibleKBs = knowledgeBases.filter((kb) => kb.id !== MEMO_KB_ID);
@@ -60,6 +61,9 @@ export default function Sidebar() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteTargetKb, setDeleteTargetKb] = useState<KnowledgeBase | null>(null);
   const [isConflictOpen, setIsConflictOpen] = useState(false);
+
+  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null);
+  const [syncPopoverAnchor, setSyncPopoverAnchor] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const checkRemoteStatus = () => {
@@ -140,9 +144,21 @@ export default function Sidebar() {
   return (
     <aside className="w-[220px] min-w-[220px] bg-bg-sidebar border-r border-border-color flex flex-col p-5 h-full">
       {/* Brand & User Zone */}
-      <div className="flex items-center gap-3 mb-6 cursor-pointer shrink-0">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-200 to-pink-200 shadow-sm" />
-        <div className="font-bold text-[16px] text-text-primary">DuetDoc</div>
+      <div
+        className="flex items-center gap-2 mb-6 cursor-pointer hover:bg-hover-bg p-1.5 -mx-1.5 rounded-lg transition-colors shrink-0"
+        onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+      >
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-xs font-bold text-accent shadow-sm border border-indigo-100/50">
+          {(currentUser?.display_name || currentUser?.username || 'D').slice(0, 1).toUpperCase()}
+        </div>
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="font-semibold text-[13px] text-text-primary truncate">
+            {currentUser?.display_name || currentUser?.username || 'DuetDoc User'}
+          </div>
+          <div className="text-[11px] text-text-secondary truncate">
+            {currentUser?.username ? `@${currentUser.username}` : 'DuetDoc'}
+          </div>
+        </div>
       </div>
 
       {/* Search Box */}
@@ -353,103 +369,54 @@ export default function Sidebar() {
         anchorEl={menuAnchorEl}
       />
 
-      <div className="mt-auto mb-3 flex items-center gap-2 border-t border-border-color px-1 pt-3">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-accent">
-          {(currentUser?.display_name || currentUser?.username || 'D').slice(0, 1).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium text-text-primary">
-            {currentUser?.display_name || currentUser?.username}
-          </div>
-          {authStatus === 'offline-authenticated' && (
-            <div className="text-[10px] text-text-secondary">离线模式</div>
-          )}
-        </div>
+      <div className="mt-auto shrink-0 pt-3">
         <button
-          type="button"
-          onClick={() => void handleLogout()}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary hover:bg-hover-bg hover:text-text-primary"
-          title="退出登录"
-          aria-label="退出登录"
+          onClick={(e) => setSyncPopoverAnchor(e.currentTarget)}
+          className="flex items-center justify-center p-2 rounded-lg hover:bg-hover-bg transition-colors cursor-pointer"
+          title="同步状态"
         >
-          <LogOut size={14} />
+          {syncStatus === 'syncing' ? (
+            <Loader2 size={16} className="animate-spin text-accent" />
+          ) : syncStatus === 'offline' ? (
+            <CloudOff size={16} className="text-text-secondary" />
+          ) : conflicts.length > 0 || errorCount > 0 || syncStatus === 'error' ? (
+            <AlertCircle size={16} className="text-red-500" />
+          ) : hasRemoteUpdates ? (
+            <CloudDownload size={16} className="text-accent" />
+          ) : pendingCount > 0 ? (
+            <CloudUpload size={16} className="text-amber-500" />
+          ) : (
+            <CheckCircle2 size={16} className="text-emerald-500" />
+          )}
         </button>
       </div>
 
-      {/* Cloud Sync Footer */}
-      <div className="shrink-0 border-t border-border-color pt-3">
-        <div className="flex items-center justify-between text-[12px] text-text-secondary mb-1.5 px-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {syncStatus === 'syncing' ? (
-              <Loader2 size={13} className="animate-spin text-accent shrink-0" />
-            ) : syncStatus === 'offline' ? (
-              <CloudOff size={13} className="text-text-secondary shrink-0" />
-            ) : conflicts.length > 0 || errorCount > 0 || syncStatus === 'error' ? (
-              <AlertCircle size={13} className="text-red-500 shrink-0" />
-            ) : hasRemoteUpdates ? (
-              <CloudDownload size={13} className="text-accent shrink-0" />
-            ) : pendingCount > 0 ? (
-              <CloudUpload size={13} className="text-amber-500 shrink-0" />
-            ) : (
-              <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-            )}
-            <span className="font-medium truncate">
-              {syncStatus === 'syncing'
-                ? '正在同步...'
-                : syncStatus === 'offline'
-                  ? '云端暂不可用'
-                  : conflicts.length > 0
-                    ? `存在冲突 (${conflicts.length})`
-                    : errorCount > 0
-                      ? `同步异常 (${errorCount} 项失败)`
-                      : syncStatus === 'error'
-                        ? '同步异常'
-                        : hasRemoteUpdates
-                          ? '云端有更新'
-                          : pendingCount > 0
-                            ? `待上传 (${pendingCount})`
-                            : '云端已对齐'}
-            </span>
-          </div>
-          {conflicts.length > 0 ? (
-            <button
-              onClick={() => setIsConflictOpen(true)}
-              disabled={syncStatus === 'syncing'}
-              className="px-2 py-0.5 rounded text-[11px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
-            >
-              处理冲突
-            </button>
-          ) : errorCount > 0 ? (
-            <button
-              onClick={() => void retryErrors()}
-              disabled={syncStatus === 'syncing'}
-              className="px-2 py-0.5 rounded text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
-              title="重新尝试失败的同步任务"
-            >
-              {syncStatus === 'syncing' ? '同步中' : '重试'}
-            </button>
-          ) : (
-            <button
-              onClick={handleSync}
-              disabled={syncStatus === 'syncing'}
-              className="px-2 py-0.5 rounded text-[11px] font-medium bg-bg-main hover:bg-hover-bg border border-border-color transition-colors disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
-              title="拉取云端更新并上传本地修改"
-            >
-              {syncStatus === 'syncing' ? '同步中' : '立即同步'}
-            </button>
-          )}
-        </div>
-        {errorMessage && (
-          <div className="text-[11px] text-red-500 truncate px-1" title={errorMessage}>
-            {errorMessage}
-          </div>
-        )}
-        {lastSyncAt && !errorMessage && errorCount === 0 && (
-          <div className="text-[10px] text-text-secondary/70 px-1 truncate">
-            上次同步: {new Date(lastSyncAt).toLocaleTimeString()}
-          </div>
-        )}
-      </div>
+      <UserActionMenu
+        isOpen={userMenuAnchor !== null}
+        onClose={() => setUserMenuAnchor(null)}
+        onLogout={() => void handleLogout()}
+        anchorEl={userMenuAnchor}
+      />
+
+      <SyncStatusPopover
+        isOpen={syncPopoverAnchor !== null}
+        onClose={() => setSyncPopoverAnchor(null)}
+        anchorEl={syncPopoverAnchor}
+        syncStatus={syncStatus}
+        pendingCount={pendingCount}
+        errorCount={errorCount}
+        lastSyncAt={lastSyncAt}
+        errorMessage={errorMessage}
+        conflictsCount={conflicts.length}
+        hasRemoteUpdates={hasRemoteUpdates}
+        onRetry={() => void retryErrors()}
+        onSync={handleSync}
+        onOpenConflicts={() => {
+          setSyncPopoverAnchor(null);
+          setIsConflictOpen(true);
+        }}
+      />
+
       <SyncConflictModal
         conflict={isConflictOpen ? (conflicts[0] ?? null) : null}
         remainingCount={conflicts.length}
