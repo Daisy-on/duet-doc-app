@@ -47,8 +47,8 @@ function FolderCard({
       onMouseLeave={() => setHovered(false)}
       className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all select-none ${
         isSelected
-          ? 'border-accent bg-indigo-50 shadow-sm'
-          : 'border-transparent hover:border-border-color hover:bg-white'
+          ? 'border-accent/40 bg-indigo-50/80 dark:bg-indigo-950/60 shadow-xs'
+          : 'border-transparent hover:border-border-color hover:bg-hover-bg'
       }`}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -88,7 +88,9 @@ function FolderCard({
       ) : (
         <span
           className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-semibold ${
-            isSelected ? 'bg-indigo-100 text-accent' : 'bg-gray-100 text-text-secondary'
+            isSelected
+              ? 'bg-indigo-100/80 dark:bg-indigo-900/60 text-accent'
+              : 'bg-hover-bg text-text-secondary'
           }`}
         >
           {count}
@@ -248,7 +250,7 @@ export default function Favorites() {
               return (
                 <div
                   key={folder.id}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-accent rounded-xl"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-bg-main border border-accent rounded-xl"
                 >
                   <input
                     autoFocus
@@ -289,7 +291,7 @@ export default function Favorites() {
 
           {/* Inline new-folder creation */}
           {isCreatingFolder ? (
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-accent rounded-xl">
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-bg-main border border-accent rounded-xl">
               <input
                 autoFocus
                 value={newFolderName}
@@ -332,12 +334,12 @@ export default function Favorites() {
       {/* ── Right panel — document list ────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main">
         {/* Header */}
-        <header className="h-[60px] border-b border-border-color flex items-center px-6 shrink-0 bg-white gap-3">
+        <header className="h-[60px] border-b border-border-color flex items-center px-6 shrink-0 bg-bg-main gap-3">
           <Star size={16} className="text-yellow-400 fill-yellow-400 shrink-0" />
           <h1 className="text-[15px] font-bold text-text-primary truncate">
             {folders.find((f) => f.id === selectedFolderId)?.name ?? '收藏'}
           </h1>
-          <span className="text-[11px] text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full font-semibold shrink-0">
+          <span className="text-[11px] text-text-secondary bg-hover-bg px-2 py-0.5 rounded-full font-semibold shrink-0">
             {selectedItems.length} 篇
           </span>
         </header>

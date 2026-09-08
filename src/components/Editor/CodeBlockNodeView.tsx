@@ -1,6 +1,7 @@
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from '@tiptap/react';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { useThemeStore } from '../../store/themeStore';
 
 export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -13,7 +14,10 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
 
   const name = node.attrs.name || '';
   const language = node.attrs.language || 'plaintext';
-  const theme = node.attrs.theme || 'dark';
+  const resolvedGlobalTheme = useThemeStore((state) => state.resolvedTheme);
+  const theme = node.attrs.theme || 'auto';
+  const effectiveTheme = theme === 'auto' ? resolvedGlobalTheme : theme;
+  const isDark = effectiveTheme === 'dark';
 
   const allLanguages = [
     'plaintext',
@@ -77,8 +81,11 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
     return display.toLowerCase();
   };
 
-  const themes = ['dark', 'light'];
-  const isDark = theme === 'dark';
+  const themes = [
+    { value: 'auto', label: '跟随全局' },
+    { value: 'light', label: '浅色' },
+    { value: 'dark', label: '深色' },
+  ];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -107,7 +114,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
   return (
     <NodeViewWrapper
       className={`code-block group relative my-6 rounded-xl border font-sans transition-all duration-300 shadow-sm hover:shadow-md ${
-        isDark ? 'border-[#333] bg-[#1E1E1E]' : 'border-gray-200 bg-[#F8F9FA]'
+        isDark ? 'border-[#333] bg-[#1E1E1E]' : 'border-border-color bg-[#F8F9FA]'
       }`}
     >
       {/* 极简展开按钮 (折叠状态显示) */}
@@ -224,7 +231,11 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
                     : 'hover:text-gray-900 hover:bg-gray-300'
                 }`}
               >
-                {theme === 'dark' ? '暗色' : '亮色'}
+                {theme === 'auto'
+                  ? `自动 (${effectiveTheme === 'dark' ? '深色' : '浅色'})`
+                  : theme === 'dark'
+                    ? '深色'
+                    : '浅色'}
                 <ChevronDown
                   size={12}
                   className={`transition-transform duration-200 ${themeOpen ? 'rotate-180' : ''}`}
@@ -232,17 +243,17 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
               </button>
               {themeOpen && (
                 <div
-                  className={`absolute top-full right-0 mt-1 py-1 w-24 rounded-lg shadow-xl border z-[60] ${
+                  className={`absolute top-full right-0 mt-1 py-1 w-28 rounded-lg shadow-xl border z-[60] ${
                     isDark
                       ? 'bg-[#2D2D2D] border-[#444] text-[#D4D4D4]'
                       : 'bg-white border-gray-200 text-gray-700'
                   }`}
                 >
                   {themes.map((t) => {
-                    const isActive = theme === t;
+                    const isActive = theme === t.value;
                     return (
                       <button
-                        key={t}
+                        key={t.value}
                         tabIndex={-1}
                         className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
                           isDark
@@ -254,11 +265,11 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
                               : 'hover:bg-gray-100 hover:text-gray-900'
                         }`}
                         onClick={() => {
-                          updateAttributes({ theme: t });
+                          updateAttributes({ theme: t.value });
                           setThemeOpen(false);
                         }}
                       >
-                        {t === 'dark' ? '暗色' : '亮色'}
+                        {t.label}
                         {isActive && <Check size={12} />}
                       </button>
                     );
@@ -282,7 +293,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
       )}
 
       {/* 代码编辑区始终可见，通过 data-theme 设置主题让 CSS 进行高亮渲染 */}
-      <div data-theme={theme} className="rounded-b-xl">
+      <div data-theme={effectiveTheme} className="rounded-b-xl">
         <pre
           className={`!m-0 !bg-transparent !p-4 !border-none ${isDark ? 'text-gray-100' : 'text-gray-800'}`}
         >

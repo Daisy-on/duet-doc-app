@@ -78,7 +78,7 @@ export default function SyncStatusPopover({
           maxWidth: '288px',
           width: 'max-content',
         }}
-        className="z-50 bg-white border border-border-color rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-3 animate-dropdown-fade-in flex flex-col gap-1.5"
+        className="z-50 bg-bg-main border border-border-color rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-3 animate-dropdown-fade-in flex flex-col gap-1.5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-1.5 whitespace-nowrap">

@@ -93,7 +93,7 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
         left: assistantPos.left,
       }}
     >
-      <div className="bg-white text-zinc-800 rounded-xl p-3 shadow-xl border border-zinc-200/80 w-[560px] flex flex-col gap-2.5">
+      <div className="bg-bg-main text-text-primary rounded-xl p-3 shadow-xl border border-border-color w-[560px] flex flex-col gap-2.5">
         {/* 输入行 */}
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center text-indigo-500 shrink-0">
@@ -106,7 +106,7 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
 
           <input
             type="text"
-            className="flex-1 bg-transparent border-none outline-none text-zinc-800 placeholder-zinc-400 text-[13px] h-7"
+            className="flex-1 bg-transparent border-none outline-none text-text-primary placeholder-text-ghost text-[13px] h-7"
             placeholder="向智能助手提出要求或按 Enter 提交..."
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
@@ -123,7 +123,7 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
           />
 
           <button
-            className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 p-1 rounded-md transition-colors"
+            className="text-text-ghost hover:text-text-primary hover:bg-hover-bg p-1 rounded-md transition-colors"
             onClick={handleClose}
           >
             <X size={14} />
@@ -132,7 +132,7 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
 
         {/* 警告消息 */}
         {warningMsg && (
-          <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 text-[12px] px-2.5 py-1.5 rounded-lg border border-amber-200">
+          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 text-[12px] px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800">
             <AlertCircle size={13} />
             <span>{warningMsg}</span>
           </div>
@@ -140,7 +140,7 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
 
         {/* 错误展示 */}
         {error && (
-          <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 text-[12px] px-2.5 py-1.5 rounded-lg border border-rose-200">
+          <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 text-[12px] px-2.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800">
             <AlertCircle size={13} />
             <span>{error.message || '请求服务发生异常'}</span>
           </div>
@@ -148,8 +148,8 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
 
         {/* 流式结果预览区 */}
         {showPreview && !error && (
-          <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2.5 max-h-[200px] overflow-y-auto">
-            <div className="text-[13px] text-zinc-700 leading-relaxed whitespace-pre-wrap select-text">
+          <div className="flex flex-col gap-2 border-t border-border-color pt-2.5 max-h-[200px] overflow-y-auto">
+            <div className="text-[13px] text-text-primary leading-relaxed whitespace-pre-wrap select-text">
               {generatedText}
               {isGenerating && (
                 <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-1 animate-pulse align-middle" />
@@ -158,11 +158,11 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
 
             {/* 操作按钮区（生成结束或已有文本时展示） */}
             {!isGenerating && generatedText.length > 0 && (
-              <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-50 select-none">
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-border-color select-none">
                 {task === 'explain' ? (
                   <button
                     onClick={handleCopy}
-                    className="flex items-center gap-1 text-[12px] px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium rounded-md transition-colors"
+                    className="flex items-center gap-1 text-[12px] px-2.5 py-1 bg-hover-bg hover:bg-border-color text-text-primary font-medium rounded-md transition-colors"
                   >
                     {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                     {copied ? '已复制' : '复制解释'}
@@ -171,7 +171,7 @@ export const AIAssistantPopover: React.FC<AIAssistantPopoverProps> = ({
                   <>
                     <button
                       onClick={handleCopy}
-                      className="flex items-center gap-1 text-[12px] px-2.5 py-1 text-zinc-500 hover:bg-zinc-100 rounded-md transition-colors"
+                      className="flex items-center gap-1 text-[12px] px-2.5 py-1 text-text-secondary hover:bg-hover-bg rounded-md transition-colors"
                     >
                       <Copy size={12} />
                       复制

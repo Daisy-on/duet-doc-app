@@ -153,7 +153,7 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
         default: '',
       },
       theme: {
-        default: 'dark',
+        default: 'auto',
       },
     };
   },

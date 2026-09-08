@@ -47,16 +47,16 @@ export default function CreateKnowledgeBaseModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-[480px] max-w-[92vw] border border-gray-100 overflow-hidden flex flex-col px-4.5 py-5.5 animate-modal-scale-in"
+        className="bg-bg-main rounded-2xl shadow-xl w-[480px] max-w-[92vw] border border-border-color overflow-hidden flex flex-col px-4.5 py-5.5 animate-modal-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-4 pb-2 border-b border-border-color/60">
-          <h1 className="text-base font-bold text-gray-900 tracking-tight">新建知识库</h1>
+          <h1 className="text-base font-bold text-text-primary tracking-tight">新建知识库</h1>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+            className="text-text-ghost hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-hover-bg"
           >
             <X size={16} />
           </button>
@@ -74,7 +74,7 @@ export default function CreateKnowledgeBaseModal({
               placeholder="知识库名称，例如：核心产品规划..."
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="px-3.5 py-2 border border-border-color rounded-xl text-xs text-text-primary outline-none focus:border-accent transition-colors"
+              className="px-3.5 py-2 bg-bg-main border border-border-color rounded-xl text-xs text-text-primary outline-none focus:border-accent transition-colors"
               autoFocus
             />
           </div>
@@ -88,7 +88,7 @@ export default function CreateKnowledgeBaseModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="px-3.5 py-2 border border-border-color rounded-xl text-xs text-text-primary outline-none focus:border-accent transition-colors resize-none"
+              className="px-3.5 py-2 bg-bg-main border border-border-color rounded-xl text-xs text-text-primary outline-none focus:border-accent transition-colors resize-none"
             />
           </div>
 

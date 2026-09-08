@@ -105,11 +105,11 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
         style={{ scrollbarGutter: 'stable' }}
       >
         {/* Top Header Bar */}
-        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-8 shrink-0 bg-white">
+        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-8 shrink-0 bg-bg-main">
           <div className="flex items-center gap-3.5 min-w-0">
             <button
               onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
-              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title={isCatalogCollapsed ? '展开' : '折叠'}
             >
               <PanelLeft size={16} />
@@ -120,7 +120,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                 style={{ backgroundColor: kb.icon }}
               />
               <div className="text-[15px] font-semibold text-text-primary truncate">{kb.name}</div>
-              <div className="text-[11px] text-text-secondary bg-gray-50 border border-border-color px-2 py-0.5 rounded-full font-medium shrink-0">
+              <div className="text-[11px] text-text-secondary bg-bg-panel border border-border-color px-2 py-0.5 rounded-full font-medium shrink-0">
                 共 {allDocs.length} 篇文档
               </div>
             </div>
@@ -137,7 +137,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
         </header>
 
         {/* Details Banner */}
-        <div className="px-10 py-10 border-b border-border-color bg-white shrink-0">
+        <div className="px-10 py-10 border-b border-border-color bg-bg-main shrink-0">
           <div className="max-w-4xl mx-auto flex items-start gap-6">
             <div
               className="w-16 h-16 rounded-xl flex items-center justify-center text-white shadow-md shrink-0 transition-transform duration-300 hover:scale-105"
@@ -213,7 +213,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                   );
                 })}
               </div>
-              <div className="text-[11px] font-semibold text-text-secondary/70 uppercase tracking-wider bg-white border border-border-color/60 px-2 py-1 rounded-md shadow-sm shrink-0">
+              <div className="text-[11px] font-semibold text-text-secondary/70 uppercase tracking-wider bg-bg-main border border-border-color/60 px-2 py-1 rounded-md shadow-sm shrink-0">
                 当前路径
               </div>
             </div>
@@ -235,7 +235,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                       <div
                         key={group.id}
                         onClick={() => setCurrentGroupId(group.id)}
-                        className="bg-white border border-border-color rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-accent hover:-translate-y-0.5 transition-all duration-200 group flex items-start gap-3.5"
+                        className="bg-bg-main border border-border-color rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-accent hover:-translate-y-0.5 transition-all duration-200 group flex items-start gap-3.5"
                       >
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform"
@@ -265,7 +265,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
             {/* Documents Section */}
             {currentSubGroups.length === 0 && currentDocs.length === 0 ? (
               /* Empty State */
-              <div className="bg-white border border-border-color rounded-2xl p-16 text-center shadow-sm flex flex-col items-center">
+              <div className="bg-bg-main border border-border-color rounded-2xl p-16 text-center shadow-sm flex flex-col items-center">
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center mb-4 text-white opacity-90 shadow-inner"
                   style={{ backgroundColor: kb.icon }}
@@ -286,8 +286,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
               </div>
             ) : currentDocs.length > 0 ? (
               /* Table list of documents */
-              <div className="bg-white rounded-xl border border-border-color shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-border-color bg-gray-50/50 flex justify-between items-center">
+              <div className="bg-bg-main rounded-xl border border-border-color shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-border-color bg-bg-panel/50 flex justify-between items-center">
                   <h3 className="text-sm font-semibold text-text-primary">文档列表</h3>
                   {currentGroupId && (
                     <button
@@ -319,11 +319,11 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                         <tr
                           key={doc.id}
                           onClick={() => navigate(`/kb/${kbId}/doc/${doc.id}`)}
-                          className="hover:bg-gray-50/70 border-b border-border-color last:border-0 cursor-pointer transition-colors"
+                          className="hover:bg-hover-bg border-b border-border-color last:border-0 cursor-pointer transition-colors"
                         >
                           <td className="py-4 px-6">
                             <div className="flex items-center gap-3 font-semibold text-[14px] text-text-primary">
-                              <div className="w-[22px] h-[22px] bg-gray-100 rounded-md flex items-center justify-center text-text-secondary">
+                              <div className="w-[22px] h-[22px] bg-hover-bg rounded-md flex items-center justify-center text-text-secondary">
                                 <FileText size={13} />
                               </div>
                               <span className="hover:text-accent transition-colors truncate max-w-sm">
@@ -333,15 +333,15 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                           </td>
                           <td className="py-4 px-6 text-[13px] text-text-secondary">
                             {group ? (
-                              <span className="bg-indigo-50/80 text-accent border border-indigo-100 px-2 py-0.5 rounded-md font-medium">
+                              <span className="bg-indigo-50/80 dark:bg-indigo-950/80 text-accent border border-indigo-100 dark:border-indigo-900 px-2 py-0.5 rounded-md font-medium">
                                 {group.name.replace(/^\d+\.\s*/, '')}
                               </span>
                             ) : (
-                              <span className="text-gray-400">无分组</span>
+                              <span className="text-text-ghost">无分组</span>
                             )}
                           </td>
                           <td className="py-4 px-6 text-[13px] text-text-secondary flex items-center gap-1.5 mt-0.5">
-                            <User size={13} className="text-gray-300" />
+                            <User size={13} className="text-text-ghost" />
                             <span>管理员 · {formatRelativeTime(doc.updatedAt)}</span>
                           </td>
                         </tr>
@@ -352,7 +352,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
               </div>
             ) : (
               /* No direct docs, but there are sub-groups */
-              <div className="bg-white rounded-xl border border-border-color border-dashed p-8 text-center text-text-secondary text-xs">
+              <div className="bg-bg-main rounded-xl border border-border-color border-dashed p-8 text-center text-text-secondary text-xs">
                 当前目录下暂无直属文档。你可以点击
                 <span
                   onClick={handleCreateDocument}

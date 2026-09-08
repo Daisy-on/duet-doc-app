@@ -45,3 +45,4 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 }));
 
 export * from './layoutStore';
+export * from './themeStore';

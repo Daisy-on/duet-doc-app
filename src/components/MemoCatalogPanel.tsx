@@ -176,7 +176,7 @@ export default function MemoCatalogPanel() {
             </div>
 
             {/* Search Box */}
-            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color focus-within:border-accent rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0">
+            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-bg-main border border-border-color focus-within:border-accent rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0">
               <Search size={14} className="shrink-0" />
               <input
                 type="text"
@@ -208,7 +208,7 @@ export default function MemoCatalogPanel() {
                       }}
                       className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
                         isActive
-                          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[10px]'
+                          ? 'text-accent font-semibold bg-bg-main shadow-sm border-l-2 border-accent rounded-l-none pl-[10px]'
                           : 'text-text-secondary'
                       } ${activeMenuId === memo.id ? 'bg-hover-bg' : ''}`}
                     >
@@ -229,7 +229,7 @@ export default function MemoCatalogPanel() {
                               if (e.key === 'Enter') handleFinishRename();
                               else if (e.key === 'Escape') handleCancelRename();
                             }}
-                            className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+                            className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                             onFocus={(e) => e.target.select()}

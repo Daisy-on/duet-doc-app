@@ -68,7 +68,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-[420px] min-h-[320px] border border-border-color flex flex-col p-5 animate-modal-scale-in relative"
+        className="bg-bg-main rounded-2xl shadow-2xl w-[420px] min-h-[320px] border border-border-color flex flex-col p-5 animate-modal-scale-in relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -109,9 +109,9 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className={`w-full flex items-center justify-between pl-3.5 pr-3.5 py-2.5 border rounded-lg text-sm text-text-primary outline-none transition-all bg-white cursor-pointer select-none ${
+                  className={`w-full flex items-center justify-between pl-3.5 pr-3.5 py-2.5 border rounded-lg text-sm text-text-primary outline-none transition-all bg-bg-main cursor-pointer select-none ${
                     dropdownOpen
-                      ? 'border-accent ring-2 ring-indigo-100 shadow-sm'
+                      ? 'border-accent ring-2 ring-indigo-100 dark:ring-indigo-950 shadow-sm'
                       : 'border-border-color hover:border-text-ghost shadow-sm'
                   }`}
                 >
@@ -139,7 +139,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
 
                 {/* Dropdown Options List */}
                 {dropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-1.5 bg-white border border-border-color rounded-lg shadow-xl py-1.5 max-h-[172px] overflow-y-auto z-50 animate-dropdown-fade-in custom-scrollbar">
+                  <div className="absolute left-0 right-0 mt-1.5 bg-bg-main border border-border-color rounded-lg shadow-xl py-1.5 max-h-[172px] overflow-y-auto z-50 animate-dropdown-fade-in custom-scrollbar">
                     {knowledgeBases.map((kb) => {
                       const isSelected = kb.id === effectiveKbId;
                       return (

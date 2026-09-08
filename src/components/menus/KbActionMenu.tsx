@@ -72,7 +72,7 @@ export default function KbActionMenu({
           left: `${coords.left}px`,
           width: '120px',
         }}
-        className="z-50 bg-white border border-border-color rounded-lg shadow-lg py-1 animate-dropdown-fade-in text-xs"
+        className="z-50 bg-bg-main border border-border-color rounded-lg shadow-lg py-1 animate-dropdown-fade-in text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -82,7 +82,7 @@ export default function KbActionMenu({
           }}
           className="w-full px-3 py-2 text-text-primary hover:bg-hover-bg flex items-center gap-2 transition-colors text-left cursor-pointer font-medium"
         >
-          <Pencil size={12} className="text-gray-500" />
+          <Pencil size={12} className="text-text-secondary" />
           <span>重命名</span>
         </button>
 
@@ -91,7 +91,7 @@ export default function KbActionMenu({
             onDelete();
             onClose();
           }}
-          className="w-full px-3 py-2 text-red-600 hover:bg-red-50/50 flex items-center gap-2 transition-colors text-left cursor-pointer font-medium"
+          className="w-full px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2 transition-colors text-left cursor-pointer font-medium"
         >
           <Trash2 size={12} className="text-red-500" />
           <span>删除</span>

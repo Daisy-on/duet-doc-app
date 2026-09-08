@@ -21,7 +21,7 @@ export default function AddContentMenu({
       <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
 
       {/* Menu dropdown */}
-      <div className="absolute right-[-10px] top-8 z-50 w-50 bg-white border border-border-color/80 rounded-xl shadow-xl py-1.5 animate-dropdown-fade-in">
+      <div className="absolute right-[-10px] top-8 z-50 w-50 bg-bg-main border border-border-color/80 rounded-xl shadow-xl py-1.5 animate-dropdown-fade-in">
         <button
           type="button"
           onClick={() => {
@@ -57,7 +57,7 @@ export default function AddContentMenu({
             <Download size={15} className="shrink-0" />
             <span className="whitespace-nowrap">导入</span>
           </div>
-          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium border border-gray-200/80 shrink-0 whitespace-nowrap">
+          <span className="text-[10px] bg-hover-bg text-text-secondary px-1.5 py-0.5 rounded font-medium border border-border-color/80 shrink-0 whitespace-nowrap">
             即将上线
           </span>
         </div>
@@ -71,7 +71,7 @@ export default function AddContentMenu({
             <LayoutTemplate size={15} className="shrink-0" />
             <span className="whitespace-nowrap">从模板创建</span>
           </div>
-          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium border border-gray-200/80 shrink-0 whitespace-nowrap">
+          <span className="text-[10px] bg-hover-bg text-text-secondary px-1.5 py-0.5 rounded font-medium border border-border-color/80 shrink-0 whitespace-nowrap">
             即将上线
           </span>
         </div>

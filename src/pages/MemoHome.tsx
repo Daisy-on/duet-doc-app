@@ -25,7 +25,7 @@ export default function MemoHome() {
         <header className="h-[60px] flex items-center px-6 shrink-0 bg-transparent">
           <button
             onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
-            className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
             title={isCatalogCollapsed ? '展开' : '折叠'}
           >
             <PanelLeft size={16} />

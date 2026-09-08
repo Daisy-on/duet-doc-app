@@ -76,7 +76,7 @@ export default function GroupAddMenu({
           top: `${coords.top}px`,
           left: `${coords.left}px`,
         }}
-        className="z-50 w-48 bg-white border border-border-color rounded-lg shadow-lg py-1.5 animate-dropdown-fade-in"
+        className="z-50 w-48 bg-bg-main border border-border-color rounded-lg shadow-lg py-1.5 animate-dropdown-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         <button

@@ -53,7 +53,7 @@ export default function ConfirmDeleteModal({
       onClick={isSubmitting ? undefined : onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-[420px] max-w-[90vw] p-5 animate-modal-scale-in border border-gray-100 flex flex-col gap-4"
+        className="bg-bg-main rounded-2xl shadow-xl w-[420px] max-w-[90vw] p-5 animate-modal-scale-in border border-border-color flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Title line with inline orange warning icon */}
@@ -61,19 +61,19 @@ export default function ConfirmDeleteModal({
           <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-sm">
             !
           </div>
-          <h3 className="text-base font-bold text-gray-900 tracking-tight flex-1">{title}</h3>
+          <h3 className="text-base font-bold text-text-primary tracking-tight flex-1">{title}</h3>
           <button
             type="button"
             disabled={isSubmitting}
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-text-ghost hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-hover-bg shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Description (indented to align with title text) */}
-        <div className="text-sm text-gray-500 leading-relaxed pl-7.5 break-words">
+        <div className="text-sm text-text-secondary leading-relaxed pl-7.5 break-words">
           {description}
         </div>
 
@@ -83,7 +83,7 @@ export default function ConfirmDeleteModal({
             type="button"
             disabled={isSubmitting}
             onClick={onClose}
-            className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2 rounded-xl border border-border-color text-sm font-medium text-text-primary bg-bg-main hover:bg-hover-bg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             取消
           </button>

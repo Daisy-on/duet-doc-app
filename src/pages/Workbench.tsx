@@ -48,9 +48,9 @@ export default function Workbench() {
         {/* New Document Card */}
         <div
           onClick={() => setIsDocModalOpen(true)}
-          className="bg-white border border-border-color p-5 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
+          className="bg-bg-main border border-border-color p-5 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/40 transition-colors">
             <FileText size={18} />
           </div>
           <div className="text-[15px] font-semibold text-text-primary mt-1">新建文档</div>
@@ -62,9 +62,9 @@ export default function Workbench() {
         {/* New Knowledge Base Card */}
         <div
           onClick={() => setIsKBModalOpen(true)}
-          className="bg-white border border-border-color p-5 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
+          className="bg-bg-main border border-border-color p-5 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
             <FolderPlus size={18} />
           </div>
           <div className="text-[15px] font-semibold text-text-primary mt-1">新建知识库</div>
@@ -73,15 +73,15 @@ export default function Workbench() {
 
         {/* Templates Card (Static placeholder / soon tooltip) */}
         <div
-          className="bg-white border border-border-color p-5 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
+          className="bg-bg-main border border-border-color p-5 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
           title="模板中心即将上线"
         >
-          <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
             <Copy size={18} />
           </div>
           <div className="text-[15px] font-semibold text-text-primary mt-1 flex items-center gap-1.5">
             <span>模板中心</span>
-            <span className="text-[9px] bg-orange-50 text-orange-600 border border-orange-200 px-1 py-0.5 rounded font-bold">
+            <span className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60 px-1 py-0.5 rounded font-bold">
               即将上线
             </span>
           </div>
@@ -90,15 +90,15 @@ export default function Workbench() {
 
         {/* AI Writer Card (Static placeholder / soon tooltip) */}
         <div
-          className="bg-white border border-border-color p-5 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
+          className="bg-bg-main border border-border-color p-5 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
           title="AI 自动生成文档即将上线"
         >
-          <div className="w-8 h-8 rounded-lg bg-slate-100 text-text-secondary flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-hover-bg text-text-secondary flex items-center justify-center">
             <Sparkles size={18} />
           </div>
           <div className="text-[15px] font-semibold text-text-primary mt-1 flex items-center gap-1.5">
             <span>AI 帮你写</span>
-            <span className="text-[9px] bg-gray-100 text-gray-600 border border-gray-200 px-1 py-0.5 rounded font-bold">
+            <span className="text-[9px] bg-hover-bg text-text-secondary border border-border-color px-1 py-0.5 rounded font-bold">
               即将上线
             </span>
           </div>
@@ -109,7 +109,7 @@ export default function Workbench() {
       </div>
 
       {/* Doc List Section */}
-      <div className="bg-white rounded-xl p-6 border border-border-color shadow-sm">
+      <div className="bg-bg-main rounded-xl p-6 border border-border-color shadow-sm">
         {/* Tabs */}
         <div className="flex gap-6 border-b border-border-color mb-4 pb-2">
           <div className="text-sm font-semibold text-text-primary cursor-pointer relative pb-2 select-none">

@@ -160,11 +160,11 @@ export default function MemoEdit() {
       {/* Right panel editor workspace */}
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
         {/* Header */}
-        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
+        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-bg-main">
           <div className="flex items-center gap-3.5 min-w-0">
             <button
               onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
-              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title={isCatalogCollapsed ? '展开' : '折叠'}
             >
               <PanelLeft size={16} />
@@ -185,7 +185,7 @@ export default function MemoEdit() {
                     content: updatedContent,
                   });
                 }}
-                className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
+                className="text-[15px] font-semibold text-text-primary bg-transparent hover:bg-hover-bg focus:bg-bg-main border border-transparent focus:border-border-color rounded-lg px-2.5 py-1 outline-none transition-colors max-w-[280px] font-sans"
                 placeholder="无标题小记"
               />
               <div className="flex items-center gap-3 text-xs shrink-0">

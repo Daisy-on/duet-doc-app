@@ -167,7 +167,7 @@ export default function Sidebar() {
           <Search size={14} />
           <span className="truncate w-[90px]">搜索知识库...</span>
         </div>
-        <span className="bg-white px-1.5 py-0.5 rounded border border-border-color text-[11px] shadow-sm">
+        <span className="bg-bg-main px-1.5 py-0.5 rounded border border-border-color text-[11px] shadow-sm">
           ⌘K
         </span>
       </div>
@@ -269,7 +269,7 @@ export default function Sidebar() {
                           if (e.key === 'Enter') handleFinishRename();
                           else if (e.key === 'Escape') setRenamingKbId(null);
                         }}
-                        className="w-full text-xs font-semibold text-text-primary bg-white px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
+                        className="w-full text-xs font-semibold text-text-primary bg-bg-main px-1.5 py-0.5 border border-border-color rounded outline-none focus:border-accent"
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
                         onFocus={(e) => e.target.select()}

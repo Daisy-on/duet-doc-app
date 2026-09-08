@@ -68,7 +68,7 @@ function DocTreeItem({
       onClick={handleDocClick}
       className={`text-[13px] py-1.5 px-1.5 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
         isDocActive
-          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none'
+          ? 'text-accent font-semibold bg-bg-main shadow-sm border-l-2 border-accent rounded-l-none'
           : 'text-text-secondary'
       } ${activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''}`}
       style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
@@ -88,7 +88,7 @@ function DocTreeItem({
               if (e.key === 'Enter') handleFinishRenameDoc();
               else if (e.key === 'Escape') handleCancelRenameDoc();
             }}
-            className="w-full text-xs text-text-primary bg-white px-1.5 py-0.5 border border-accent rounded outline-none shadow-xs"
+            className="w-full text-xs text-text-primary bg-bg-main px-1.5 py-0.5 border border-accent rounded outline-none shadow-xs"
             autoFocus
             onClick={(e) => e.stopPropagation()}
             onFocus={(e) => e.target.select()}
@@ -249,7 +249,7 @@ function GroupTreeNode({
               type="text"
               value={renamingName}
               onChange={(e) => setRenamingName(e.target.value)}
-              className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+              className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
               autoFocus
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.target.select()}
@@ -369,7 +369,7 @@ function GroupTreeNode({
                   if (e.key === 'Enter') handleFinishCreateGroup();
                   else if (e.key === 'Escape') setCreatingParentId(undefined);
                 }}
-                className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+                className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
                 autoFocus
                 onFocus={(e) => e.target.select()}
               />
@@ -398,7 +398,7 @@ function GroupTreeNode({
 
           {subGroups.length === 0 && groupDocs.length === 0 && (
             <div
-              className="text-[11px] text-gray-400 italic py-1 px-2 pr-2"
+              className="text-[11px] text-text-ghost italic py-1 px-2 pr-2"
               style={{ paddingLeft: `${docPaddingLeft}px` }}
             >
               (空分组)
@@ -755,7 +755,7 @@ export default function CatalogPanel() {
             </div>
 
             {/* Search Current KB */}
-            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-white border border-border-color rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0 cursor-text hover:border-accent transition-colors">
+            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-bg-main border border-border-color rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0 cursor-text hover:border-accent transition-colors">
               <Search size={14} /> 搜索当前知识库...
             </div>
 
@@ -822,7 +822,7 @@ export default function CatalogPanel() {
                       if (e.key === 'Enter') handleFinishCreateGroup();
                       else if (e.key === 'Escape') setCreatingParentId(undefined);
                     }}
-                    className="w-full text-xs font-semibold text-text-primary bg-white px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+                    className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
                     autoFocus
                     onFocus={(e) => e.target.select()}
                   />
@@ -831,7 +831,7 @@ export default function CatalogPanel() {
 
               {/* Render Root Level Documents */}
               {documents.filter((doc) => doc.groupId === null).length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-100">
+                <div className="mt-4 pt-3 border-t border-border-color/60">
                   <div className="text-[11px] font-bold text-text-secondary uppercase tracking-wider px-2 mb-1.5">
                     未分组文档
                   </div>

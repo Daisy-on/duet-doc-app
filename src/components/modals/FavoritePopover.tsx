@@ -104,7 +104,7 @@ export default function FavoritePopover({
     <div
       ref={popoverRef}
       style={{ position: 'fixed', top: posTop, right: posRight, zIndex: 9999, width: 232 }}
-      className="bg-white border border-border-color rounded-xl shadow-2xl py-3 animate-dropdown-fade-in"
+      className="bg-bg-main border border-border-color rounded-xl shadow-2xl py-3 animate-dropdown-fade-in"
     >
       {/* Header row */}
       <div className="px-3 mb-2 flex items-center justify-between">
@@ -143,7 +143,7 @@ export default function FavoritePopover({
             >
               <div
                 className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  isInFolder ? 'border-accent bg-accent' : 'border-gray-300 bg-white'
+                  isInFolder ? 'border-accent bg-accent' : 'border-border-color bg-bg-main'
                 }`}
               >
                 {isInFolder && <Check size={10} className="text-white" />}
@@ -172,7 +172,7 @@ export default function FavoritePopover({
               }
             }}
             placeholder="输入分组名称"
-            className="flex-1 text-xs border border-border-color rounded-lg px-2.5 py-1.5 outline-none focus:border-accent transition-colors"
+            className="flex-1 text-xs bg-bg-main text-text-primary border border-border-color rounded-lg px-2.5 py-1.5 outline-none focus:border-accent transition-colors"
           />
           <button
             onClick={handleCreateFolder}

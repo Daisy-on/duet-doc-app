@@ -776,6 +776,34 @@ export default function Editor() {
     };
   }, [editor, setEditorInstance]);
 
+  // 监听全局主题变更，重置文档中被手动设置过独立主题的代码块，使其重归跟随全局 (auto)
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const handleThemeChange = () => {
+      if (!editor || editor.isDestroyed) return;
+      const { doc, tr } = editor.state;
+      let modified = false;
+      doc.descendants((node, pos) => {
+        if (node.type.name === 'codeBlock' && node.attrs.theme !== 'auto') {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            theme: 'auto',
+          });
+          modified = true;
+        }
+      });
+      if (modified) {
+        editor.view.dispatch(tr);
+      }
+    };
+
+    window.addEventListener('duet:theme-changed', handleThemeChange);
+    return () => {
+      window.removeEventListener('duet:theme-changed', handleThemeChange);
+    };
+  }, [editor]);
+
   // 组件卸载时清理定时器并异步拉起 GC
   useEffect(() => {
     return () => {

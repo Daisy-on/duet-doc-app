@@ -297,19 +297,19 @@ export default function KBTreePickerModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-xl w-[480px] h-[550px] max-w-[92vw] border border-gray-100 overflow-hidden flex flex-col p-5 animate-modal-scale-in"
+        className="bg-bg-main rounded-3xl shadow-xl w-[480px] h-[550px] max-w-[92vw] border border-border-color overflow-hidden flex flex-col p-5 animate-modal-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-start mb-3 pb-2 border-b border-border-color/60 shrink-0">
           <div>
-            <h3 className="text-base font-bold text-gray-900 tracking-tight">{title}</h3>
+            <h3 className="text-base font-bold text-text-primary tracking-tight">{title}</h3>
             {subtitle && <div className="text-[11px] text-text-secondary mt-0.5">{subtitle}</div>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+            className="text-text-ghost hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-hover-bg"
           >
             <X size={16} />
           </button>
@@ -324,12 +324,11 @@ export default function KBTreePickerModal({
               value={docTitle}
               onChange={(e) => setDocTitle(e.target.value)}
               placeholder="输入文档标题..."
-              className="w-full text-xs text-text-primary bg-bg-panel px-3 py-2 border border-border-color rounded-lg outline-none focus:border-accent focus:bg-white transition-colors font-medium"
+              className="w-full text-xs text-text-primary bg-bg-panel px-3 py-2 border border-border-color rounded-lg outline-none focus:border-accent focus:bg-bg-main transition-colors font-medium"
             />
           </div>
         )}
 
-        {/* Unified Search Bar */}
         {showSearch && (
           <div className="relative mb-3 shrink-0">
             <Search size={14} className="absolute left-3 top-2.5 text-text-secondary" />
@@ -338,7 +337,7 @@ export default function KBTreePickerModal({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={mode === 'document' ? '搜索文档标题...' : '搜索知识库或目录名称...'}
-              className="w-full text-xs text-text-primary bg-bg-panel pl-9 pr-4 py-2 border border-border-color rounded-lg outline-none focus:border-accent focus:bg-white transition-colors"
+              className="w-full text-xs text-text-primary bg-bg-panel pl-9 pr-4 py-2 border border-border-color rounded-lg outline-none focus:border-accent focus:bg-bg-main transition-colors"
             />
           </div>
         )}
@@ -455,8 +454,8 @@ export default function KBTreePickerModal({
                       }}
                       className={`flex items-center justify-between py-2 px-3 rounded-lg border cursor-pointer hover:bg-hover-bg transition-all ${
                         isKbSelected
-                          ? 'bg-indigo-50/80 border-accent/60 text-accent font-semibold shadow-xs'
-                          : 'bg-white border-border-color/50 text-text-primary font-bold'
+                          ? 'bg-indigo-50/80 dark:bg-indigo-950/80 border-accent/60 text-accent font-semibold shadow-xs'
+                          : 'bg-bg-main border-border-color/50 text-text-primary font-bold'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -464,7 +463,7 @@ export default function KBTreePickerModal({
                           <button
                             type="button"
                             onClick={(e) => toggleNode(kb.id, e)}
-                            className="p-0.5 hover:bg-gray-200/70 rounded text-text-secondary shrink-0 transition-colors"
+                            className="p-0.5 hover:bg-hover-bg rounded text-text-secondary shrink-0 transition-colors"
                           >
                             {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                           </button>

@@ -62,7 +62,7 @@ export default function AIAttachMenu({
       {/* Dropdown container */}
       <div
         style={style}
-        className="z-[115] w-38 bg-white border border-border-color rounded-xl shadow-xl py-1.5 animate-dropdown-fade-in"
+        className="z-[115] w-38 bg-bg-main border border-border-color rounded-xl shadow-xl py-1.5 animate-dropdown-fade-in"
       >
         <button
           type="button"

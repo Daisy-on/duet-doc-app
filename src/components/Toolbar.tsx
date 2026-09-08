@@ -49,7 +49,7 @@ function ToolBtn({ title, active, disabled, onClick, children }: ToolBtnProps) {
       tabIndex={-1}
       className={[
         'flex items-center justify-center w-7 h-7 rounded transition-colors text-[14px]',
-        'hover:bg-gray-100 hover:text-text-primary',
+        'hover:bg-hover-bg hover:text-text-primary',
         active ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-text-secondary',
         disabled ? 'opacity-30 cursor-not-allowed pointer-events-none' : 'cursor-pointer',
       ].join(' ')}
@@ -97,7 +97,7 @@ function DropItem({ label, active, onClick, className = '' }: DropItemProps) {
       }}
       tabIndex={-1}
       className={[
-        'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors',
+        'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-hover-bg transition-colors',
         active ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-text-primary',
         className,
       ].join(' ')}
@@ -149,14 +149,14 @@ function BlockTypeDropdown({ editor }: { editor: Editor }) {
         title="段落样式"
         onClick={() => setOpen((o) => !o)}
         tabIndex={-1}
-        className="flex items-center gap-1 px-2 h-7 rounded text-[13px] font-medium text-text-primary hover:bg-gray-100 transition-colors cursor-pointer whitespace-nowrap"
+        className="flex items-center gap-1 px-2 h-7 rounded text-[13px] font-medium text-text-primary hover:bg-hover-bg transition-colors cursor-pointer whitespace-nowrap"
       >
         <Type size={13} className="text-text-secondary" />
         {currentLabel}
         <ChevronDown size={12} className="text-text-secondary" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-32 bg-white border border-border-color rounded-lg shadow-lg z-50 py-1">
+        <div className="absolute top-full left-0 mt-1 w-32 bg-bg-main border border-border-color rounded-lg shadow-lg z-50 py-1">
           {items.map((it) => (
             <DropItem
               key={it.label}
@@ -208,7 +208,7 @@ function TextStyleDropdown({ editor }: { editor: Editor }) {
         </span>
       </ToolBtn>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-32 bg-white border border-border-color rounded-lg shadow-lg z-50 py-1">
+        <div className="absolute top-full left-0 mt-1 w-32 bg-bg-main border border-border-color rounded-lg shadow-lg z-50 py-1">
           {items.map((it) => (
             <button
               key={it.label}
@@ -219,7 +219,7 @@ function TextStyleDropdown({ editor }: { editor: Editor }) {
                 setOpen(false);
               }}
               className={[
-                'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors flex items-center gap-2',
+                'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-hover-bg transition-colors flex items-center gap-2',
                 it.active ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-text-primary',
               ].join(' ')}
             >
@@ -254,13 +254,13 @@ function AlignDropdown({ editor }: { editor: Editor }) {
         title="对齐方式"
         onClick={() => setOpen((o) => !o)}
         tabIndex={-1}
-        className="flex items-center gap-0.5 w-8 h-7 rounded text-text-secondary hover:bg-gray-100 hover:text-text-primary transition-colors cursor-pointer justify-center"
+        className="flex items-center gap-0.5 w-8 h-7 rounded text-text-secondary hover:bg-hover-bg hover:text-text-primary transition-colors cursor-pointer justify-center"
       >
         {activeIcon}
         <ChevronDown size={10} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-32 bg-white border border-border-color rounded-lg shadow-lg z-50 py-1">
+        <div className="absolute top-full left-0 mt-1 w-32 bg-bg-main border border-border-color rounded-lg shadow-lg z-50 py-1">
           {alignments.map((a) => (
             <button
               key={a.value}
@@ -271,7 +271,7 @@ function AlignDropdown({ editor }: { editor: Editor }) {
                 setOpen(false);
               }}
               className={[
-                'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors flex items-center gap-2',
+                'w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-hover-bg transition-colors flex items-center gap-2',
                 editor.isActive({ textAlign: a.value })
                   ? 'text-indigo-600 font-medium bg-indigo-50'
                   : 'text-text-primary',
@@ -344,7 +344,7 @@ function TableActionsDropdown({ editor }: { editor: Editor }) {
           表格操作 <ChevronDown size={12} />
         </button>
         {open && (
-          <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-border-color rounded-lg shadow-lg z-50 py-1">
+          <div className="absolute top-full left-0 mt-1 w-36 bg-bg-main border border-border-color rounded-lg shadow-lg z-50 py-1">
             {items.map((it) => (
               <button
                 key={it.label}
@@ -354,7 +354,7 @@ function TableActionsDropdown({ editor }: { editor: Editor }) {
                   it.action();
                   setOpen(false);
                 }}
-                className="w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-gray-100 transition-colors flex items-center gap-2 text-text-primary"
+                className="w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-hover-bg transition-colors flex items-center gap-2 text-text-primary"
               >
                 {it.icon}
                 {it.label}
@@ -603,7 +603,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
       {open && (
         <div
           ref={popoverRef}
-          className="fixed z-[100] bg-white border border-border-color rounded-xl shadow-xl p-2 flex gap-2 w-72 animate-dropdown-fade-in"
+          className="fixed z-[100] bg-bg-main border border-border-color rounded-xl shadow-xl p-2 flex gap-2 w-72 animate-dropdown-fade-in"
           style={{ top: pos.top, left: pos.left }}
         >
           <input
@@ -614,7 +614,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 border border-border-color rounded px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="flex-1 bg-bg-main text-text-primary border border-border-color rounded px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
           <button
             onClick={handleSubmit}
@@ -659,7 +659,7 @@ function TablePicker({ editor }: { editor: Editor }) {
       </div>
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 bg-white border border-border-color rounded-lg shadow-lg z-50 p-3 select-none"
+          className="absolute top-full left-0 mt-1 bg-bg-main border border-border-color rounded-lg shadow-lg z-50 p-3 select-none"
           onMouseLeave={() => setHovered({ r: 0, c: 0 })}
         >
           <div className="flex flex-col gap-[2px]">
@@ -677,8 +677,8 @@ function TablePicker({ editor }: { editor: Editor }) {
                         onClick={() => handleInsert(r, c)}
                         className={`w-[22px] h-[22px] rounded-[2px] border cursor-pointer transition-colors ${
                           isHovered
-                            ? 'bg-indigo-100 border-indigo-400'
-                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                            ? 'bg-indigo-100 border-indigo-400 dark:bg-indigo-950 dark:border-indigo-500'
+                            : 'bg-hover-bg border-border-color hover:border-accent'
                         }`}
                       />
                     );
@@ -687,7 +687,7 @@ function TablePicker({ editor }: { editor: Editor }) {
               );
             })}
           </div>
-          <div className="text-sm text-gray-500 mt-3 text-center font-medium">
+          <div className="text-sm text-text-secondary mt-3 text-center font-medium">
             {hovered.r > 0 ? `${hovered.c} × ${hovered.r}` : '插入表格'}
           </div>
         </div>

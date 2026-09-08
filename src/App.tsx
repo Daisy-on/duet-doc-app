@@ -7,6 +7,7 @@ import { useAIWritingStore } from './store/aiWritingStore';
 import { useAuthStore } from './store/authStore';
 import { useFavoritesStore } from './store/favoritesStore';
 import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
+import { useThemeStore } from './store/themeStore';
 
 const KnowledgeBaseHome = lazy(() => import('./pages/KnowledgeBaseHome'));
 const DocEdit = lazy(() => import('./pages/DocEdit'));
@@ -78,10 +79,15 @@ function DataGuard() {
 
 function App() {
   const initializeAuth = useAuthStore((state) => state.initialize);
+  const initTheme = useThemeStore((state) => state.initTheme);
 
   useEffect(() => {
     void initializeAuth();
   }, [initializeAuth]);
+
+  useEffect(() => {
+    return initTheme();
+  }, [initTheme]);
 
   return (
     <BrowserRouter>

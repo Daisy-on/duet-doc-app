@@ -1,21 +1,53 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+:root,
+[data-theme='light'] {
+  --sys-bg-main: #ffffff;
+  --sys-bg-sidebar: #f9fafb;
+  --sys-bg-panel: #f9fafb;
+  --sys-text-primary: #111827;
+  --sys-text-secondary: #6b7280;
+  --sys-text-ghost: #9ca3af;
+  --sys-accent: #6366f1;
+  --sys-hover-bg: #f3f4f6;
+  --sys-border-color: #e5e7eb;
+  --sys-success-color: #10b981;
+  --sys-selection-bg: #e0e7ff;
+}
+
+[data-theme='dark'] {
+  --sys-bg-main: #111827;
+  --sys-bg-sidebar: #182234;
+  --sys-bg-panel: #1f293d;
+  --sys-text-primary: #f9fafb;
+  --sys-text-secondary: #9ca3af;
+  --sys-text-ghost: #6b7280;
+  --sys-accent: #818cf8;
+  --sys-hover-bg: #1f293d;
+  --sys-border-color: #374151;
+  --sys-success-color: #34d399;
+  --sys-selection-bg: #312e81;
+}
+
 @theme {
-  --color-bg-main: #ffffff;
-  --color-bg-sidebar: #f9fafb;
-  --color-bg-panel: #f9fafb;
-  --color-text-primary: #111827;
-  --color-text-secondary: #6b7280;
-  --color-text-ghost: #9ca3af;
-  --color-accent: #6366f1;
-  --color-hover-bg: #f3f4f6;
-  --color-border-color: #e5e7eb;
-  --color-success-color: #10b981;
-  --color-selection-bg: #e0e7ff;
+  --color-bg-main: var(--sys-bg-main);
+  --color-bg-sidebar: var(--sys-bg-sidebar);
+  --color-bg-panel: var(--sys-bg-panel);
+  --color-text-primary: var(--sys-text-primary);
+  --color-text-secondary: var(--sys-text-secondary);
+  --color-text-ghost: var(--sys-text-ghost);
+  --color-accent: var(--sys-accent);
+  --color-hover-bg: var(--sys-hover-bg);
+  --color-border-color: var(--sys-border-color);
+  --color-success-color: var(--sys-success-color);
+  --color-selection-bg: var(--sys-selection-bg);
 }
 
 body {
-  background-color: #e5e7eb;
+  background-color: var(--color-bg-main);
+  color: var(--color-text-primary);
   margin: 0;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -54,7 +86,7 @@ body {
 .ProseMirror p {
   font-size: 15px;
   line-height: 1.625;
-  color: #374151; /* gray-700 */
+  color: var(--color-text-primary);
   margin-bottom: 16px;
 }
 
@@ -150,7 +182,7 @@ body {
 
 /* 行内代码 */
 .ProseMirror code {
-  background-color: #f3f4f6; /* gray-100 */
+  background-color: var(--color-hover-bg);
   color: #ef4444; /* red-500 */
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
@@ -207,14 +239,14 @@ body {
 
 /* --- Highlight.js 语法高亮样式 --- */
 [data-theme='dark'] .hljs-comment,
-[data-theme='dark'] .hljs-quote {
+[data-theme='dark'] .hljs-quote,
+[data-theme='dark'] .hljs-deletion {
   color: #6a9955;
 }
 [data-theme='dark'] .hljs-variable,
 [data-theme='dark'] .hljs-template-variable,
 [data-theme='dark'] .hljs-attribute,
 [data-theme='dark'] .hljs-tag,
-[data-theme='dark'] .hljs-name,
 [data-theme='dark'] .hljs-regexp,
 [data-theme='dark'] .hljs-link,
 [data-theme='dark'] .hljs-name,
@@ -233,33 +265,36 @@ body {
 }
 [data-theme='dark'] .hljs-string,
 [data-theme='dark'] .hljs-symbol,
-[data-theme='dark'] .hljs-bullet {
+[data-theme='dark'] .hljs-bullet,
+[data-theme='dark'] .hljs-addition {
   color: #ce9178;
 }
 [data-theme='dark'] .hljs-title,
-[data-theme='dark'] .hljs-section {
+[data-theme='dark'] .hljs-section,
+[data-theme='dark'] .hljs-function {
   color: #dcdcaa;
 }
 [data-theme='dark'] .hljs-keyword,
-[data-theme='dark'] .hljs-selector-tag {
+[data-theme='dark'] .hljs-selector-tag,
+[data-theme='dark'] .hljs-subst {
   color: #569cd6;
 }
 
 [data-theme='light'] .hljs-comment,
-[data-theme='light'] .hljs-quote {
+[data-theme='light'] .hljs-quote,
+[data-theme='light'] .hljs-deletion {
   color: #008000;
 }
 [data-theme='light'] .hljs-variable,
 [data-theme='light'] .hljs-template-variable,
 [data-theme='light'] .hljs-attribute,
 [data-theme='light'] .hljs-tag,
-[data-theme='light'] .hljs-name,
 [data-theme='light'] .hljs-regexp,
 [data-theme='light'] .hljs-link,
 [data-theme='light'] .hljs-name,
 [data-theme='light'] .hljs-selector-id,
 [data-theme='light'] .hljs-selector-class {
-  color: #0000ff;
+  color: #a31515;
 }
 [data-theme='light'] .hljs-number,
 [data-theme='light'] .hljs-meta,
@@ -272,15 +307,18 @@ body {
 }
 [data-theme='light'] .hljs-string,
 [data-theme='light'] .hljs-symbol,
-[data-theme='light'] .hljs-bullet {
+[data-theme='light'] .hljs-bullet,
+[data-theme='light'] .hljs-addition {
   color: #a31515;
 }
 [data-theme='light'] .hljs-title,
-[data-theme='light'] .hljs-section {
+[data-theme='light'] .hljs-section,
+[data-theme='light'] .hljs-function {
   color: #795e26;
 }
 [data-theme='light'] .hljs-keyword,
-[data-theme='light'] .hljs-selector-tag {
+[data-theme='light'] .hljs-selector-tag,
+[data-theme='light'] .hljs-subst {
   color: #0000ff;
 }
 /* --- 自定义滚动条 --- */
@@ -373,51 +411,6 @@ body.is-selecting-codeblock .code-block * {
   background-color: var(--color-selection-bg) !important;
 }
 
-/* --- Lowlight / Highlight.js Dark Theme Token Colors for AI Code Blocks --- */
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-subst {
-  color: #ff7b72; /* Pink / Red */
-  font-weight: 600;
-}
-.hljs-string,
-.hljs-title,
-.hljs-section,
-.hljs-attribute,
-.hljs-literal,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type,
-.hljs-addition {
-  color: #a5d6ff; /* Light Blue */
-}
-.hljs-comment,
-.hljs-quote,
-.hljs-deletion,
-.hljs-meta {
-  color: #8b949e; /* Muted Gray */
-  font-style: italic;
-}
-.hljs-number,
-.hljs-regexp,
-.hljs-link {
-  color: #79c0ff; /* Bright Blue */
-}
-.hljs-variable,
-.hljs-template-variable,
-.hljs-tag,
-.hljs-name {
-  color: #7ee787; /* Emerald Green */
-}
-.hljs-built_in,
-.hljs-symbol,
-.hljs-bullet {
-  color: #ffa657; /* Amber / Orange */
-}
-.hljs-function .hljs-title {
-  color: #d2a8ff; /* Purple */
-}
-
 /* --- AI Markdown Output Typography --- */
 .markdown-body h1 {
   font-size: 1.25rem;
@@ -506,7 +499,7 @@ body.is-selecting-codeblock .code-block * {
 }
 
 .markdown-body th {
-  background-color: #f9fafb;
+  background-color: var(--color-bg-panel);
   font-weight: 700;
   text-align: left;
   padding: 0.5rem 0.75rem;

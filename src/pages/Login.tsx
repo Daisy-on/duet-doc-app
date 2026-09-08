@@ -62,7 +62,10 @@ export default function Login() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-white px-5 sm:bg-[#fbfbfd]">
+    <main
+      data-theme="light"
+      className="flex min-h-screen flex-col items-center justify-center bg-white px-5 sm:bg-[#fbfbfd]"
+    >
       <section className="w-full max-w-[380px] sm:rounded-2xl sm:bg-white sm:px-10 sm:py-12 sm:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300">
         <div className="mb-10 flex flex-col items-center justify-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900 text-white shadow-sm">

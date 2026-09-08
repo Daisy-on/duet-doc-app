@@ -174,9 +174,9 @@ export default function DocHistory() {
 
   if (!doc) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white text-gray-800">
+      <div className="flex h-screen w-screen items-center justify-center bg-bg-main text-text-primary">
         <div className="text-center">
-          <h2 className="text-lg font-bold mb-2 text-gray-900">文档不存在</h2>
+          <h2 className="text-lg font-bold mb-2 text-text-primary">文档不存在</h2>
           <button
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs"
@@ -205,19 +205,19 @@ export default function DocHistory() {
     switch (type) {
       case 'published':
         return (
-          <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium">
+          <span className="bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium">
             已发布
           </span>
         );
       case 'manual':
         return (
-          <span className="bg-blue-50 text-blue-600 border border-blue-200 text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium">
+          <span className="bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium">
             手动保存
           </span>
         );
       default:
         return (
-          <span className="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium">
+          <span className="bg-hover-bg text-text-secondary border border-border-color text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium">
             自动保存
           </span>
         );
@@ -230,26 +230,26 @@ export default function DocHistory() {
   );
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white text-gray-800 select-none">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-bg-main text-text-primary select-none">
       {/* Global Top Bar */}
-      <header className="h-[60px] border-b border-gray-200 flex justify-between items-center px-4 shrink-0 bg-white">
+      <header className="h-[60px] border-b border-border-color flex justify-between items-center px-4 shrink-0 bg-bg-main">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate(`/kb/${kbId}/doc/${docId}`)}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer text-gray-500 hover:text-gray-900"
+            className="p-1.5 hover:bg-hover-bg rounded-lg transition-colors cursor-pointer text-text-secondary hover:text-text-primary"
             title="返回编辑页"
           >
             <ArrowLeft size={18} />
           </button>
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="font-semibold text-[15px] text-gray-900 shrink-0">历史记录</h2>
-            <div className="w-[1px] h-3.5 bg-gray-300 mx-1.5 shrink-0" />
-            <p className="text-[13px] text-gray-500 truncate max-w-[200px] sm:max-w-[300px]">
+            <h2 className="font-semibold text-[15px] text-text-primary shrink-0">历史记录</h2>
+            <div className="w-[1px] h-3.5 bg-border-color mx-1.5 shrink-0" />
+            <p className="text-[13px] text-text-secondary truncate max-w-[200px] sm:max-w-[300px]">
               {doc.title}
             </p>
           </div>
           <div className="ml-4 flex items-center gap-2">
-            <span className="bg-indigo-50 px-2.5 py-1 rounded text-xs text-indigo-600 font-semibold border border-indigo-100 flex items-center gap-1.5 shrink-0">
+            <span className="bg-indigo-50 dark:bg-indigo-950 px-2.5 py-1 rounded text-xs text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-100 dark:border-indigo-800 flex items-center gap-1.5 shrink-0">
               <History size={13} />
               对比视图
             </span>
@@ -258,12 +258,12 @@ export default function DocHistory() {
 
         <div className="flex items-center gap-4 shrink-0">
           {/* Select comparison version dropdown */}
-          <div className="flex items-center gap-2 text-xs text-gray-500 overflow-x-auto whitespace-nowrap">
+          <div className="flex items-center gap-2 text-xs text-text-secondary overflow-x-auto whitespace-nowrap">
             <span>当前选中版本与</span>
             <select
               value={compareId}
               onChange={(e) => setCompareId(e.target.value)}
-              className="bg-white border border-gray-300 rounded px-2.5 py-1 outline-none text-gray-800 cursor-pointer focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors text-xs font-medium"
+              className="bg-bg-main border border-border-color rounded px-2.5 py-1 outline-none text-text-primary cursor-pointer focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors text-xs font-medium"
             >
               {versions.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -280,14 +280,14 @@ export default function DocHistory() {
             <span>对比</span>
           </div>
 
-          <div className="w-[1px] h-4 bg-gray-200 shrink-0" />
+          <div className="w-[1px] h-4 bg-border-color shrink-0" />
 
-          <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2 py-0.5 flex gap-2 shrink-0">
-            <span className="flex items-center gap-1 text-emerald-600 font-medium">
+          <span className="text-[11px] text-text-secondary bg-bg-panel border border-border-color rounded-md px-2 py-0.5 flex gap-2 shrink-0">
+            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               新增内容
             </span>
-            <span className="flex items-center gap-1 text-red-600 font-medium">
+            <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
               删除内容
             </span>
@@ -298,7 +298,7 @@ export default function DocHistory() {
             disabled={!selectedId || restoring}
             className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer text-white ${
               !selectedId || restoring
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
+                ? 'bg-border-color text-text-ghost cursor-not-allowed shadow-none'
                 : 'bg-green-700 hover:bg-green-600 hover:shadow'
             }`}
           >
@@ -310,9 +310,9 @@ export default function DocHistory() {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* 1. Left Sidebar - Checklist of history snapshots (Narrowed to 240px) */}
-        <aside className="w-[240px] border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
-          <div className="p-3 border-b border-gray-200 bg-gray-50 text-[11px] text-gray-500 space-y-1">
-            <label className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors">
+        <aside className="w-[240px] border-r border-border-color bg-bg-sidebar flex flex-col shrink-0">
+          <div className="p-3 border-b border-border-color bg-bg-sidebar text-[11px] text-text-secondary space-y-1">
+            <label className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-hover-bg transition-colors">
               <input
                 type="checkbox"
                 checked={true}
@@ -326,9 +326,9 @@ export default function DocHistory() {
           {/* Scrollable list */}
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1.5">
             {loading ? (
-              <div className="text-center py-8 text-xs text-gray-400">正在读取历史版本...</div>
+              <div className="text-center py-8 text-xs text-text-ghost">正在读取历史版本...</div>
             ) : versions.length === 0 ? (
-              <div className="text-center py-8 text-xs text-gray-400">暂无版本历史</div>
+              <div className="text-center py-8 text-xs text-text-ghost">暂无版本历史</div>
             ) : (
               versions.map((v) => {
                 const active = selectedId === v.id;
@@ -338,20 +338,30 @@ export default function DocHistory() {
                     onClick={() => handleSelect(v.id)}
                     className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col gap-2 ${
                       active
-                        ? 'bg-indigo-50/60 border-indigo-400 text-indigo-900 shadow-sm'
-                        : 'bg-white border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200 shadow-sm'
+                        ? 'bg-indigo-50/60 dark:bg-indigo-950/60 border-indigo-400 text-indigo-900 dark:text-indigo-200 shadow-sm'
+                        : 'bg-bg-main border-transparent text-text-primary hover:bg-hover-bg hover:border-border-color shadow-sm'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-xs font-semibold">
-                        <Clock size={12} className={active ? 'text-indigo-600' : 'text-gray-400'} />
+                        <Clock
+                          size={12}
+                          className={
+                            active ? 'text-indigo-600 dark:text-indigo-400' : 'text-text-ghost'
+                          }
+                        />
                         <span>{formatTime(v.createdAt)}</span>
                       </div>
                       {getTag(v.saveType)}
                     </div>
-                    <div className="text-[11px] text-gray-500 truncate flex items-center justify-between">
+                    <div className="text-[11px] text-text-secondary truncate flex items-center justify-between">
                       <span className="truncate">修改者: Daisy</span>
-                      {active && <Check size={12} className="text-indigo-600 shrink-0" />}
+                      {active && (
+                        <Check
+                          size={12}
+                          className="text-indigo-600 dark:text-indigo-400 shrink-0"
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -361,17 +371,17 @@ export default function DocHistory() {
         </aside>
 
         {/* 2. Right Panel - Side-by-side comparison */}
-        <main className="flex-1 flex flex-col min-w-0 bg-white">
+        <main className="flex-1 flex flex-col min-w-0 bg-bg-main">
           {/* Diff Canvas Area */}
-          <div ref={containerRef} className="flex-1 flex overflow-hidden relative bg-white">
+          <div ref={containerRef} className="flex-1 flex overflow-hidden relative bg-bg-main">
             {isIdentical ? (
-              <div className="flex-1 flex items-center justify-center bg-gray-50/30">
-                <div className="text-center p-8 border border-gray-200 rounded-xl bg-white shadow-sm max-w-sm w-full mx-4">
-                  <div className="text-gray-400 mb-3 font-mono text-xs uppercase tracking-wider">
+              <div className="flex-1 flex items-center justify-center bg-bg-panel/30">
+                <div className="text-center p-8 border border-border-color rounded-xl bg-bg-main shadow-sm max-w-sm w-full mx-4">
+                  <div className="text-text-ghost mb-3 font-mono text-xs uppercase tracking-wider">
                     === NO DIFFERENCE ===
                   </div>
-                  <div className="text-gray-900 font-semibold text-base mb-1">内容一致</div>
-                  <div className="text-gray-500 text-xs">
+                  <div className="text-text-primary font-semibold text-base mb-1">内容一致</div>
+                  <div className="text-text-secondary text-xs">
                     选中的版本与对比的版本在内容上完全相同
                   </div>
                 </div>
@@ -382,13 +392,13 @@ export default function DocHistory() {
                 <div
                   ref={leftScrollRef}
                   onScroll={() => handleScroll('left')}
-                  className="border-r border-gray-200 overflow-auto custom-scrollbar bg-gray-50/50 flex flex-col font-mono text-[13px] leading-relaxed select-text"
+                  className="border-r border-border-color overflow-auto custom-scrollbar bg-bg-sidebar/50 flex flex-col font-mono text-[13px] leading-relaxed select-text"
                   style={{ width: `${splitPercent}%`, flexGrow: 0, flexShrink: 0 }}
                 >
                   {/* Version Sticky Header (Source) */}
-                  <div className="sticky top-0 z-10 bg-gray-100/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex items-center justify-between text-xs text-gray-600 font-sans select-none shrink-0">
+                  <div className="sticky top-0 z-10 bg-bg-sidebar/90 backdrop-blur-sm border-b border-border-color px-4 py-2.5 flex items-center justify-between text-xs text-text-secondary font-sans select-none shrink-0">
                     <div className="flex items-center gap-1.5 font-medium">
-                      <Clock size={12} className="text-indigo-600" />
+                      <Clock size={12} className="text-indigo-600 dark:text-indigo-400" />
                       <span>源版本: {leftVer ? formatTime(leftVer.createdAt) : '无'}</span>
                     </div>
                     {leftVer && getTag(leftVer.saveType)}
@@ -398,15 +408,15 @@ export default function DocHistory() {
                   <div className="py-4 flex-1">
                     {diffResults.map((line: DiffResult, idx: number) => {
                       const type = line.left.type;
-                      let bgClass = 'hover:bg-gray-100/60';
-                      let lineNumClass = 'text-gray-400';
+                      let bgClass = 'hover:bg-hover-bg/60';
+                      let lineNumClass = 'text-text-ghost';
                       if (type === 'deleted') {
                         bgClass =
-                          'bg-red-50 text-red-950 border-l-4 border-red-500 hover:bg-red-100/70';
+                          'bg-red-500/10 text-red-700 dark:text-red-300 border-l-4 border-red-500 hover:bg-red-500/20';
                         lineNumClass = 'text-red-500 font-bold';
                       } else if (type === 'empty') {
-                        bgClass = 'bg-gray-100/40 text-transparent select-none';
-                        lineNumClass = 'text-gray-200';
+                        bgClass = 'bg-hover-bg/40 text-transparent select-none';
+                        lineNumClass = 'text-border-color';
                       } else {
                         bgClass += ' border-l-4 border-transparent';
                       }
@@ -433,24 +443,24 @@ export default function DocHistory() {
                 {/* Draggable Resizer Divider (拉风箱样式边界调整) */}
                 <div
                   onMouseDown={handleMouseDown}
-                  className="w-1 bg-gray-200 hover:bg-indigo-500 cursor-col-resize select-none shrink-0 transition-colors z-20 flex items-center justify-center group relative"
+                  className="w-1 bg-border-color hover:bg-indigo-500 cursor-col-resize select-none shrink-0 transition-colors z-20 flex items-center justify-center group relative"
                   title="拖动调整分栏大小"
                 >
                   <div className="absolute w-3 h-full cursor-col-resize" />
-                  <div className="w-[1px] h-8 bg-gray-400/50 group-hover:bg-white" />
+                  <div className="w-[1px] h-8 bg-text-ghost/50 group-hover:bg-bg-main" />
                 </div>
 
                 {/* Right Column - Compare Version (Target) */}
                 <div
                   ref={rightScrollRef}
                   onScroll={() => handleScroll('right')}
-                  className="overflow-auto custom-scrollbar bg-white flex flex-col font-mono text-[13px] leading-relaxed select-text"
+                  className="overflow-auto custom-scrollbar bg-bg-main flex flex-col font-mono text-[13px] leading-relaxed select-text"
                   style={{ width: `${100 - splitPercent}%`, flexGrow: 0, flexShrink: 0 }}
                 >
                   {/* Version Sticky Header (Target) */}
-                  <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex items-center justify-between text-xs text-gray-600 font-sans select-none shrink-0">
+                  <div className="sticky top-0 z-10 bg-bg-main/90 backdrop-blur-sm border-b border-border-color px-4 py-2.5 flex items-center justify-between text-xs text-text-secondary font-sans select-none shrink-0">
                     <div className="flex items-center gap-1.5 font-medium">
-                      <Clock size={12} className="text-emerald-600" />
+                      <Clock size={12} className="text-emerald-600 dark:text-emerald-400" />
                       <span>对比版本: {rightVer ? formatTime(rightVer.createdAt) : '无'}</span>
                     </div>
                     {rightVer && getTag(rightVer.saveType)}
@@ -460,15 +470,15 @@ export default function DocHistory() {
                   <div className="py-4 flex-1">
                     {diffResults.map((line: DiffResult, idx: number) => {
                       const type = line.right.type;
-                      let bgClass = 'hover:bg-gray-55';
-                      let lineNumClass = 'text-gray-400';
+                      let bgClass = 'hover:bg-hover-bg/60';
+                      let lineNumClass = 'text-text-ghost';
                       if (type === 'added') {
                         bgClass =
-                          'bg-emerald-50 text-emerald-950 border-l-4 border-emerald-500 hover:bg-emerald-100/70';
+                          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-l-4 border-emerald-500 hover:bg-emerald-500/20';
                         lineNumClass = 'text-emerald-600 font-bold';
                       } else if (type === 'empty') {
-                        bgClass = 'bg-gray-100/40 text-transparent select-none';
-                        lineNumClass = 'text-gray-200';
+                        bgClass = 'bg-hover-bg/40 text-transparent select-none';
+                        lineNumClass = 'text-border-color';
                       } else {
                         bgClass += ' border-l-4 border-transparent';
                       }

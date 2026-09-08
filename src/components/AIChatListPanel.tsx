@@ -175,7 +175,7 @@ export default function AIChatListPanel() {
                       }}
                       className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all relative ${
                         isActive
-                          ? 'text-accent font-semibold bg-white shadow-sm border-l-2 border-accent rounded-l-none pl-[14px]'
+                          ? 'text-accent font-semibold bg-bg-main shadow-sm border-l-2 border-accent rounded-l-none pl-[14px]'
                           : 'text-text-secondary'
                       }`}
                     >
@@ -234,7 +234,7 @@ export default function AIChatListPanel() {
                         {popoverOpenId === session.id && (
                           <div
                             ref={popoverRef}
-                            className="absolute right-0 top-7 z-50 w-32 bg-white shadow-lg rounded-xl border border-border-color py-1 text-text-primary text-[12px] overflow-hidden"
+                            className="absolute right-0 top-7 z-50 w-32 bg-bg-main shadow-lg rounded-xl border border-border-color py-1 text-text-primary text-[12px] overflow-hidden"
                           >
                             <button
                               onClick={(e) => handleTogglePin(session.id, session.isPinned, e)}

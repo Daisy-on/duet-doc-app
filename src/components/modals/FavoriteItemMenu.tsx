@@ -108,7 +108,7 @@ export default function FavoriteItemMenu({
         zIndex: 9999,
         width: menuWidth,
       }}
-      className="bg-white border border-border-color rounded-xl shadow-2xl py-1.5 animate-dropdown-fade-in text-xs"
+      className="bg-bg-main border border-border-color rounded-xl shadow-2xl py-1.5 animate-dropdown-fade-in text-xs"
     >
       {view === 'main' ? (
         <div className="flex flex-col">
@@ -124,7 +124,7 @@ export default function FavoriteItemMenu({
 
           <button
             onClick={handleUnfavorite}
-            className="flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 transition-colors cursor-pointer text-left w-full font-medium"
+            className="flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer text-left w-full font-medium"
           >
             <Trash2 size={13} className="text-red-400" />
             取消收藏
@@ -166,7 +166,7 @@ export default function FavoriteItemMenu({
                 >
                   <div
                     className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                      isChecked ? 'border-accent bg-accent' : 'border-gray-300 bg-white'
+                      isChecked ? 'border-accent bg-accent' : 'border-border-color bg-bg-main'
                     }`}
                   >
                     {isChecked && <Check size={9} className="text-white" />}
@@ -196,7 +196,7 @@ export default function FavoriteItemMenu({
                   }
                 }}
                 placeholder="分组名称"
-                className="flex-1 text-[11px] border border-border-color rounded px-1.5 py-1 outline-none focus:border-accent min-w-0"
+                className="flex-1 text-[11px] bg-bg-main text-text-primary border border-border-color rounded px-1.5 py-1 outline-none focus:border-accent min-w-0"
               />
               <button
                 onClick={handleCreateFolder}

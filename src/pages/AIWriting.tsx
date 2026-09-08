@@ -350,23 +350,23 @@ export default function AIWriting() {
       {/* 2. Main Chat Panel */}
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
         {/* Top Header */}
-        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-white">
+        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-bg-main">
           <div className="flex items-center gap-3.5 min-w-0">
             <button
               onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
-              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-white shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title={isCatalogCollapsed ? '展开' : '折叠'}
             >
               <Sparkles size={14} className="text-indigo-500" />
             </button>
             <div className="flex items-center gap-3 ml-1 min-w-0">
               <h2 className="text-[15px] font-bold text-text-primary truncate">Duet 助手</h2>
-              <span className="text-[10px] font-semibold bg-indigo-50 text-accent px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
+              <span className="text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-accent px-2 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800/60 shrink-0">
                 {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-text-secondary bg-gray-50 border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
+          <div className="flex items-center gap-2 text-xs text-text-secondary bg-bg-panel border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
             <span className="relative flex h-2 w-2">
               {backendStatus === 'connected' && (
                 <span
@@ -421,7 +421,7 @@ export default function AIWriting() {
                     <button
                       key={idx}
                       onClick={() => selectPrompt(p)}
-                      className="p-3.5 bg-white border border-border-color hover:border-indigo-200 rounded-xl text-left hover:shadow-md transition-all group cursor-pointer"
+                      className="p-3.5 bg-bg-panel border border-border-color hover:border-indigo-200 dark:hover:border-indigo-800 rounded-xl text-left hover:shadow-md transition-all group cursor-pointer"
                     >
                       <div className="text-xs font-bold text-text-primary group-hover:text-accent mb-1 flex items-center justify-between">
                         {p.title}
@@ -458,17 +458,17 @@ export default function AIWriting() {
                       <div
                         className={`relative rounded-2xl shadow-sm border ${
                           isUser
-                            ? 'bg-indigo-50 border-indigo-100 rounded-tr-none text-text-primary max-w-[85%] self-end px-4 py-3'
-                            : 'bg-white border-border-color rounded-tl-none text-text-primary w-full px-5 py-4'
+                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-100 dark:border-indigo-900 rounded-tr-none text-text-primary max-w-[85%] self-end px-4 py-3'
+                            : 'bg-bg-main border-border-color rounded-tl-none text-text-primary w-full px-5 py-4'
                         }`}
                       >
                         {/* 引用文档标签 */}
                         {isUser && msg.referencedDocs && msg.referencedDocs.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 pb-2">
+                          <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
                             {msg.referencedDocs.map((doc, idx) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-semibold"
+                                className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
                               >
                                 <FileText size={10} />
                                 {doc.title}
@@ -586,8 +586,8 @@ export default function AIWriting() {
                             disabled={isGenerating || !isLastAssistant}
                             className={`p-1 rounded-lg transition-colors ${
                               isGenerating || !isLastAssistant
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'text-text-secondary hover:text-indigo-600 hover:bg-gray-100 cursor-pointer'
+                                ? 'text-text-ghost cursor-not-allowed'
+                                : 'text-text-secondary hover:text-indigo-600 hover:bg-hover-bg cursor-pointer'
                             }`}
                             title={isLastAssistant ? '重新生成回答' : '仅最新一条回答可重新生成'}
                           >
@@ -597,7 +597,7 @@ export default function AIWriting() {
                           {/* 复制 */}
                           <button
                             onClick={() => handleCopyText(msg.id, msg.content)}
-                            className="p-1 text-text-secondary hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                            className="p-1 text-text-secondary hover:text-indigo-600 hover:bg-hover-bg rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                             title="复制回答"
                           >
                             {copiedMsgId === msg.id ? (
@@ -612,7 +612,7 @@ export default function AIWriting() {
                           {/* 生成文档 */}
                           <button
                             onClick={() => handleOpenDocChooser(msg.content)}
-                            className="h-6 px-2 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
+                            className="h-6 px-2 rounded-lg bg-hover-bg hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-indigo-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
                           >
                             <FilePlus size={11} />
                             <span>生成文档</span>
@@ -621,7 +621,7 @@ export default function AIWriting() {
                           {/* 保存到小记 */}
                           <button
                             onClick={() => handleSaveToMemo(msg.content)}
-                            className="h-6 px-2 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
+                            className="h-6 px-2 rounded-lg bg-hover-bg hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
                           >
                             <StickyNote size={11} />
                             <span>保存到小记</span>
@@ -648,7 +648,7 @@ export default function AIWriting() {
                       <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
                         Duet 助手
                       </div>
-                      <div className="bg-white border border-border-color rounded-2xl rounded-tl-none px-4 py-3 text-xs text-text-secondary flex items-center gap-2 shadow-sm">
+                      <div className="bg-bg-main border border-border-color rounded-2xl rounded-tl-none px-4 py-3 text-xs text-text-secondary flex items-center gap-2 shadow-sm">
                         <Loader2 size={14} className="animate-spin text-accent" />
                         <span>AI 正在思考并撰写内容...</span>
                       </div>
@@ -663,7 +663,7 @@ export default function AIWriting() {
             <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
               {/* Attachment badges above input */}
               {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
+                <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
                   {referencedDocs.map((doc) => (
                     <span
                       key={doc.id}
@@ -698,7 +698,7 @@ export default function AIWriting() {
               )}
 
               {/* Main Textarea Container (Kimi Unified Style) */}
-              <div className="border border-border-color focus-within:border-accent bg-white rounded-2xl md:rounded-[24px] shadow-sm transition-all overflow-hidden flex flex-col p-2 gap-2">
+              <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-sm transition-all overflow-hidden flex flex-col p-2 gap-2">
                 <textarea
                   ref={textareaRef}
                   value={inputText}
@@ -723,7 +723,7 @@ export default function AIWriting() {
                           setAttachMenuAnchorEl(e.currentTarget);
                           setIsAttachMenuOpen(!isAttachMenuOpen);
                         }}
-                        className="w-8.5 h-8.5 rounded-full hover:bg-gray-100 text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
+                        className="w-8.5 h-8.5 rounded-full hover:bg-hover-bg text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
                         title="引用知识库文档"
                       >
                         <Plus size={18} />
@@ -736,8 +736,8 @@ export default function AIWriting() {
                       onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
                       className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
                         isThinkingEnabled
-                          ? 'bg-indigo-50 border-indigo-200 text-accent font-semibold'
-                          : 'bg-white border-border-color/80 text-text-secondary hover:bg-gray-50'
+                          ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-accent font-semibold'
+                          : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
                       }`}
                       title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
                     >
