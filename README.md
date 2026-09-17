@@ -42,7 +42,7 @@ cp .env.example .env.local
 
 ### 4. 手动下载端侧模型权重
 
-出于体积考虑，端侧使用的量化模型已被 `.gitignore` 忽略，无法通过 Git 克隆获取。您需要手动下载模型（如 `Qwen2.5-0.5B-Instruct-ONNX`）并放置在项目的 `public` 目录下。
+出于体积考虑，端侧模型已被 `.gitignore` 忽略，无法通过 Git 克隆获取。开发环境需要准备幽灵文本使用的 Qwen3.5 Q4F16 权重，以及本地检索使用的 Multilingual E5 FP16 权重。
 
 **预期的目录结构**:
 
@@ -50,10 +50,13 @@ cp .env.example .env.local
 duet-doc-app/
   ├─ public/
   │  ├─ ai-models/
-  │  │  └─ qwen2.5-0.5b-instruct-q4f16/   <-- 在此处放置下载的 ONNX 模型文件夹
-  │  │      ├─ model.onnx
-  │  │      ├─ tokenizer.json
-  │  │      └─ ...
+  │  │  ├─ qwen3.5-0.8b-opt/
+  │  │  │  ├─ onnx/*_q4f16.onnx
+  │  │  │  ├─ onnx/*_q4f16.onnx_data
+  │  │  │  └─ tokenizer.json
+  │  │  └─ multilingual-e5-base/
+  │  │     ├─ onnx/model_fp16.onnx
+  │  │     └─ tokenizer.json
   ...
 ```
 

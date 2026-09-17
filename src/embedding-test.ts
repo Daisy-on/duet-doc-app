@@ -12,7 +12,7 @@ env.useBrowserCache = false;
 const MODEL_PATH = '/ai-models/multilingual-e5-base/';
 const WARM_RUN_COUNT = 10;
 
-export type EmbeddingDtype = 'fp16' | 'int8';
+export type EmbeddingDtype = 'fp16';
 
 export type EmbeddingProgress = {
   file: string;

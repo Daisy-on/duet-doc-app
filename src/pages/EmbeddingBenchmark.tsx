@@ -10,23 +10,7 @@ import {
 
 const precisionOptions: Array<{ dtype: EmbeddingDtype; label: string; size: string }> = [
   { dtype: 'fp16', label: 'FP16', size: '555 MB' },
-  { dtype: 'int8', label: 'INT8', size: '278 MB' },
 ];
-
-const STORAGE_PREFIX = 'duet-doc:embedding-benchmark:';
-
-function loadSavedResults(): Partial<Record<EmbeddingDtype, EmbeddingBenchmarkResult>> {
-  const savedResults: Partial<Record<EmbeddingDtype, EmbeddingBenchmarkResult>> = {};
-
-  for (const { dtype } of precisionOptions) {
-    const rawResult = localStorage.getItem(`${STORAGE_PREFIX}${dtype}`);
-    if (rawResult) {
-      savedResults[dtype] = JSON.parse(rawResult) as EmbeddingBenchmarkResult;
-    }
-  }
-
-  return savedResults;
-}
 
 function formatMilliseconds(milliseconds: number) {
   return `${milliseconds.toFixed(1)} ms`;
@@ -47,7 +31,6 @@ export default function EmbeddingBenchmark() {
   const [progress, setProgress] = useState<EmbeddingProgress | null>(null);
   const [result, setResult] = useState<EmbeddingBenchmarkResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [savedResults, setSavedResults] = useState(loadSavedResults);
 
   async function handleRun(dtype: EmbeddingDtype) {
     setIsRunning(true);
@@ -62,8 +45,6 @@ export default function EmbeddingBenchmark() {
         onProgress: setProgress,
       });
       setResult(benchmarkResult);
-      localStorage.setItem(`${STORAGE_PREFIX}${dtype}`, JSON.stringify(benchmarkResult));
-      setSavedResults((current) => ({ ...current, [dtype]: benchmarkResult }));
       setHasRun(true);
     } catch (caughtError) {
       console.error('[embedding-benchmark] test failed:', caughtError);
@@ -95,14 +76,11 @@ export default function EmbeddingBenchmark() {
         <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <div className="flex gap-2">
             <TriangleAlert className="mt-0.5 shrink-0" size={17} />
-            <p>
-              每次页面只测试一种精度。完成一轮后请刷新页面，再测试下一种，避免已加载的模型占用 GPU
-              内存而影响结果。
-            </p>
+            <p>当前生产链路仅保留 FP16 权重。重复测试前请刷新页面，避免已加载模型影响结果。</p>
           </div>
         </section>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2">
+        <section className="mt-6 grid gap-3">
           {precisionOptions.map((option) => (
             <button
               key={option.dtype}
@@ -133,44 +111,6 @@ export default function EmbeddingBenchmark() {
           </section>
         )}
 
-        {savedResults.fp16 && savedResults.int8 && (
-          <section className="mt-6 rounded-lg border border-border-color bg-white p-5">
-            <h2 className="text-sm font-semibold">FP16 / INT8 对照</h2>
-            <p className="mt-1 text-xs leading-5 text-text-secondary">
-              这是固定样例的冒烟对比，只能观察量化后的排序和分数偏移，不能替代真实 RAG 评测集。
-            </p>
-            <dl className="mt-4 grid gap-x-8 sm:grid-cols-2">
-              <Metric
-                label="FP16 热推理 P50"
-                value={formatMilliseconds(savedResults.fp16.p50InferenceMs)}
-              />
-              <Metric
-                label="INT8 热推理 P50"
-                value={formatMilliseconds(savedResults.int8.p50InferenceMs)}
-              />
-              <Metric
-                label="Top 1 是否一致"
-                value={
-                  savedResults.fp16.ranking[0]?.passage === savedResults.int8.ranking[0]?.passage
-                    ? '一致'
-                    : '不一致'
-                }
-              />
-              <Metric
-                label="候选分数最大偏移"
-                value={Math.max(
-                  ...savedResults.fp16.ranking.map((fp16Item) => {
-                    const int8Item = savedResults.int8?.ranking.find(
-                      (candidate) => candidate.passage === fp16Item.passage,
-                    );
-                    return Math.abs(fp16Item.score - (int8Item?.score ?? fp16Item.score));
-                  }),
-                ).toFixed(6)}
-              />
-            </dl>
-          </section>
-        )}
-
         {result && (
           <>
             <section className="mt-6 rounded-lg border border-border-color bg-white p-5">
@@ -187,7 +127,7 @@ export default function EmbeddingBenchmark() {
                   className="inline-flex items-center gap-2 rounded-md border border-border-color px-3 py-2 text-sm hover:bg-hover-bg"
                 >
                   <RotateCcw size={14} />
-                  刷新后测下一组
+                  刷新后重测
                 </button>
               </div>
 
