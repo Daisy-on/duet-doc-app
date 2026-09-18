@@ -27,6 +27,7 @@ import SyncConflictModal from './modals/SyncConflictModal';
 import KbActionMenu from './menus/KbActionMenu';
 import UserActionMenu from './menus/UserActionMenu';
 import SyncStatusPopover from './modals/SyncStatusPopover';
+import ModelManagerModal from './modals/ModelManagerModal';
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
@@ -61,6 +62,7 @@ export default function Sidebar() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteTargetKb, setDeleteTargetKb] = useState<KnowledgeBase | null>(null);
   const [isConflictOpen, setIsConflictOpen] = useState(false);
+  const [isModelManagerOpen, setIsModelManagerOpen] = useState(false);
 
   const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null);
   const [syncPopoverAnchor, setSyncPopoverAnchor] = useState<HTMLElement | null>(null);
@@ -395,8 +397,11 @@ export default function Sidebar() {
         isOpen={userMenuAnchor !== null}
         onClose={() => setUserMenuAnchor(null)}
         onLogout={() => void handleLogout()}
+        onOpenModelManager={() => setIsModelManagerOpen(true)}
         anchorEl={userMenuAnchor}
       />
+
+      <ModelManagerModal isOpen={isModelManagerOpen} onClose={() => setIsModelManagerOpen(false)} />
 
       <SyncStatusPopover
         isOpen={syncPopoverAnchor !== null}

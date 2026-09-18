@@ -1,6 +1,10 @@
 import type { EmbeddingProgress } from './types';
+import { getModelBasePath, type ModelId } from '../models/catalog';
+import { requireModelInstallation } from '../models/modelCache';
+import { ensureModelCacheServiceWorkerReady } from '../models/modelCacheServiceWorker';
 
-const MODEL_PATH = '/ai-models/multilingual-e5-base/';
+const MODEL_ID: ModelId = 'multilingual-e5-base-fp16';
+const MODEL_PATH = getModelBasePath(MODEL_ID);
 
 type QueuePriority = 'interactive' | 'background';
 
@@ -147,18 +151,25 @@ function getWorker() {
 export function ensureEmbeddingModelReady(): Promise<void> {
   if (readyPromise) return readyPromise;
 
-  const instance = getWorker();
-  readyPromise = new Promise<void>((resolve, reject) => {
-    resolveReady = resolve;
-    rejectReady = reject;
-  });
-  console.info('[LocalRAG] Loading embedding model', {
-    model: 'multilingual-e5-base',
-    dtype: 'fp16',
-  });
-  instance.postMessage({
-    type: 'load',
-    payload: { modelPath: MODEL_PATH, dtype: 'fp16', device: 'webgpu' },
+  readyPromise = (async () => {
+    await requireModelInstallation(MODEL_ID);
+    await ensureModelCacheServiceWorkerReady();
+    const instance = getWorker();
+    console.info('[LocalRAG] Loading embedding model', {
+      model: 'multilingual-e5-base',
+      dtype: 'fp16',
+    });
+    await new Promise<void>((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+      instance.postMessage({
+        type: 'load',
+        payload: { modelPath: MODEL_PATH, dtype: 'fp16', device: 'webgpu' },
+      });
+    });
+  })().catch((error) => {
+    readyPromise = null;
+    throw error;
   });
 
   return readyPromise;

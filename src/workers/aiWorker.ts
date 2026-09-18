@@ -7,6 +7,7 @@ import {
 
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
+env.useBrowserCache = false;
 
 type LoadPayload = {
   modelPath: string;

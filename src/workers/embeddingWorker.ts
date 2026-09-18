@@ -7,8 +7,7 @@ import {
 
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
-// The local FP16 file can be replaced during model evaluation. Always read the
-// current public asset instead of reusing a stale Cache Storage entry.
+// Model files are already versioned and managed by the application cache.
 env.useBrowserCache = false;
 
 type LoadRequest = {

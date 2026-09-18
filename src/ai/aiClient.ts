@@ -1,6 +1,10 @@
 import { logAITrace } from './aiLogger';
+import { getModelBasePath, type ModelId } from '../models/catalog';
+import { ModelNotInstalledError, requireModelInstallation } from '../models/modelCache';
+import { ensureModelCacheServiceWorkerReady } from '../models/modelCacheServiceWorker';
 
-const GHOST_TEXT_MODEL_PATH = '/ai-models/qwen3.5-0.8b-opt/';
+const GHOST_TEXT_MODEL_ID: ModelId = 'qwen3.5-0.8b-opt-q4f16';
+const GHOST_TEXT_MODEL_PATH = getModelBasePath(GHOST_TEXT_MODEL_ID);
 
 type GhostTextStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -36,6 +40,7 @@ let inFlightStartedAt = 0;
 let hasDroppedRequest = false;
 let cooldownTimer: number | null = null;
 let modelLoadStartedAt: number | null = null;
+let waitingForInstallation = false;
 
 function getModelLoadElapsedMs(): number | undefined {
   return modelLoadStartedAt === null ? undefined : performance.now() - modelLoadStartedAt;
@@ -194,34 +199,52 @@ export function loadGhostTextModel() {
     dtype: 'q4f16',
   });
 
-  try {
-    getWorker().postMessage({
-      type: 'load',
-      payload: {
-        modelPath: GHOST_TEXT_MODEL_PATH,
+  void (async () => {
+    try {
+      await requireModelInstallation(GHOST_TEXT_MODEL_ID);
+      await ensureModelCacheServiceWorkerReady();
+      getWorker().postMessage({
+        type: 'load',
+        payload: {
+          modelPath: GHOST_TEXT_MODEL_PATH,
+          dtype: 'q4f16',
+          device: 'webgpu',
+        },
+      });
+    } catch (error) {
+      status = error instanceof ModelNotInstalledError ? 'idle' : 'error';
+      const modelLoadMs = getModelLoadElapsedMs();
+      modelLoadStartedAt = null;
+      logAITrace({
+        requestId: 'model-init',
+        runtime: 'local',
+        kind: 'model-load',
+        task: 'ghost-text-load',
+        status: 'failed',
+        model: 'qwen3.5-0.8b-opt',
+        modelLoadMs,
+        device: detectedGpuDevice,
         dtype: 'q4f16',
-        device: 'webgpu',
-      },
-    });
-  } catch (error) {
-    status = 'error';
-    const modelLoadMs = getModelLoadElapsedMs();
-    modelLoadStartedAt = null;
-    logAITrace({
-      requestId: 'model-init',
-      runtime: 'local',
-      kind: 'model-load',
-      task: 'ghost-text-load',
-      status: 'failed',
-      model: 'qwen3.5-0.8b-opt',
-      modelLoadMs,
-      device: detectedGpuDevice,
-      dtype: 'q4f16',
-      errorCode: 'MODEL_LOAD_START_ERROR',
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
+        errorCode:
+          error instanceof ModelNotInstalledError
+            ? 'MODEL_NOT_INSTALLED'
+            : 'MODEL_LOAD_START_ERROR',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      if (error instanceof ModelNotInstalledError && !waitingForInstallation) {
+        waitingForInstallation = true;
+        const handleModelInstalled = (event: Event) => {
+          const modelId = (event as CustomEvent<{ modelId: ModelId }>).detail.modelId;
+          if (modelId !== GHOST_TEXT_MODEL_ID) return;
+          window.removeEventListener('duet-model-installed', handleModelInstalled);
+          waitingForInstallation = false;
+          loadGhostTextModel();
+        };
+        window.addEventListener('duet-model-installed', handleModelInstalled);
+      }
+    }
+  })();
 }
 
 export function getGhostTextStatus() {

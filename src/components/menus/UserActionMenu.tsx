@@ -1,12 +1,15 @@
 import { useEffect, useState, useLayoutEffect, useRef } from 'react';
-import { LogOut, Sun, Moon, Laptop } from 'lucide-react';
+import { ChevronRight, HardDriveDownload, LogOut, Sun, Moon, Laptop } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
+import { MODEL_DEFINITIONS } from '../../models/catalog';
+import { useModelStore } from '../../store/modelStore';
 
 interface UserActionMenuProps {
   isOpen: boolean;
   onClose: () => void;
   onLogout: () => void;
+  onOpenModelManager: () => void;
   anchorEl: HTMLElement | null;
 }
 
@@ -14,6 +17,7 @@ export default function UserActionMenu({
   isOpen,
   onClose,
   onLogout,
+  onOpenModelManager,
   anchorEl,
 }: UserActionMenuProps) {
   const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -22,6 +26,15 @@ export default function UserActionMenu({
   const authStatus = useAuthStore((state) => state.status);
   const theme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
+  const models = useModelStore((state) => state.models);
+  const initializeModels = useModelStore((state) => state.initialize);
+  const installedModelCount = MODEL_DEFINITIONS.filter(
+    (definition) => models[definition.id].status === 'installed',
+  ).length;
+
+  useEffect(() => {
+    if (isOpen) void initializeModels();
+  }, [initializeModels, isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -123,6 +136,24 @@ export default function UserActionMenu({
               <span>系统</span>
             </button>
           </div>
+        </div>
+
+        <div className="border-b border-border-color p-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenModelManager();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-text-primary transition-colors hover:bg-hover-bg"
+          >
+            <HardDriveDownload size={15} className="text-text-secondary" />
+            <span className="flex-1">端侧模型</span>
+            <span className="text-[11px] font-normal text-text-secondary">
+              {installedModelCount}/2
+            </span>
+            <ChevronRight size={14} className="text-text-ghost" />
+          </button>
         </div>
 
         <div className="py-1">

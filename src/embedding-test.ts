@@ -4,12 +4,16 @@ import {
   type FeatureExtractionPipeline,
   type ProgressInfo,
 } from '@huggingface/transformers';
+import { getModelBasePath } from './models/catalog';
+import { requireModelInstallation } from './models/modelCache';
+import { ensureModelCacheServiceWorkerReady } from './models/modelCacheServiceWorker';
 
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.useBrowserCache = false;
 
-const MODEL_PATH = '/ai-models/multilingual-e5-base/';
+const MODEL_ID = 'multilingual-e5-base-fp16' as const;
+const MODEL_PATH = getModelBasePath(MODEL_ID);
 const WARM_RUN_COUNT = 10;
 
 export type EmbeddingDtype = 'fp16';
@@ -75,6 +79,8 @@ export async function runEmbeddingBenchmark({
   dtype,
   onProgress,
 }: BenchmarkOptions): Promise<EmbeddingBenchmarkResult> {
+  await requireModelInstallation(MODEL_ID);
+  await ensureModelCacheServiceWorkerReady();
   const modelLoadStartedAt = performance.now();
 
   const extractor = (await pipeline('feature-extraction', MODEL_PATH, {
