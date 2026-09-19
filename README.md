@@ -1,104 +1,124 @@
-# DuetDoc (前端)
+# DuetDoc 前端
 
-DuetDoc 是一个智能协作文档编辑器，采用了创新的 **“端云分治”** AI 架构。端侧（浏览器）利用 WebGPU 加载量化模型实现极速响应的行内幽灵文本补全（Ghost Text）；云端通过 FastAPI 接入云端大模型，处理多轮对话、长文本重写等高复杂度生成任务。
+DuetDoc 是一个本地优先的 AI 文档编辑器。正文编辑、本地历史版本、图片 Blob、端侧检索索引和待同步队列保存在浏览器 IndexedDB；登录后可将知识库、分组、文档、聊天记录及正文引用的图片同步到云端。
 
-> **注意**: 本仓库为 DuetDoc 的前端部分，构建在 React + Vite + TypeScript 基础之上。后端项目代码位于 `../duet-doc-backend` 目录中。
+前端采用“端云协作”的 AI 架构：
 
-## 📦 架构概览
+- 浏览器通过 WebGPU 运行 Qwen3.5 0.8B，提供行内幽灵文本。
+- 浏览器通过 multilingual-e5-base 生成 768 维向量，完成本地语义检索。
+- FastAPI 代理云端大模型请求，通过 SSE 返回聊天与写作结果。
+- 端侧模型不随前端构建产物发布，登录用户可在个人菜单中按需下载到 Cache Storage。
 
-- **前端框架**: React 19, Vite, Tailwind CSS, Zustand
-- **编辑器**: Tiptap (集成自定义 Ghost Text 扩展)
-- **本地持久化**: IndexedDB (基于 Dexie.js 存储文档与多轮 AI 会话)
-- **端侧模型驱动**: ONNX Runtime WebGPU (通过 Worker 线程异步推理)
-- **云端服务网关**: FastAPI (`http://127.0.0.1:8000`) 接入 DeepSeek 云端大模型，采用 Server-Sent Events (SSE) 实现流式交互
+项目后端另见 `../duet-doc-backend`。
 
-## 🚀 快速开始
+## 当前能力
 
-### 1. 准备环境
+- Tiptap 富文本编辑、知识库与多级分组、收藏、小记和历史版本。
+- 用户名密码登录，短期 Access Token 与 HttpOnly Refresh Cookie。
+- 按用户隔离的 IndexedDB：`DuetDocDB:<user_id>`。
+- 离线优先编辑与手动双向同步，支持断网重试、修订冲突和云端更新提示。
+- 文档及 Duet 助手聊天记录跨客户端同步。
+- 图片先保存在 IndexedDB；手动同步时只上传当前正文实际引用的图片，新客户端可从私有 OSS 恢复。
+- 浏览器端模型下载、进度显示、缓存文件齐全检查和跨账号缓存复用。
+- 本地 RAG：文档切分、向量索引和语义检索。
 
-- **Node.js**: v18+ (推荐 v20)
-- **浏览器**: 支持 WebGPU 的现代浏览器 (推荐 Chrome 113+ 或 Edge 113+)
-- **显卡**: 推荐使用配备独立显卡的设备以保障端侧打字补全体验，若使用集成显卡，生成速度会相对降低。
+## 技术栈
 
-### 2. 依赖安装
+- React 19、TypeScript、Vite 8、Tailwind CSS 4
+- Tiptap 3、Zustand、Dexie.js
+- Transformers.js、ONNX Runtime Web、WebGPU、Web Worker
+- Cache Storage、Service Worker、IndexedDB
 
-在前端项目根目录下执行：
+## 本地开发
 
-```bash
+### 环境要求
+
+- Node.js 22（或满足 Vite 8 要求的较新版本）
+- npm
+- Chrome 或 Edge 最新版；端侧 AI 需要浏览器和设备支持 WebGPU
+- 已启动的 DuetDoc 后端，默认地址为 `http://127.0.0.1:8000`
+
+### 安装与启动
+
+```powershell
+cd duet-doc-app
 npm install
-```
-
-### 3. 配置环境变量
-
-复制根目录下的 `.env.example` 为 `.env.local`：
-
-```bash
-cp .env.example .env.local
-```
-
-确保 `.env.local` 里的 `VITE_API_BASE_URL` 指向您的本地或远程后端地址（默认 `http://127.0.0.1:8000`）。
-
-> **🚨 安全警告**: `VITE_API_BASE_URL` 会暴露在前端代码中。但是 **API Key (如 DeepSeek API Key) 绝对不能写入前端**。所有的云端模型鉴权请在后端仓库进行配置！
-
-### 4. 手动下载端侧模型权重
-
-出于体积考虑，端侧模型已被 `.gitignore` 忽略，无法通过 Git 克隆获取。开发环境需要准备幽灵文本使用的 Qwen3.5 Q4F16 权重，以及本地检索使用的 Multilingual E5 FP16 权重。
-
-**预期的目录结构**:
-
-```
-duet-doc-app/
-  ├─ public/
-  │  ├─ ai-models/
-  │  │  ├─ qwen3.5-0.8b-opt/
-  │  │  │  ├─ onnx/*_q4f16.onnx
-  │  │  │  ├─ onnx/*_q4f16.onnx_data
-  │  │  │  └─ tokenizer.json
-  │  │  └─ multilingual-e5-base/
-  │  │     ├─ onnx/model_fp16.onnx
-  │  │     └─ tokenizer.json
-  ...
-```
-
-### 5. 启动前后端服务
-
-**启动后端**: (请先参考后端仓库 README 完成依赖安装)
-
-```bash
-cd ../duet-doc-backend
-uvicorn app.main:app --reload --port 8000
-```
-
-_(默认端口: 8000)_
-
-**启动前端**:
-
-```bash
-# 在 duet-doc-app 目录下
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-_(默认端口: 5173)_
+访问 `http://localhost:5173`。首次使用需要注册或登录；新用户只创建一个默认知识库和一篇默认文档。
 
-在浏览器中访问 `http://localhost:5173` 即可体验。
+开发环境建议让 `VITE_API_BASE_URL` 保持为空。Vite 会把 `/api` 代理到 `http://127.0.0.1:8000`，这样 Refresh Cookie 与前端保持同源：
 
-### 6. 生产环境构建
+```dotenv
+VITE_API_BASE_URL=
+```
 
-```bash
+只有在后端已经正确配置 CORS、Cookie 和 HTTPS 时，才将它设置为完整的远程 API 地址。任何 DeepSeek Key、OSS 凭证或 JWT 密钥都不能写入前端环境变量。
+
+## 端侧模型
+
+模型权重不再放入 `public/ai-models`，也不会进入 Git 或前端构建产物。登录后从个人菜单打开“端侧模型”，按需安装：
+
+| 用途         | 模型                 | 精度  | 约占空间 |
+| ------------ | -------------------- | ----- | -------- |
+| 本地语义检索 | multilingual-e5-base | FP16  | 546 MiB  |
+| 幽灵文本     | Qwen3.5 0.8B         | Q4F16 | 634 MiB  |
+
+后端为私有 OSS 文件签发短期 URL，前端下载后写入当前站点 Origin 的 Cache Storage。同一 Origin 下切换 DuetDoc 账号会复用模型缓存；不同协议、域名或端口的缓存彼此隔离。
+
+自行部署时建议从以下 Hugging Face 仓库准备与 Transformers.js 兼容的 ONNX 文件：
+
+- 语义检索：[Xenova/multilingual-e5-base](https://huggingface.co/Xenova/multilingual-e5-base)，使用 `onnx/model_fp16.onnx`。FP16 是当前项目默认精度，可避免进一步量化给检索向量带来的额外偏差；模型输出仍为 768 维。
+- 幽灵文本：[onnx-community/Qwen3.5-0.8B-ONNX](https://huggingface.co/onnx-community/Qwen3.5-0.8B-ONNX)，使用名称带 `_q4f16` 的 decoder、embed tokens 和 vision encoder 文件组。Q4F16 在下载体积、浏览器显存占用和 WebGPU 推理质量之间更适合当前演示项目。
+
+不要把 FP16、Q4、Q4F16 或 quantized 文件混合到同一模型目录。上游仓库可能更新文件；下载时建议固定 Hugging Face revision，并确认文件名和大小与后端 `app/services/model_delivery.py` 的 `MODEL_CATALOG` 一致。更换 E5 模型或精度后应重新建立本地向量索引，避免新旧向量混用。
+
+若要清理模型，请使用浏览器开发者工具的“应用/存储空间”页面。模型管理弹窗不提供删除按钮，以减少误删后的重复大文件下载。
+
+仓库不提供模型权重，也不内置项目维护者的 OSS 地址或访问凭证。克隆或 Fork 后自行部署时，需要自行取得符合相应许可证的模型文件，保持后端模型清单约定的目录结构，将其上传到自己的私有对象存储，并配置自己的后端 OSS/RAM 权限。只有访问项目维护者实际部署的演示站点时，才会使用该演示环境配置的模型存储。
+
+## 数据与同步边界
+
+- 本地编辑不依赖网络，业务数据先写 IndexedDB 和同步 Outbox。
+- 云同步由用户手动触发；可见页面会低频检查云端是否有新版本，但不会静默覆盖本地修改。
+- 知识库、分组、文档、聊天会同步到 PostgreSQL；图片原文件存入私有 OSS。
+- 历史版本、收藏和本地向量索引仍以浏览器本地数据为准。
+- 图片正文只保存稳定的 `assetId`，不保存会过期的 OSS 签名 URL。
+- 登出后会关闭当前用户数据库；模型缓存是设备级资源，不随账号切换清除。
+
+## 质量检查与构建
+
+```powershell
+npm run check
 npm run build
 ```
 
-执行后会在 `dist` 目录下生成静态文件，可部署至 Nginx、Vercel 或其他静态托管服务。由于打包包含了 ONNX WASM 运行时，产物较大，建议配置服务器的 Gzip 或 Brotli 压缩。
+常用单项命令：
 
----
+```powershell
+npm run format:check
+npm run lint
+npm run typecheck
+```
 
-## ❓ 常见问题 (FAQ)
+生产构建输出到 `dist/`。部署时应由 Nginx/OpenResty 托管静态文件，并将 `/api/` 反向代理到 FastAPI；前端路由需要回退到 `index.html`。模型由 OSS 按需交付，因此重新发布前端不会重复携带约 1.2 GiB 的模型权重。
 
-**Q: 控制台报错 `Model not found` 或者幽灵文本不生效？**  
-A: 请检查是否已经将下载好的模型文件放置到了正确的 `public/ai-models/...` 路径，并确保路径拼写与代码 (如 `aiClient.ts` 中的 `GHOST_TEXT_MODEL_PATH`) 保持一致。
+## 常见问题
 
-**Q: 浏览器提示 `WebGPU is not available`？**  
-A: 当前设备/浏览器不支持 WebGPU，或者被系统拉黑。请使用最新版的 Chrome，并在 `chrome://flags` 中确认 `Unsafe WebGPU` 选项的状态（必要时可强制开启）。
+### 刷新接口返回 403
 
-**Q: AI 写作页面一直显示“未连接”？**  
-A: 请检查后端服务是否已成功启动并在 `8000` 端口监听，同时确保前端的 `.env.local` 中的 `VITE_API_BASE_URL` 配置正确且无跨域 (CORS) 拦截。
+确认前端请求经过同源 Vite/Nginx 代理，浏览器允许 Cookie，并且后端 `FRONTEND_ORIGINS` 包含当前前端 Origin。直接跨域访问 FastAPI 时还需要正确的凭据请求和 Cookie 配置。
+
+### 模型显示未安装或端侧 AI 不工作
+
+先在“端侧模型”中完成下载，再检查浏览器是否支持 WebGPU，以及 Cache Storage 中是否存在 `duet-model:*` 缓存。模型清单接口需要有效登录状态。
+
+### 新客户端看不到最新内容
+
+点击左下角同步入口执行拉取。如果提示冲突，先处理冲突，不要直接删除 IndexedDB 中的 Outbox 或实体状态记录。
+
+### 图片在新客户端无法显示
+
+先确认原客户端已经同步过包含该图片的正文，再检查后端媒体 Bucket、RAM Role 与 OSS CORS。图片只在正文同步前上传完成后，文档变更才会推送。
