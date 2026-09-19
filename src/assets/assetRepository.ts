@@ -55,6 +55,24 @@ export const assetRepository = {
     return await db.assets.get(assetId);
   },
 
+  async cacheCloudAsset(assetId: string, docId: string, blob: Blob): Promise<DocumentAsset> {
+    const existing = await db.assets.get(assetId);
+    if (existing) return existing;
+
+    const asset: DocumentAsset = {
+      id: assetId,
+      docId,
+      kind: 'image',
+      blob,
+      mimeType: blob.type || 'image/png',
+      fileName: 'cloud-image',
+      size: blob.size,
+      createdAt: Date.now(),
+    };
+    await db.assets.put(asset);
+    return asset;
+  },
+
   /**
    * 删除指定文档的所有图片资产
    */

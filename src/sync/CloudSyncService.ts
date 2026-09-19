@@ -19,6 +19,8 @@ import type { AIResponseMetadata } from '../ai/types';
 import { scheduleDocumentIndex } from '../rag/documentIndexer';
 import { authFetch } from '../auth/authClient';
 import { getActiveSyncIdentity } from './syncIdentity';
+import { MediaSyncError } from '../media/mediaClient';
+import { ensureOperationMediaReady, uploadReferencedLocalAssets } from '../media/syncMedia';
 
 export interface PushResult {
   success: boolean;
@@ -487,6 +489,7 @@ export class CloudSyncService {
     if (!entry) return { hasMore: false, success: true };
 
     try {
+      await ensureOperationMediaReady(workspaceId, entry.operations);
       const response = await authFetch('/api/v1/sync/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -620,7 +623,10 @@ export class CloudSyncService {
       return {
         hasMore: false,
         success: false,
-        error: '网络连接异常，未完成的变更仍保留在本地队列中。',
+        error:
+          networkError instanceof MediaSyncError
+            ? networkError.message
+            : '网络连接异常，未完成的变更仍保留在本地队列中。',
       };
     }
   }
@@ -663,6 +669,7 @@ export class CloudSyncService {
         };
       }
 
+      await uploadReferencedLocalAssets(workspaceId);
       const pushed = await this.drainOutbox(workspaceId, onProgress);
       if (!pushed.success) {
         if (!pushed.conflict) return pushed;

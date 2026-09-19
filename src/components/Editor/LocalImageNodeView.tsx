@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
 import { Loader2, ImageOff } from 'lucide-react';
 import { assetRepository } from '../../assets/assetRepository';
+import { downloadMedia } from '../../media/mediaClient';
+import { useEditorStore } from '../../store';
+import { getActiveWorkspaceId } from '../../sync/syncIdentity';
 
 interface AsyncAssetState {
   loadedAssetId: string | null;
@@ -31,9 +34,18 @@ export default function LocalImageNodeView(props: NodeViewProps) {
     let active = true;
     let createdObjectUrl: string | null = null;
 
-    // 2. 从 IndexedDB 异步读取 Blob 并生成内存 URL
-    assetRepository
-      .getAsset(assetId)
+    const loadAsset = async () => {
+      const localAsset = await assetRepository.getAsset(assetId);
+      if (localAsset) return localAsset;
+
+      const documentId = useEditorStore.getState().activeEditorDocumentId;
+      if (!documentId) throw new Error('当前文档尚未就绪');
+      const blob = await downloadMedia(getActiveWorkspaceId(), assetId);
+      return assetRepository.cacheCloudAsset(assetId, documentId, blob);
+    };
+
+    // 2. 优先读取 IndexedDB；新客户端缺少本地 Blob 时再从云端取回
+    loadAsset()
       .then((asset) => {
         if (!active) return;
         if (asset && asset.blob) {
@@ -43,13 +55,6 @@ export default function LocalImageNodeView(props: NodeViewProps) {
             objectUrl: createdObjectUrl,
             status: 'loaded',
             errorText: '',
-          });
-        } else {
-          setAsyncState({
-            loadedAssetId: assetId,
-            objectUrl: null,
-            status: 'error',
-            errorText: '图片资源不存在或已被清除',
           });
         }
       })
