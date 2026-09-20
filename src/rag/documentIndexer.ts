@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { chunkDocument, getDocumentFingerprint, getDocumentSourceType } from './documentChunker';
-import { embedPassages } from './embeddingClient';
+import { embedPassages, withEmbeddingRuntime } from './embeddingClient';
 import {
   getDocumentIndexState,
   markDocumentIndexError,
@@ -55,7 +55,7 @@ function hasCurrentEmbedding(
   );
 }
 
-export async function indexDocument(document: IndexableDocument): Promise<'indexed' | 'skipped'> {
+async function indexDocumentInternal(document: IndexableDocument): Promise<'indexed' | 'skipped'> {
   const sourceFingerprint = getDocumentFingerprint(document);
   const sourceType = getDocumentSourceType(document);
   const existingState = await getDocumentIndexState(document.id);
@@ -133,6 +133,10 @@ export async function indexDocument(document: IndexableDocument): Promise<'index
   }
 }
 
+export function indexDocument(document: IndexableDocument): Promise<'indexed' | 'skipped'> {
+  return withEmbeddingRuntime(() => indexDocumentInternal(document));
+}
+
 export function scheduleDocumentIndex(document: IndexableDocument): void {
   if (!isLocalIndexingEnabled()) return;
 
@@ -151,44 +155,46 @@ export function scheduleDocumentIndex(document: IndexableDocument): void {
 export async function rebuildLocalDocumentIndex(
   onProgress?: (progress: IndexProgress) => void,
 ): Promise<IndexRunResult> {
-  enableLocalIndexing();
-  const documents = (await db.documents.toArray()).sort(
-    (left, right) => right.updatedAt - left.updatedAt,
-  );
-  console.info('[LocalRAG] Starting local index rebuild', {
-    origin: window.location.origin,
-    documentCount: documents.length,
-  });
-  const result: IndexRunResult = {
-    indexedDocuments: 0,
-    skippedDocuments: 0,
-    failedDocuments: 0,
-    failures: [],
-  };
+  return withEmbeddingRuntime(async () => {
+    enableLocalIndexing();
+    const documents = (await db.documents.toArray()).sort(
+      (left, right) => right.updatedAt - left.updatedAt,
+    );
+    console.info('[LocalRAG] Starting local index rebuild', {
+      origin: window.location.origin,
+      documentCount: documents.length,
+    });
+    const result: IndexRunResult = {
+      indexedDocuments: 0,
+      skippedDocuments: 0,
+      failedDocuments: 0,
+      failures: [],
+    };
 
-  for (let index = 0; index < documents.length; index += 1) {
-    const document = documents[index];
-    try {
-      const status = await indexDocument(document);
-      if (status === 'indexed') result.indexedDocuments += 1;
-      else result.skippedDocuments += 1;
-    } catch (error) {
-      result.failedDocuments += 1;
-      const message = error instanceof Error ? error.message : String(error);
-      result.failures.push({ sourceId: document.id, title: document.title, message });
-      console.error('[LocalRAG] Document indexing failed', {
+    for (let index = 0; index < documents.length; index += 1) {
+      const document = documents[index];
+      try {
+        const status = await indexDocument(document);
+        if (status === 'indexed') result.indexedDocuments += 1;
+        else result.skippedDocuments += 1;
+      } catch (error) {
+        result.failedDocuments += 1;
+        const message = error instanceof Error ? error.message : String(error);
+        result.failures.push({ sourceId: document.id, title: document.title, message });
+        console.error('[LocalRAG] Document indexing failed', {
+          sourceId: document.id,
+          title: document.title,
+          message,
+        });
+      }
+      onProgress?.({
+        completedDocuments: index + 1,
+        totalDocuments: documents.length,
         sourceId: document.id,
         title: document.title,
-        message,
       });
     }
-    onProgress?.({
-      completedDocuments: index + 1,
-      totalDocuments: documents.length,
-      sourceId: document.id,
-      title: document.title,
-    });
-  }
 
-  return result;
+    return result;
+  });
 }

@@ -649,6 +649,12 @@ export default function Editor() {
       }
     };
 
+    const handleLocalModelRuntimeIdle = () => {
+      if (AIDispatcher.getGhostTextStatus() !== 'idle') return;
+      started = false;
+      scheduleIdlePreload();
+    };
+
     preloadTimerId = window.setTimeout(() => {
       preloadTimerId = null;
       autoDelayElapsed = true;
@@ -659,12 +665,14 @@ export default function Editor() {
     editorElement.addEventListener('pointerdown', handleUserIntent, { once: true });
     editorElement.addEventListener('keydown', handleUserIntent, { once: true });
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('duet-local-model-runtime-idle', handleLocalModelRuntimeIdle);
 
     return () => {
       cancelPendingSchedule();
       editorElement.removeEventListener('pointerdown', handleUserIntent);
       editorElement.removeEventListener('keydown', handleUserIntent);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('duet-local-model-runtime-idle', handleLocalModelRuntimeIdle);
     };
   }, [editor]);
 

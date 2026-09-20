@@ -1,5 +1,5 @@
 import { listIndexedChunks } from './chunkRepository';
-import { rankLocalCandidates } from './embeddingClient';
+import { rankLocalCandidates, withEmbeddingRuntime } from './embeddingClient';
 import { DIVERSE_SOURCE_TARGET, fuseRankings, MAX_CHUNKS_PER_SOURCE } from './hybridRanker';
 import { rankLexicalCandidates } from './lexicalRetriever';
 import type {
@@ -169,6 +169,13 @@ async function searchByHybrid(
 export async function searchLocalKnowledge(
   query: string,
   options: LocalSearchOptions = {},
+): Promise<RetrievedChunk[]> {
+  return withEmbeddingRuntime(() => searchLocalKnowledgeInternal(query, options));
+}
+
+async function searchLocalKnowledgeInternal(
+  query: string,
+  options: LocalSearchOptions,
 ): Promise<RetrievedChunk[]> {
   const limit = Math.min(Math.max(1, options.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
   const strategy: LocalRetrievalStrategy = options.strategy ?? 'vector';

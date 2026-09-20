@@ -2,6 +2,7 @@ import {
   loadGhostTextModel as loadLocalGhostTextModel,
   requestGhostText as requestLocalGhostText,
   clearActiveGhostTextRequest,
+  disposeGhostTextRuntime,
   getGhostTextStatus,
 } from './aiClient';
 import type { GhostTextRequest, GhostTextResult } from './aiClient';
@@ -26,6 +27,10 @@ export const AIDispatcher = {
 
   clearGhostTextRequest(): void {
     clearActiveGhostTextRequest();
+  },
+
+  disposeGhostTextModel(): void {
+    disposeGhostTextRuntime();
   },
 
   getGhostTextStatus(): string {

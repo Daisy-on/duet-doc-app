@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { ensureEmbeddingModelReady } from './embeddingClient';
+import { ensureEmbeddingModelReady, withEmbeddingRuntime } from './embeddingClient';
 import {
   DIVERSE_SOURCE_TARGET,
   LEXICAL_RRF_WEIGHT,
@@ -396,15 +396,25 @@ export function validateRetrievalEvaluationSources(
 }
 
 export async function warmupRetrievalEvaluation(): Promise<number> {
-  const startedAt = performance.now();
-  await ensureEmbeddingModelReady();
-  return performance.now() - startedAt;
+  return withEmbeddingRuntime(async () => {
+    const startedAt = performance.now();
+    await ensureEmbeddingModelReady();
+    return performance.now() - startedAt;
+  });
 }
 
 export async function runRetrievalEvaluation(
   cases: RetrievalEvaluationCase[],
   options: EvaluationRunOptions = {},
 ): Promise<RetrievalEvaluationRun> {
+  return withEmbeddingRuntime(() => runRetrievalEvaluationInternal(cases, options));
+}
+
+async function runRetrievalEvaluationInternal(
+  cases: RetrievalEvaluationCase[],
+  options: EvaluationRunOptions,
+): Promise<RetrievalEvaluationRun> {
+  await ensureEmbeddingModelReady();
   const limit = options.limit ?? DEFAULT_LIMIT;
   const strategy = options.strategy ?? 'vector';
   const results: RetrievalEvaluationCaseResult[] = [];
