@@ -17,6 +17,7 @@ import type {
 } from '../store/aiWritingStore';
 import type { AIResponseMetadata } from '../ai/types';
 import { scheduleDocumentIndex } from '../rag/documentIndexer';
+import { uploadReadyTextIndexes } from '../rag/cloudTextIndex';
 import { authFetch } from '../auth/authClient';
 import { getActiveSyncIdentity } from './syncIdentity';
 import { MediaSyncError } from '../media/mediaClient';
@@ -680,6 +681,8 @@ export class CloudSyncService {
           conflictCount: afterConflict.conflictCount,
         };
       }
+
+      await uploadReadyTextIndexes(workspaceId);
 
       const afterPush = await this.pullAllUnlocked(workspaceId);
       return {
