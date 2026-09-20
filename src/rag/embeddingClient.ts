@@ -11,6 +11,7 @@ import {
 
 const MODEL_ID: ModelId = 'multilingual-e5-base-fp16';
 const MODEL_PATH = getModelBasePath(MODEL_ID);
+export const EMBEDDING_BATCH_SIZE = 4;
 
 type QueuePriority = 'interactive' | 'background';
 
@@ -249,6 +250,34 @@ export function embedPassages(texts: string[]): Promise<EmbeddingResult> {
     requestId,
     payload: { texts },
   }));
+}
+
+export async function embedPassagesInBatches(
+  texts: string[],
+  onProgress?: (completed: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<EmbeddingResult> {
+  const vectors: Float32Array[] = [];
+  let inferenceMs = 0;
+
+  for (let offset = 0; offset < texts.length; offset += EMBEDDING_BATCH_SIZE) {
+    signal?.throwIfAborted();
+    const batch = texts.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+    const result = await embedPassages(batch);
+    if (result.vectors.length !== batch.length) {
+      throw new Error('Embedding worker returned an unexpected vector count.');
+    }
+
+    vectors.push(...result.vectors);
+    inferenceMs += result.inferenceMs;
+    onProgress?.(vectors.length, texts.length);
+
+    if (offset + EMBEDDING_BATCH_SIZE < texts.length) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+  }
+
+  return { vectors, inferenceMs };
 }
 
 export function rankLocalCandidates(

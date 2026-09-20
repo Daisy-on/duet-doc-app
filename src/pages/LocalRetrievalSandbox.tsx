@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   ClipboardList,
   Database,
@@ -96,6 +97,7 @@ export default function LocalRetrievalSandbox() {
   const [report, setReport] = useState<RetrievalEvaluationReport | null>(null);
   const [sources, setSources] = useState<Array<{ id: string; title: string }> | null>(null);
   const stopEvaluationRef = useRef(false);
+  const indexAbortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshCorpusStats(): Promise<RetrievalEvaluationCorpusStats> {
@@ -105,19 +107,27 @@ export default function LocalRetrievalSandbox() {
   }
 
   async function handleBuildIndex() {
+    const controller = new AbortController();
+    indexAbortControllerRef.current = controller;
     setIsIndexing(true);
     setError(null);
     setIndexResult(null);
+    setProgress(null);
 
     try {
-      const result = await rebuildLocalDocumentIndex(setProgress);
+      const result = await rebuildLocalDocumentIndex(setProgress, controller.signal);
       setIndexResult(result);
       await refreshCorpusStats();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地索引建立失败。'));
     } finally {
+      indexAbortControllerRef.current = null;
       setIsIndexing(false);
     }
+  }
+
+  function handleStopIndexing() {
+    indexAbortControllerRef.current?.abort();
   }
 
   async function handleSearch() {
@@ -274,6 +284,10 @@ export default function LocalRetrievalSandbox() {
         </header>
 
         <section className="mt-6 border border-border-color bg-white p-5">
+          <div className="mb-4 flex gap-3 border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <AlertTriangle className="mt-0.5 shrink-0" size={16} />
+            <p>本地索引仅在这里手动执行。开始前请预留充足显存，运行期间端侧补全会暂停。</p>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold">建立或更新索引</h2>
@@ -281,20 +295,33 @@ export default function LocalRetrievalSandbox() {
                 首次执行会加载本地模型；之后只会重建内容、标题或分块规则发生变化的文档。
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleBuildIndex}
-              disabled={isIndexing}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Database size={15} />
-              {isIndexing ? '正在建立索引' : '建立本地索引'}
-            </button>
+            {isIndexing ? (
+              <button
+                type="button"
+                onClick={handleStopIndexing}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg"
+              >
+                <Square size={14} />
+                停止索引
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBuildIndex}
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white"
+              >
+                <Database size={15} />
+                建立本地索引
+              </button>
+            )}
           </div>
 
           {progress && (
             <p className="mt-4 text-sm text-text-secondary">
               {progress.completedDocuments} / {progress.totalDocuments}：{progress.title}
+              {progress.totalChunks !== undefined && progress.completedChunks !== undefined
+                ? ` · 分块 ${progress.completedChunks} / ${progress.totalChunks}${progress.reusedChunks ? `（复用 ${progress.reusedChunks}）` : ''}`
+                : ''}
             </p>
           )}
           {indexResult && (
@@ -302,6 +329,7 @@ export default function LocalRetrievalSandbox() {
               <p>
                 本次完成：新增或更新 {indexResult.indexedDocuments} 篇，跳过{' '}
                 {indexResult.skippedDocuments} 篇，失败 {indexResult.failedDocuments} 篇。
+                {indexResult.stopped ? '任务已停止，未完成的文档保留原索引。' : ''}
               </p>
               {indexResult.failures.length > 0 && (
                 <ul className="mt-3 space-y-1 border-l-2 border-rose-200 pl-3 text-xs text-rose-700">

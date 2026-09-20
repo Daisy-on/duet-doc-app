@@ -112,7 +112,11 @@ async function embed(texts: string[]): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
 
   const output = await extractor(texts, { pooling: 'mean', normalize: true });
-  return (output.tolist() as number[][]).map((vector) => new Float32Array(vector));
+  try {
+    return (output.tolist() as number[][]).map((vector) => new Float32Array(vector));
+  } finally {
+    output.dispose();
+  }
 }
 
 function cosineSimilarity(left: Float32Array, right: Float32Array): number {

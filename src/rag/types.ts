@@ -85,6 +85,9 @@ export interface IndexProgress {
   totalDocuments: number;
   sourceId: string;
   title: string;
+  completedChunks?: number;
+  totalChunks?: number;
+  reusedChunks?: number;
 }
 
 export interface EmbeddingProgress {
@@ -96,6 +99,7 @@ export interface IndexRunResult {
   indexedDocuments: number;
   skippedDocuments: number;
   failedDocuments: number;
+  stopped: boolean;
   failures: Array<{
     sourceId: string;
     title: string;

@@ -16,7 +16,6 @@ import type {
   ReferencedDoc,
 } from '../store/aiWritingStore';
 import type { AIResponseMetadata } from '../ai/types';
-import { scheduleDocumentIndex } from '../rag/documentIndexer';
 import { uploadReadyTextIndexes } from '../rag/cloudTextIndex';
 import { authFetch } from '../auth/authClient';
 import { getActiveSyncIdentity } from './syncIdentity';
@@ -420,10 +419,6 @@ export class CloudSyncService {
       cursor = page.next_cursor;
     }
 
-    for (const documentId of changedDocumentIds) {
-      const document = await db.documents.get(documentId);
-      if (document) scheduleDocumentIndex(document);
-    }
     const conflicts = await this.listConflicts(workspaceId);
     return {
       appliedCount,
@@ -905,11 +900,6 @@ export class CloudSyncService {
         conflict: undefined,
       });
     });
-
-    if (resolution === 'use-cloud' && conflict.entityType === 'document') {
-      const document = await db.documents.get(conflict.entityId);
-      if (document) scheduleDocumentIndex(document);
-    }
   }
 
   async resolveConflict(
