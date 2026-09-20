@@ -4,6 +4,7 @@ import { cloudSyncService, type SyncConflict } from '../sync/CloudSyncService';
 import { enqueueMutationInTx, detectContentFormat } from '../sync/syncOutboxHelper';
 import type { SyncEntityStateV2, SyncEntityType, SyncOperation } from '../db';
 import { setActiveSyncIdentity } from '../sync/syncIdentity';
+import { getDocumentFingerprint } from '../rag/documentChunker';
 
 export type SyncUiStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
@@ -38,6 +39,26 @@ let remoteStatusRequest: Promise<void> | null = null;
 
 async function getWorkspaceOutboxEntries(workspaceId: string) {
   return db.syncOutbox.where('workspaceId').equals(workspaceId).toArray();
+}
+
+async function getTextIndexUploadSummary() {
+  const states = await db.documentIndexStates.where('status').equals('indexed').toArray();
+  const documents = await db.documents.bulkGet(states.map((state) => state.sourceId));
+  let pending = 0;
+  let error = 0;
+  let firstError: string | null = null;
+
+  states.forEach((state, index) => {
+    const document = documents[index];
+    if (!document || getDocumentFingerprint(document) !== state.sourceFingerprint) return;
+    if (state.cloudUploadStatus === 'pending') pending += 1;
+    if (state.cloudUploadStatus === 'error') {
+      error += 1;
+      firstError ??= state.cloudUploadError ?? '文本索引上传失败';
+    }
+  });
+
+  return { pending, error, firstError };
 }
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
@@ -92,13 +113,15 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       const wid = get().workspaceId;
       if (!wid) throw new Error('同步身份尚未初始化');
       const state = await db.syncState.get(wid);
-      const [outboxEntries, conflicts] = await Promise.all([
+      const [outboxEntries, conflicts, textIndexes] = await Promise.all([
         getWorkspaceOutboxEntries(wid),
         cloudSyncService.listConflicts(wid),
+        getTextIndexUploadSummary(),
       ]);
-      const pending = outboxEntries.filter((entry) => entry.status === 'pending').length;
+      const pending =
+        outboxEntries.filter((entry) => entry.status === 'pending').length + textIndexes.pending;
       const errorEntries = outboxEntries.filter((entry) => entry.status === 'error');
-      const errors = errorEntries.length;
+      const errors = errorEntries.length + textIndexes.error;
       if (get().workspaceId !== wid) return;
 
       const firstError = errorEntries.sort((a, b) => a.queueSequence - b.queueSequence)[0];
@@ -111,6 +134,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         status: errors > 0 || conflicts.length > 0 ? 'error' : 'idle',
         errorMessage:
           firstError?.errorReason ||
+          textIndexes.firstError ||
           (errors > 0
             ? '存在未解决的同步异常'
             : conflicts.length > 0
@@ -159,9 +183,13 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const workspaceId = get().workspaceId;
     if (!workspaceId) return { pending: 0, error: 0 };
     try {
-      const entries = await getWorkspaceOutboxEntries(workspaceId);
-      const pending = entries.filter((entry) => entry.status === 'pending').length;
-      const errors = entries.filter((entry) => entry.status === 'error').length;
+      const [entries, textIndexes] = await Promise.all([
+        getWorkspaceOutboxEntries(workspaceId),
+        getTextIndexUploadSummary(),
+      ]);
+      const pending =
+        entries.filter((entry) => entry.status === 'pending').length + textIndexes.pending;
+      const errors = entries.filter((entry) => entry.status === 'error').length + textIndexes.error;
       if (get().workspaceId !== workspaceId) return { pending, error: errors };
       set((state) => ({
         pendingCount: pending,

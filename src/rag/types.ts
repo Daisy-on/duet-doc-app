@@ -48,6 +48,9 @@ export interface DocumentIndexState {
   chunkerVersion: string;
   indexedAt?: number;
   errorMessage?: string;
+  cloudUploadStatus?: 'pending' | 'uploaded' | 'error';
+  cloudUploadError?: string;
+  cloudUploadedRevision?: number;
 }
 
 export interface RetrievedChunk {

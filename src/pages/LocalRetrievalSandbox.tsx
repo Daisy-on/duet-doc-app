@@ -29,6 +29,7 @@ import {
   type RetrievalEvaluationRun,
 } from '../rag/retrievalEvaluation';
 import { searchLocalKnowledge } from '../rag/localRetriever';
+import { useSyncStore } from '../store/syncStore';
 import type {
   IndexProgress,
   IndexRunResult,
@@ -117,7 +118,7 @@ export default function LocalRetrievalSandbox() {
     try {
       const result = await rebuildLocalDocumentIndex(setProgress, controller.signal);
       setIndexResult(result);
-      await refreshCorpusStats();
+      await Promise.all([refreshCorpusStats(), useSyncStore.getState().refreshCounts()]);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地索引建立失败。'));
     } finally {

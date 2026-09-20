@@ -36,6 +36,7 @@ import { useAIChat } from '../hooks/useAIChat';
 import { renderMarkdownToHtml } from '../utils/markdownRenderer';
 import { markdownToHtml, getSmartTitle } from '../utils/markdownUtils';
 import { buildApiUrl } from '../utils/apiUtils';
+import CloudRagGate from '../components/CloudRagGate';
 
 function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
   if (msg.status === 'streaming' && !msg.content) {
@@ -807,6 +808,9 @@ export default function AIWriting() {
         mode="create-doc"
         defaultTitle={kbChooserDefaultTitle}
         onCreateDoc={handleConfirmCreateDoc}
+      />
+      <CloudRagGate
+        onCreated={(jobCount) => setToastText(`已创建云端索引任务（${jobCount} 项）`)}
       />
     </div>
   );

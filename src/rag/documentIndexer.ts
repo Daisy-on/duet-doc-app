@@ -165,6 +165,9 @@ async function indexDocumentInternal(
         ...baseState,
         status: 'indexed',
         indexedAt,
+        cloudUploadStatus: 'pending',
+        cloudUploadError: undefined,
+        cloudUploadedRevision: undefined,
       },
       chunks,
     );
