@@ -189,7 +189,7 @@ function normalizeCase(value: unknown, caseIndex: number): RetrievalEvaluationCa
   };
 }
 
-function percentile(values: number[], ratio: number): number {
+export function percentile(values: number[], ratio: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.max(0, Math.ceil(sorted.length * ratio) - 1)];
@@ -289,7 +289,7 @@ function toSource(chunk: RetrievedChunk): RetrievalEvaluationSource {
   };
 }
 
-function evaluateCase(
+export function evaluateRetrievalCase(
   evaluationCase: RetrievalEvaluationCase,
   results: RetrievedChunk[],
   durationMs: number,
@@ -424,14 +424,29 @@ async function runRetrievalEvaluationInternal(
 
     const startedAt = performance.now();
     const retrievedChunks = await searchLocalKnowledge(evaluationCase.query, { limit, strategy });
-    results.push(evaluateCase(evaluationCase, retrievedChunks, performance.now() - startedAt));
+    results.push(
+      evaluateRetrievalCase(evaluationCase, retrievedChunks, performance.now() - startedAt),
+    );
     options.onProgress?.(results.length, cases.length);
   }
 
+  const summary = summarizeRetrievalEvaluation(results);
+
+  return {
+    cases: results,
+    summary,
+    cancelled: results.length < cases.length,
+    strategy,
+  };
+}
+
+export function summarizeRetrievalEvaluation(
+  results: RetrievalEvaluationCaseResult[],
+): RetrievalEvaluationSummary {
   const durations = results.map((result) => result.durationMs);
   const keywordResults = results.filter((result) => result.keywordRecallAt5 !== undefined);
   const total = results.length;
-  const summary: RetrievalEvaluationSummary = {
+  return {
     completedCases: total,
     hitAt1: total ? results.filter((result) => result.hitAt1).length / total : 0,
     hitAt3: total ? results.filter((result) => result.hitAt3).length / total : 0,
@@ -463,13 +478,6 @@ async function runRetrievalEvaluationInternal(
     p50DurationMs: percentile(durations, 0.5),
     p95DurationMs: percentile(durations, 0.95),
   };
-
-  return {
-    cases: results,
-    summary,
-    cancelled: results.length < cases.length,
-    strategy,
-  };
 }
 
 export function createRetrievalEvaluationReport(
@@ -477,13 +485,16 @@ export function createRetrievalEvaluationReport(
   warmupMs: number | null,
   corpus: RetrievalEvaluationCorpusStats,
   run: RetrievalEvaluationRun,
+  model: string = LOCAL_EMBEDDING_MODEL,
+  embeddingDimension: number = LOCAL_EMBEDDING_DIMENSION,
+  chunkerVersion: string = DOCUMENT_CHUNKER_VERSION,
 ): RetrievalEvaluationReport {
   return {
     label: label.trim() || 'local-rag-evaluation',
     createdAt: new Date().toISOString(),
-    model: LOCAL_EMBEDDING_MODEL,
-    embeddingDimension: LOCAL_EMBEDDING_DIMENSION,
-    chunkerVersion: DOCUMENT_CHUNKER_VERSION,
+    model,
+    embeddingDimension,
+    chunkerVersion,
     topK: DEFAULT_LIMIT,
     retrievalStrategy: run.strategy,
     hybridConfig:

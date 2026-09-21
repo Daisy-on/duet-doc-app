@@ -1,4 +1,4 @@
-export type LocalModelOwner = 'ghost-text' | 'embedding';
+export type LocalModelOwner = 'ghost-text' | 'embedding' | 'bge-lab';
 
 interface RuntimeController {
   dispose: () => void | Promise<void>;
@@ -25,8 +25,8 @@ export function activateLocalModelRuntime(owner: LocalModelOwner): Promise<boole
     }
 
     const previousOwner = activeOwner;
-    if (owner === 'ghost-text' && previousOwner === 'embedding') {
-      const embedding = controllers.get('embedding');
+    if (owner === 'ghost-text' && previousOwner && previousOwner !== 'ghost-text') {
+      const embedding = controllers.get(previousOwner);
       if (embedding?.isBusy()) return;
     }
 
