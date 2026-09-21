@@ -367,31 +367,34 @@ export default function AIWriting() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-text-secondary bg-bg-panel border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
-            <span className="relative flex h-2 w-2">
-              {backendStatus === 'connected' && (
+          <div className="flex items-center gap-2 shrink-0">
+            <CloudRagGate onMessage={setToastText} />
+            <div className="flex items-center gap-2 text-xs text-text-secondary bg-bg-panel border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
+              <span className="relative flex h-2 w-2">
+                {backendStatus === 'connected' && (
+                  <span
+                    className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                    style={{ animationDuration: '2.5s' }}
+                  />
+                )}
                 <span
-                  className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
-                  style={{ animationDuration: '2.5s' }}
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    backendStatus === 'connected'
+                      ? 'bg-emerald-500'
+                      : backendStatus === 'disconnected'
+                        ? 'bg-red-500'
+                        : 'bg-gray-400'
+                  }`}
                 />
-              )}
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  backendStatus === 'connected'
-                    ? 'bg-emerald-500'
-                    : backendStatus === 'disconnected'
-                      ? 'bg-red-500'
-                      : 'bg-gray-400'
-                }`}
-              />
-            </span>
-            <span className="font-medium">
-              {backendStatus === 'connected'
-                ? '已连接云端'
-                : backendStatus === 'disconnected'
-                  ? '离线模式'
-                  : '检测连接中...'}
-            </span>
+              </span>
+              <span className="font-medium">
+                {backendStatus === 'connected'
+                  ? '已连接云端'
+                  : backendStatus === 'disconnected'
+                    ? '离线模式'
+                    : '检测连接中...'}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -808,9 +811,6 @@ export default function AIWriting() {
         mode="create-doc"
         defaultTitle={kbChooserDefaultTitle}
         onCreateDoc={handleConfirmCreateDoc}
-      />
-      <CloudRagGate
-        onCreated={(jobCount) => setToastText(`已创建云端索引任务（${jobCount} 项）`)}
       />
     </div>
   );

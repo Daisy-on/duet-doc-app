@@ -8,6 +8,8 @@ export interface CloudRagCoverage {
   has_client_index: boolean;
   has_cloud_index: boolean;
   has_any_index: boolean;
+  active_run_id: string | null;
+  active_run_status: 'pending' | 'running' | null;
 }
 
 export interface CloudRagPlan {
@@ -55,4 +57,8 @@ export function getCloudRagPlan(workspaceId: string) {
 
 export function createCloudRagRun(workspaceId: string) {
   return request<CloudRagRun>(`${base(workspaceId)}/runs`, { method: 'POST' });
+}
+
+export function getCloudRagRun(workspaceId: string, runId: string) {
+  return request<CloudRagRun>(`${base(workspaceId)}/runs/${runId}`);
 }
