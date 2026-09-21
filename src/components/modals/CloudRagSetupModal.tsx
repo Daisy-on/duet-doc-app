@@ -18,7 +18,7 @@ export default function CloudRagSetupModal({
 }: Props) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
-      <section className="w-[440px] max-w-[calc(100vw-32px)] rounded-lg border border-border-color bg-bg-main p-5 shadow-xl">
+      <section className="w-[460px] max-w-[calc(100vw-32px)] rounded-xl border border-border-color bg-bg-main p-5 shadow-xl">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60">
             <Cloud size={19} />
@@ -40,7 +40,7 @@ export default function CloudRagSetupModal({
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 divide-x divide-border-color rounded-lg border border-border-color bg-bg-panel py-3 text-center">
+        <div className="mt-4 grid grid-cols-3 divide-x divide-border-color rounded-xl border border-border-color bg-bg-panel py-3 text-center">
           <div>
             <strong className="block text-sm text-text-primary">{plan.document_count}</strong>
             <span className="text-xs text-text-secondary">篇文档</span>
