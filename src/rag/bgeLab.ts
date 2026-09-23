@@ -29,9 +29,9 @@ import type {
 
 export const BGE_MODEL = 'bge-large-zh-v1.5';
 export const BGE_DIMENSION = 1024;
-export const BGE_PRECISIONS: BgePrecision[] = ['q4f16'];
+export const BGE_PRECISIONS: BgePrecision[] = ['q4f16', 'fp16'];
 export const BGE_CHUNKER_VERSION = 'v2-bge-lab';
-const EMBEDDING_BATCH_SIZE = 4;
+const EMBEDDING_BATCH_SIZE = 2;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 12;
 const MIN_HYBRID_CANDIDATES = 20;
@@ -43,6 +43,7 @@ interface BgeLabState {
   sourceUpdatedAt: number;
   chunkCount: number;
   precision: BgePrecision;
+  batchSize: number;
   indexedAt: number;
 }
 
@@ -116,7 +117,7 @@ export interface BgePerformanceResult {
   modelLoadMs: number;
   singleQuery: { runs: number; averageMs: number; p50Ms: number; p95Ms: number };
   batches: Array<{
-    batchSize: 1 | 4;
+    batchSize: 1 | 2 | 4 | 8;
     chunks: number;
     durationMs: number;
     chunksPerSecond: number;
@@ -156,7 +157,11 @@ export async function rebuildBgeLabIndex(
       const document = documents[documentIndex];
       const fingerprint = getDocumentFingerprint(document);
       const existing = await database.states.get(document.id);
-      if (existing?.sourceFingerprint === fingerprint && existing.precision === precision) {
+      if (
+        existing?.sourceFingerprint === fingerprint &&
+        existing.precision === precision &&
+        existing.batchSize === EMBEDDING_BATCH_SIZE
+      ) {
         result.skippedDocuments += 1;
         onProgress?.({
           completedDocuments: documentIndex + 1,
@@ -206,6 +211,7 @@ export async function rebuildBgeLabIndex(
             sourceUpdatedAt: document.updatedAt,
             chunkCount: chunks.length,
             precision,
+            batchSize: EMBEDDING_BATCH_SIZE,
             indexedAt,
           });
         });
@@ -450,7 +456,7 @@ export async function runBgePerformanceBenchmark(
     }
 
     const batches: BgePerformanceResult['batches'] = [];
-    for (const batchSize of [1, 4] as const) {
+    for (const batchSize of [1, 2, 4, 8] as const) {
       const startedAt = performance.now();
       for (let offset = 0; offset < chunks.length; offset += batchSize) {
         await embedBgeLabTexts(precision, chunks.slice(offset, offset + batchSize));

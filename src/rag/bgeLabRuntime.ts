@@ -9,9 +9,11 @@ import {
   releaseLocalModelRuntime,
 } from '../models/localModelRuntime';
 
-const MODEL_ID: ModelId = 'bge-large-zh-v1.5-q4f16';
-const MODEL_PATH = getModelBasePath(MODEL_ID);
 const QUERY_INSTRUCTION = '为这个句子生成表示以用于检索相关文章：';
+
+function getModelId(precision: BgePrecision): ModelId {
+  return `bge-large-zh-v1.5-${precision}`;
+}
 
 type WorkerMessage =
   | { type: 'load-progress'; payload: { file?: string; percent?: number } }
@@ -89,7 +91,8 @@ export async function ensureBgeLabRuntime(precision: BgePrecision): Promise<BgeR
     }
 
     try {
-      await requireModelInstallation(MODEL_ID);
+      const modelId = getModelId(precision);
+      await requireModelInstallation(modelId);
       await ensureModelCacheServiceWorkerReady();
       activePrecision = precision;
       worker = createWorker();
@@ -107,7 +110,10 @@ export async function ensureBgeLabRuntime(precision: BgePrecision): Promise<BgeR
           }
         };
         instance.addEventListener('message', handleMessage);
-        instance.postMessage({ type: 'load', payload: { modelPath: MODEL_PATH, precision } });
+        instance.postMessage({
+          type: 'load',
+          payload: { modelPath: getModelBasePath(modelId), precision },
+        });
       });
     } catch (error) {
       disposeBgeLabRuntime();

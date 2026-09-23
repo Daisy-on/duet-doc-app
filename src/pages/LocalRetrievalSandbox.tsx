@@ -30,6 +30,7 @@ import {
   type BgePerformanceResult,
   type BgePrecision,
 } from '../rag/bgeLab';
+import { exportBgeCompatibilityFixture } from '../rag/bgeCompatibility';
 import {
   createRetrievalEvaluationReport,
   parseRetrievalEvaluationCases,
@@ -85,6 +86,7 @@ export default function LocalRetrievalSandbox() {
   const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const [isExportingCompatibility, setIsExportingCompatibility] = useState(false);
   const [query, setQuery] = useState('浏览器中的本地 AI 模型推理');
   const [progress, setProgress] = useState<IndexProgress | null>(null);
   const [indexResult, setIndexResult] = useState<BgeLabIndexResult | null>(null);
@@ -309,6 +311,18 @@ export default function LocalRetrievalSandbox() {
     }
   }
 
+  async function handleExportCompatibility() {
+    setIsExportingCompatibility(true);
+    setError(null);
+    try {
+      await exportBgeCompatibilityFixture(precision);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '导出兼容性样本失败。'));
+    } finally {
+      setIsExportingCompatibility(false);
+    }
+  }
+
   function handlePrecisionChange(nextPrecision: BgePrecision) {
     if (nextPrecision === precision) return;
     setPrecision(nextPrecision);
@@ -370,7 +384,9 @@ export default function LocalRetrievalSandbox() {
                   key={item}
                   type="button"
                   onClick={() => handlePrecisionChange(item)}
-                  disabled={isIndexing || isEvaluating || isBenchmarking}
+                  disabled={
+                    isIndexing || isEvaluating || isBenchmarking || isExportingCompatibility
+                  }
                   className={`min-w-24 px-4 text-sm font-semibold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                     precision === item
                       ? 'bg-accent text-white'
@@ -409,7 +425,8 @@ export default function LocalRetrievalSandbox() {
               <button
                 type="button"
                 onClick={handleBuildIndex}
-                className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white"
+                disabled={isExportingCompatibility || isBenchmarking}
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Database size={15} />
                 建立本地索引
@@ -459,14 +476,25 @@ export default function LocalRetrievalSandbox() {
             <button
               type="button"
               onClick={() => void handleRunPerformanceBenchmark()}
-              disabled={isBenchmarking || isIndexing || !corpusStats?.chunkCount}
+              disabled={
+                isBenchmarking || isIndexing || isExportingCompatibility || !corpusStats?.chunkCount
+              }
               className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Zap size={15} />
               {isBenchmarking ? '基准运行中' : '运行性能基准'}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleExportCompatibility()}
+              disabled={isExportingCompatibility || isBenchmarking || isIndexing || isEvaluating}
+              className="ml-2 inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download size={15} />
+              {isExportingCompatibility ? '生成中' : '导出 BGE 兼容性样本'}
+            </button>
             <p className="mt-2 text-xs text-text-secondary">
-              运行 10 次热查询，并使用相同的 16 个分块比较 batch=1 与 batch=4。
+              运行 10 次热查询，并使用相同的 16 个分块比较 batch=1、2、4、8。
             </p>
           </div>
           {performanceResult && (
@@ -506,7 +534,9 @@ export default function LocalRetrievalSandbox() {
                     <th className="px-3 py-2 font-medium">查询平均</th>
                     <th className="px-3 py-2 font-medium">查询 P95</th>
                     <th className="px-3 py-2 font-medium">Batch 1</th>
+                    <th className="px-3 py-2 font-medium">Batch 2</th>
                     <th className="px-3 py-2 font-medium">Batch 4</th>
+                    <th className="px-3 py-2 font-medium">Batch 8</th>
                     <th className="px-3 py-2 font-medium">Hit@5</th>
                     <th className="px-3 py-2 font-medium">MRR</th>
                   </tr>
@@ -518,8 +548,14 @@ export default function LocalRetrievalSandbox() {
                     const batch1 = comparison.performance?.batches.find(
                       (batch) => batch.batchSize === 1,
                     );
+                    const batch2 = comparison.performance?.batches.find(
+                      (batch) => batch.batchSize === 2,
+                    );
                     const batch4 = comparison.performance?.batches.find(
                       (batch) => batch.batchSize === 4,
+                    );
+                    const batch8 = comparison.performance?.batches.find(
+                      (batch) => batch.batchSize === 8,
                     );
                     return (
                       <tr key={item} className="border-t border-border-color">
@@ -546,7 +582,13 @@ export default function LocalRetrievalSandbox() {
                           {batch1 ? `${batch1.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
                         </td>
                         <td className="px-3 py-2 font-mono">
+                          {batch2 ? `${batch2.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
+                        </td>
+                        <td className="px-3 py-2 font-mono">
                           {batch4 ? `${batch4.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
+                        </td>
+                        <td className="px-3 py-2 font-mono">
+                          {batch8 ? `${batch8.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
                         </td>
                         <td className="px-3 py-2 font-mono">
                           {comparison.evaluation

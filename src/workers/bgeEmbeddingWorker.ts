@@ -9,7 +9,7 @@ env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.useBrowserCache = false;
 
-export type BgePrecision = 'q4f16';
+export type BgePrecision = 'q4f16' | 'fp16';
 
 type WorkerRequest =
   | {
