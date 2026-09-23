@@ -9,9 +9,9 @@ import {
   releaseLocalModelRuntime,
 } from '../models/localModelRuntime';
 
-const MODEL_ID: ModelId = 'multilingual-e5-base-fp16';
+const MODEL_ID: ModelId = 'bge-large-zh-v1.5-fp16';
 const MODEL_PATH = getModelBasePath(MODEL_ID);
-export const EMBEDDING_BATCH_SIZE = 4;
+export const EMBEDDING_BATCH_SIZE = 2;
 
 type QueuePriority = 'interactive' | 'background';
 
@@ -143,7 +143,7 @@ function getWorker() {
       isLoadingModel = false;
       deviceName = message.payload.deviceName;
       console.info('[LocalRAG] Embedding model ready', {
-        model: 'multilingual-e5-base',
+        model: 'bge-large-zh-v1.5',
         dtype: 'fp16',
         device: deviceName,
       });
@@ -200,7 +200,7 @@ export function ensureEmbeddingModelReady(): Promise<void> {
     }
     const instance = getWorker();
     console.info('[LocalRAG] Loading embedding model', {
-      model: 'multilingual-e5-base',
+      model: 'bge-large-zh-v1.5',
       dtype: 'fp16',
     });
     await new Promise<void>((resolve, reject) => {

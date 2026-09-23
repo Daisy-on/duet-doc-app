@@ -5,7 +5,7 @@ DuetDoc 是一个本地优先的 AI 文档编辑器。正文编辑、本地历�
 前端采用“端云协作”的 AI 架构：
 
 - 浏览器通过 WebGPU 运行 Qwen3.5 0.8B，提供行内幽灵文本。
-- 浏览器通过 multilingual-e5-base 生成 768 维向量，完成本地语义检索。
+- 浏览器通过 BGE Large Zh v1.5 FP16 生成 1024 维向量，完成本地语义检索。
 - FastAPI 代理云端大模型请求，通过 SSE 返回聊天与写作结果。
 - 端侧模型不随前端构建产物发布，登录用户可在个人菜单中按需下载到 Cache Storage。
 
@@ -61,19 +61,21 @@ VITE_API_BASE_URL=
 
 模型权重不再放入 `public/ai-models`，也不会进入 Git 或前端构建产物。登录后从个人菜单打开“端侧模型”，按需安装：
 
-| 用途         | 模型                 | 精度  | 约占空间 |
-| ------------ | -------------------- | ----- | -------- |
-| 本地语义检索 | multilingual-e5-base | FP16  | 546 MiB  |
-| 幽灵文本     | Qwen3.5 0.8B         | Q4F16 | 634 MiB  |
+| 用途         | 模型              | 精度  | 约占空间 |
+| ------------ | ----------------- | ----- | -------- |
+| 本地语义检索 | BGE Large Zh v1.5 | FP16  | 620 MiB  |
+| 幽灵文本     | Qwen3.5 0.8B      | Q4F16 | 634 MiB  |
+
+旧评测页仍保留 BGE Q4F16 对照入口；正式索引只使用 FP16。
 
 后端为私有 OSS 文件签发短期 URL，前端下载后写入当前站点 Origin 的 Cache Storage。同一 Origin 下切换 DuetDoc 账号会复用模型缓存；不同协议、域名或端口的缓存彼此隔离。
 
 自行部署时建议从以下 Hugging Face 仓库准备与 Transformers.js 兼容的 ONNX 文件：
 
-- 语义检索：[Xenova/multilingual-e5-base](https://huggingface.co/Xenova/multilingual-e5-base)，使用 `onnx/model_fp16.onnx`。FP16 是当前项目默认精度，可避免进一步量化给检索向量带来的额外偏差；模型输出仍为 768 维。
+- 语义检索：[Xenova/bge-large-zh-v1.5](https://huggingface.co/Xenova/bge-large-zh-v1.5)，使用 `onnx/model_fp16.onnx`，输出 1024 维向量。
 - 幽灵文本：[onnx-community/Qwen3.5-0.8B-ONNX](https://huggingface.co/onnx-community/Qwen3.5-0.8B-ONNX)，使用名称带 `_q4f16` 的 decoder、embed tokens 和 vision encoder 文件组。Q4F16 在下载体积、浏览器显存占用和 WebGPU 推理质量之间更适合当前演示项目。
 
-不要把 FP16、Q4、Q4F16 或 quantized 文件混合到同一模型目录。上游仓库可能更新文件；下载时建议固定 Hugging Face revision，并确认文件名和大小与后端 `app/services/model_delivery.py` 的 `MODEL_CATALOG` 一致。更换 E5 模型或精度后应重新建立本地向量索引，避免新旧向量混用。
+不要把 FP16、Q4、Q4F16 或 quantized 文件混合到同一模型目录。上游仓库可能更新文件；下载时建议固定 Hugging Face revision，并确认文件名和大小与后端 `app/services/model_delivery.py` 的 `MODEL_CATALOG` 一致。迁移到 BGE 时，旧 E5 索引会清空，需要手动重新建立。
 
 若要清理模型，请使用浏览器开发者工具的“应用/存储空间”页面。模型管理弹窗不提供删除按钮，以减少误删后的重复大文件下载。
 
@@ -84,7 +86,7 @@ VITE_API_BASE_URL=
 - 本地编辑不依赖网络，业务数据先写 IndexedDB 和同步 Outbox。
 - 云同步由用户手动触发；可见页面会低频检查云端是否有新版本，但不会静默覆盖本地修改。
 - 知识库、分组、文档、聊天会同步到 PostgreSQL；图片原文件存入私有 OSS。
-- 历史版本、收藏和本地向量索引仍以浏览器本地数据为准。
+- 历史版本、收藏仍以浏览器本地数据为准；手动同步时可上传 BGE 文本索引供其他设备复用。
 - 图片正文只保存稳定的 `assetId`，不保存会过期的 OSS 签名 URL。
 - 登出后会关闭当前用户数据库；模型缓存是设备级资源，不随账号切换清除。
 

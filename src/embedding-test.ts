@@ -12,7 +12,7 @@ env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.useBrowserCache = false;
 
-const MODEL_ID = 'multilingual-e5-base-fp16' as const;
+const MODEL_ID = 'bge-large-zh-v1.5-fp16' as const;
 const MODEL_PATH = getModelBasePath(MODEL_ID);
 const WARM_RUN_COUNT = 10;
 
@@ -46,13 +46,13 @@ type BenchmarkOptions = {
   onProgress?: (progress: EmbeddingProgress) => void;
 };
 
-const query = 'query: 如何在浏览器中运行本地人工智能模型？';
+const query = '为这个句子生成表示以用于检索相关文章：如何在浏览器中运行本地人工智能模型？';
 
 const passages = [
-  'passage: WebGPU allows web applications to perform machine learning inference on a local GPU.',
-  'passage: IndexedDB is a browser database suitable for storing structured local data.',
-  'passage: FastAPI is a Python framework for building backend web APIs.',
-  'passage: Browser-based local AI can keep private content on the user device.',
+  'WebGPU allows web applications to perform machine learning inference on a local GPU.',
+  'IndexedDB is a browser database suitable for storing structured local data.',
+  'FastAPI is a Python framework for building backend web APIs.',
+  'Browser-based local AI can keep private content on the user device.',
 ];
 
 function percentile(values: number[], ratio: number) {
@@ -101,21 +101,21 @@ export async function runEmbeddingBenchmark({
   const modelLoadMs = performance.now() - modelLoadStartedAt;
 
   const firstInferenceStartedAt = performance.now();
-  await extractor(query, { pooling: 'mean', normalize: true });
+  await extractor(query, { pooling: 'cls', normalize: true });
   const firstInferenceMs = performance.now() - firstInferenceStartedAt;
 
   const warmInferenceDurations: number[] = [];
   for (let index = 0; index < WARM_RUN_COUNT; index += 1) {
     const startedAt = performance.now();
-    await extractor(query, { pooling: 'mean', normalize: true });
+    await extractor(query, { pooling: 'cls', normalize: true });
     warmInferenceDurations.push(performance.now() - startedAt);
   }
 
   const batchStartedAt = performance.now();
-  const passageOutput = await extractor(passages, { pooling: 'mean', normalize: true });
+  const passageOutput = await extractor(passages, { pooling: 'cls', normalize: true });
   const batchInferenceMs = performance.now() - batchStartedAt;
 
-  const queryOutput = await extractor(query, { pooling: 'mean', normalize: true });
+  const queryOutput = await extractor(query, { pooling: 'cls', normalize: true });
   const queryVector = queryOutput.tolist()[0] as number[];
   const passageVectors = passageOutput.tolist() as number[][];
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Cloud, Loader2 } from 'lucide-react';
-import { db } from '../db';
 import { inspectModelInstallation } from '../models/modelCache';
 import {
   createCloudRagRun,
@@ -32,11 +31,8 @@ export default function CloudRagGate({ onMessage }: Props) {
     if (!userId || !workspaceId) return;
     const controller = new AbortController();
     void (async () => {
-      const [installation, localIndexCount] = await Promise.all([
-        inspectModelInstallation('multilingual-e5-base-fp16'),
-        db.documentIndexStates.where('status').equals('indexed').count(),
-      ]);
-      if (installation || localIndexCount > 0 || controller.signal.aborted) {
+      const installation = await inspectModelInstallation('bge-large-zh-v1.5-fp16');
+      if (installation || controller.signal.aborted) {
         if (!controller.signal.aborted) setIsVisible(false);
         return;
       }

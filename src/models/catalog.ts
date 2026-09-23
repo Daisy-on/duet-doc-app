@@ -18,14 +18,6 @@ export const MODEL_DEFINITIONS = [
     estimatedSizeBytes: 215_959_285,
   },
   {
-    id: 'multilingual-e5-base-fp16',
-    directory: 'multilingual-e5-base',
-    name: '多语言语义检索',
-    modelName: 'multilingual-e5-base',
-    precision: 'FP16',
-    estimatedSizeBytes: 572_319_632,
-  },
-  {
     id: 'qwen3.5-0.8b-opt-q4f16',
     directory: 'qwen3.5-0.8b-opt',
     name: '端侧智能助手',

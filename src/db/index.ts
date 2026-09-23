@@ -281,6 +281,16 @@ export class DuetDocDB extends Dexie {
           }
         }
       });
+    this.version(8)
+      .stores({
+        documentChunks:
+          'id, sourceId, kbId, sourceType, contentHash, indexedAt, [sourceId+chunkIndex]',
+        documentIndexStates: 'sourceId, kbId, status, sourceUpdatedAt, embeddingModel',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('documentChunks').clear();
+        await tx.table('documentIndexStates').clear();
+      });
   }
 }
 

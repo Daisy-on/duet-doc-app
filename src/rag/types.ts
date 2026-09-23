@@ -1,5 +1,5 @@
-export const LOCAL_EMBEDDING_MODEL = 'multilingual-e5-base';
-export const LOCAL_EMBEDDING_DIMENSION = 768;
+export const LOCAL_EMBEDDING_MODEL = 'bge-large-zh-v1.5';
+export const LOCAL_EMBEDDING_DIMENSION = 1024;
 export const DOCUMENT_CHUNKER_VERSION = 'v2';
 
 export type DocumentSourceType = 'document' | 'memo';

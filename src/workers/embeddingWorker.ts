@@ -111,9 +111,13 @@ async function embed(texts: string[]): Promise<Float32Array[]> {
   if (!extractor) throw new Error('Embedding model is not ready.');
   if (texts.length === 0) return [];
 
-  const output = await extractor(texts, { pooling: 'mean', normalize: true });
+  const output = await extractor(texts, { pooling: 'cls', normalize: true });
   try {
-    return (output.tolist() as number[][]).map((vector) => new Float32Array(vector));
+    const vectors = (output.tolist() as number[][]).map((vector) => new Float32Array(vector));
+    if (vectors.some((vector) => vector.length !== 1024)) {
+      throw new Error('BGE embedding dimension must be 1024.');
+    }
+    return vectors;
   } finally {
     output.dispose();
   }

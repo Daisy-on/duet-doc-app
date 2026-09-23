@@ -32,7 +32,7 @@ function createPassageText(chunk: {
   content: string;
 }): string {
   const section = chunk.headingPath.length > 0 ? `\n${chunk.headingPath.join(' > ')}` : '';
-  return `passage: ${chunk.title}${section}\n${chunk.content}`;
+  return `${chunk.title}${section}\n${chunk.content}`;
 }
 
 function getReusableEmbeddingKey(chunk: {
