@@ -5,6 +5,7 @@ export interface CloudRagCoverage {
   ready_sources: number;
   stale_sources: number;
   missing_sources: number;
+  pending_images: number;
   has_client_index: boolean;
   has_cloud_index: boolean;
   has_any_index: boolean;
@@ -51,12 +52,22 @@ export function getCloudRagCoverage(workspaceId: string) {
   return request<CloudRagCoverage>(`${base(workspaceId)}/coverage`);
 }
 
-export function getCloudRagPlan(workspaceId: string) {
-  return request<CloudRagPlan>(`${base(workspaceId)}/plan`);
+export function getCloudRagPlan(workspaceId: string, includeText: boolean) {
+  return request<CloudRagPlan>(
+    `${base(workspaceId)}/plan?include_text=${includeText}&include_images=true`,
+  );
 }
 
-export function createCloudRagRun(workspaceId: string) {
-  return request<CloudRagRun>(`${base(workspaceId)}/runs`, { method: 'POST' });
+export function createCloudRagRun(
+  workspaceId: string,
+  includeText: boolean,
+  includeImages: boolean,
+) {
+  return request<CloudRagRun>(`${base(workspaceId)}/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ include_text: includeText, include_images: includeImages }),
+  });
 }
 
 export function getCloudRagRun(workspaceId: string, runId: string) {

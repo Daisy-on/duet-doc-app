@@ -3,6 +3,9 @@ import type { CloudRagPlan } from '../../rag/cloudRagClient';
 
 interface Props {
   plan: CloudRagPlan;
+  hasLocalModel: boolean;
+  includeImages: boolean;
+  onIncludeImagesChange: (value: boolean) => void;
   isSubmitting: boolean;
   error: string | null;
   onConfirm: () => void;
@@ -11,6 +14,9 @@ interface Props {
 
 export default function CloudRagSetupModal({
   plan,
+  hasLocalModel,
+  includeImages,
+  onIncludeImagesChange,
   isSubmitting,
   error,
   onConfirm,
@@ -26,7 +32,9 @@ export default function CloudRagSetupModal({
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold text-text-primary">建立云端语义索引</h3>
             <p className="mt-1 text-sm leading-6 text-text-secondary">
-              当前设备未安装语义检索模型。建立后可在本设备直接使用 Duet 检索，也能在其他设备复用。
+              {hasLocalModel
+                ? '文本可使用端侧模型建立索引；图片需要云端处理。'
+                : '未安装端侧语义模型，可按需建立云端文本索引。'}
             </p>
           </div>
           <button
@@ -54,6 +62,18 @@ export default function CloudRagSetupModal({
             <span className="text-xs text-text-secondary">张图片</span>
           </div>
         </div>
+        {plan.image_count > 0 && (
+          <label className="mt-4 flex items-start gap-2 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              checked={includeImages}
+              onChange={(event) => onIncludeImagesChange(event.target.checked)}
+              disabled={isSubmitting}
+              className="mt-1"
+            />
+            <span>同意将 {plan.image_count} 张图片交由云端视觉模型生成描述并建立索引</span>
+          </label>
+        )}
         <p className="mt-3 text-xs leading-5 text-text-secondary">
           仅在你确认后调用云端模型。以后修改文档不会自动产生新的云端向量任务。
         </p>
@@ -71,7 +91,12 @@ export default function CloudRagSetupModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting ||
+              (!hasLocalModel ? plan.document_count : 0) +
+                (includeImages ? plan.image_count : 0) ===
+                0
+            }
             className="flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
           >
             {isSubmitting && <Loader2 size={15} className="animate-spin" />}

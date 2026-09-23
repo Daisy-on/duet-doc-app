@@ -21,8 +21,11 @@ export default function CloudRagGate({ onMessage }: Props) {
   const workspaceId = useAuthStore((state) => state.workspaceId);
   const lastSyncAt = useSyncStore((state) => state.lastSyncAt);
   const [isVisible, setIsVisible] = useState(false);
+  const [hasLocalModel, setHasLocalModel] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [plan, setPlan] = useState<CloudRagPlan | null>(null);
+  const [includeImages, setIncludeImages] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,20 +35,22 @@ export default function CloudRagGate({ onMessage }: Props) {
     const controller = new AbortController();
     void (async () => {
       const installation = await inspectModelInstallation('bge-large-zh-v1.5-fp16');
-      if (installation || controller.signal.aborted) {
-        if (!controller.signal.aborted) setIsVisible(false);
-        return;
-      }
+      if (controller.signal.aborted) return;
+      setHasLocalModel(Boolean(installation));
       const coverage = await getCloudRagCoverage(workspaceId);
       if (!controller.signal.aborted) {
         setActiveRunId(coverage.active_run_id);
-        setIsVisible(Boolean(coverage.active_run_id) || !coverage.has_any_index);
+        setIsVisible(
+          Boolean(coverage.active_run_id) ||
+            coverage.pending_images > 0 ||
+            (!installation && coverage.missing_sources + coverage.stale_sources > 0),
+        );
       }
     })().catch(() => {
       // The assistant remains usable when the optional cloud-index check is offline.
     });
     return () => controller.abort();
-  }, [lastSyncAt, userId, workspaceId]);
+  }, [lastSyncAt, refreshKey, userId, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !activeRunId) return;
@@ -55,8 +60,8 @@ export default function CloudRagGate({ onMessage }: Props) {
         const run = await getCloudRagRun(workspaceId, activeRunId);
         if (cancelled || run.status === 'pending' || run.status === 'running') return;
         setActiveRunId(null);
+        setRefreshKey((value) => value + 1);
         if (run.status === 'completed') {
-          setIsVisible(false);
           onMessage('云端语义索引已建立');
         } else {
           setIsVisible(true);
@@ -79,11 +84,12 @@ export default function CloudRagGate({ onMessage }: Props) {
     setIsPreparing(true);
     setError(null);
     try {
-      const nextPlan = await getCloudRagPlan(workspaceId);
+      const nextPlan = await getCloudRagPlan(workspaceId, !hasLocalModel);
       if (nextPlan.total_jobs === 0) {
-        onMessage('暂无可建立索引的云端文档，请先完成同步');
+        onMessage('暂无待建立索引的云端资源，请先完成同步');
         return;
       }
+      setIncludeImages(false);
       setPlan(nextPlan);
     } catch (reason) {
       onMessage(reason instanceof Error ? reason.message : '无法读取云端索引计划');
@@ -97,7 +103,7 @@ export default function CloudRagGate({ onMessage }: Props) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const run = await createCloudRagRun(workspaceId);
+      const run = await createCloudRagRun(workspaceId, !hasLocalModel, includeImages);
       onMessage(`已创建云端索引任务（${run.total_jobs} 项）`);
       setPlan(null);
       setActiveRunId(run.run_id);
@@ -118,7 +124,7 @@ export default function CloudRagGate({ onMessage }: Props) {
         onClick={() => void prepare()}
         disabled={isPreparing || Boolean(activeRunId)}
         className="flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-950"
-        title="当前工作区尚未配置可用的语义索引"
+        title="查看待建立的语义索引"
       >
         {isPreparing || activeRunId ? (
           <Loader2 size={13} className="animate-spin" />
@@ -130,6 +136,9 @@ export default function CloudRagGate({ onMessage }: Props) {
       {plan && (
         <CloudRagSetupModal
           plan={plan}
+          hasLocalModel={hasLocalModel}
+          includeImages={includeImages}
+          onIncludeImagesChange={setIncludeImages}
           isSubmitting={isSubmitting}
           error={error}
           onConfirm={() => void confirm()}
