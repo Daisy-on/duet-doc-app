@@ -1,4 +1,7 @@
 import type { BgePrecision } from '../workers/bgeEmbeddingWorker';
+import { getModelBasePath, type ModelId } from '../models/catalog';
+import { requireModelInstallation } from '../models/modelCache';
+import { ensureModelCacheServiceWorkerReady } from '../models/modelCacheServiceWorker';
 import {
   activateLocalModelRuntime,
   notifyLocalModelRuntimeIdle,
@@ -6,7 +9,8 @@ import {
   releaseLocalModelRuntime,
 } from '../models/localModelRuntime';
 
-const MODEL_PATH = '/models/bge-large-zh-v1.5-q4f16/';
+const MODEL_ID: ModelId = 'bge-large-zh-v1.5-q4f16';
+const MODEL_PATH = getModelBasePath(MODEL_ID);
 const QUERY_INSTRUCTION = '为这个句子生成表示以用于检索相关文章：';
 
 type WorkerMessage =
@@ -79,35 +83,42 @@ export async function ensureBgeLabRuntime(precision: BgePrecision): Promise<BgeR
   if (runtimeInfo) return runtimeInfo;
   if (readyPromise) return readyPromise;
 
-  if (!(await activateLocalModelRuntime('bge-lab'))) {
-    throw new Error('另一个本地模型任务仍在运行，请稍后重试。');
-  }
+  readyPromise = (async () => {
+    if (!(await activateLocalModelRuntime('bge-lab'))) {
+      throw new Error('另一个本地模型任务仍在运行，请稍后重试。');
+    }
 
-  activePrecision = precision;
-  worker = createWorker();
-  readyPromise = new Promise<BgeRuntimeInfo>((resolve, reject) => {
-    const instance = worker!;
-    const handleMessage = (event: MessageEvent<WorkerMessage>) => {
-      const message = event.data;
-      if (message.type === 'ready') {
-        instance.removeEventListener('message', handleMessage);
-        runtimeInfo = { precision, ...message.payload };
-        resolve(runtimeInfo);
-      } else if (message.type === 'error' && !message.requestId) {
-        instance.removeEventListener('message', handleMessage);
-        reject(new Error(message.payload.message));
-      }
-    };
-    instance.addEventListener('message', handleMessage);
-    instance.postMessage({ type: 'load', payload: { modelPath: MODEL_PATH, precision } });
+    try {
+      await requireModelInstallation(MODEL_ID);
+      await ensureModelCacheServiceWorkerReady();
+      activePrecision = precision;
+      worker = createWorker();
+      return await new Promise<BgeRuntimeInfo>((resolve, reject) => {
+        const instance = worker!;
+        const handleMessage = (event: MessageEvent<WorkerMessage>) => {
+          const message = event.data;
+          if (message.type === 'ready') {
+            instance.removeEventListener('message', handleMessage);
+            runtimeInfo = { precision, ...message.payload };
+            resolve(runtimeInfo);
+          } else if (message.type === 'error' && !message.requestId) {
+            instance.removeEventListener('message', handleMessage);
+            reject(new Error(message.payload.message));
+          }
+        };
+        instance.addEventListener('message', handleMessage);
+        instance.postMessage({ type: 'load', payload: { modelPath: MODEL_PATH, precision } });
+      });
+    } catch (error) {
+      disposeBgeLabRuntime();
+      throw error;
+    }
+  })().catch((error) => {
+    readyPromise = null;
+    throw error;
   });
 
-  try {
-    return await readyPromise;
-  } catch (error) {
-    disposeBgeLabRuntime();
-    throw error;
-  }
+  return readyPromise;
 }
 
 export async function embedBgeLabTexts(
