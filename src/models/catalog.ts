@@ -10,14 +10,6 @@ export const MODEL_DEFINITIONS = [
     estimatedSizeBytes: 650_141_789,
   },
   {
-    id: 'bge-large-zh-v1.5-q4f16',
-    directory: 'bge-large-zh-v1.5-q4f16',
-    name: '中文语义检索',
-    modelName: 'BGE Large Zh v1.5',
-    precision: 'Q4F16',
-    estimatedSizeBytes: 215_959_285,
-  },
-  {
     id: 'qwen3.5-0.8b-opt-q4f16',
     directory: 'qwen3.5-0.8b-opt',
     name: '端侧智能助手',

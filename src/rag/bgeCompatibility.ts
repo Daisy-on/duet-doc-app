@@ -1,5 +1,6 @@
-import { disposeBgeLabRuntime, embedBgeLabTexts, formatBgeQuery } from './bgeLabRuntime';
-import type { BgePrecision } from '../workers/bgeEmbeddingWorker';
+import { embedPassagesInBatches, withEmbeddingRuntime } from './embeddingClient';
+
+const formatBgeQuery = (query: string) => `为这个句子生成表示以用于检索相关文章：${query.trim()}`;
 
 const passages = [
   {
@@ -36,25 +37,21 @@ const queries = [
   { id: 'q-sync', text: '手动同步文档前需要先上传什么？', expectedPassageId: 'sync' },
 ];
 
-async function embedTexts(precision: BgePrecision, texts: string[]): Promise<number[][]> {
-  const vectors: number[][] = [];
-  for (let offset = 0; offset < texts.length; offset += 2) {
-    const result = await embedBgeLabTexts(precision, texts.slice(offset, offset + 2));
-    vectors.push(...result.vectors.map((vector) => Array.from(vector)));
-  }
-  return vectors;
+async function embedTexts(texts: string[]): Promise<number[][]> {
+  const result = await embedPassagesInBatches(texts);
+  return result.vectors.map((vector) => Array.from(vector));
 }
 
-export async function exportBgeCompatibilityFixture(precision: BgePrecision): Promise<void> {
+export async function exportBgeCompatibilityFixture(): Promise<void> {
   const passageInputs = passages.map((passage) => passage.text);
   const queryInputs = queries.map((query) => formatBgeQuery(query.text));
 
-  try {
-    const passageVectors = await embedTexts(precision, passageInputs);
-    const queryVectors = await embedTexts(precision, queryInputs);
+  await withEmbeddingRuntime(async () => {
+    const passageVectors = await embedTexts(passageInputs);
+    const queryVectors = await embedTexts(queryInputs);
     const fixture = {
       version: 1,
-      localModel: `bge-large-zh-v1.5-${precision}`,
+      localModel: 'bge-large-zh-v1.5-fp16',
       passages: passages.map((passage, index) => ({
         ...passage,
         embedding: passageVectors[index],
@@ -70,10 +67,8 @@ export async function exportBgeCompatibilityFixture(precision: BgePrecision): Pr
     );
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `duet-bge-compatibility-${precision}.json`;
+    anchor.download = 'duet-bge-compatibility-fp16.json';
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-  } finally {
-    disposeBgeLabRuntime();
-  }
+  });
 }

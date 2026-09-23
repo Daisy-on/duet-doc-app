@@ -18,17 +18,15 @@ import {
   BGE_DIMENSION,
   BGE_CHUNKER_VERSION,
   BGE_MODEL,
-  BGE_PRECISIONS,
-  getBgeLabCorpusStats,
-  listBgeLabSources,
-  rebuildBgeLabIndex,
-  runBgeLabEvaluation,
+  getBgeCorpusStats,
+  listBgeSources,
+  rebuildBgeIndex,
+  runBgeEvaluation,
   runBgePerformanceBenchmark,
-  searchBgeLab,
-  warmupBgeLab,
-  type BgeLabIndexResult,
+  searchBge,
+  warmupBge,
+  type BgeIndexResult,
   type BgePerformanceResult,
-  type BgePrecision,
 } from '../rag/bgeLab';
 import { exportBgeCompatibilityFixture } from '../rag/bgeCompatibility';
 import {
@@ -43,7 +41,7 @@ import {
 import type { IndexProgress, LocalRetrievalStrategy, RetrievedChunk } from '../rag/types';
 
 const EVALUATION_CASES_STORAGE_KEY = 'duet-doc:local-rag:evaluation-cases';
-const DEFAULT_EVALUATION_LABEL = 'bge-large-zh-v1.5-q4f16';
+const DEFAULT_EVALUATION_LABEL = 'bge-large-zh-v1.5-fp16';
 
 function getStoredEvaluationCases(): string {
   return window.localStorage.getItem(EVALUATION_CASES_STORAGE_KEY) ?? '';
@@ -80,7 +78,6 @@ function sanitizeFileName(value: string): string {
 }
 
 export default function LocalRetrievalSandbox() {
-  const [precision, setPrecision] = useState<BgePrecision>('q4f16');
   const [isIndexing, setIsIndexing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isWarmingUp, setIsWarmingUp] = useState(false);
@@ -89,25 +86,10 @@ export default function LocalRetrievalSandbox() {
   const [isExportingCompatibility, setIsExportingCompatibility] = useState(false);
   const [query, setQuery] = useState('浏览器中的本地 AI 模型推理');
   const [progress, setProgress] = useState<IndexProgress | null>(null);
-  const [indexResult, setIndexResult] = useState<BgeLabIndexResult | null>(null);
+  const [indexResult, setIndexResult] = useState<BgeIndexResult | null>(null);
   const [results, setResults] = useState<RetrievedChunk[]>([]);
-  const [searchTiming, setSearchTiming] = useState<{
-    durationMs: number;
-    inferenceMs: number;
-  } | null>(null);
+  const [searchTiming, setSearchTiming] = useState<number | null>(null);
   const [performanceResult, setPerformanceResult] = useState<BgePerformanceResult | null>(null);
-  const [comparisonResults, setComparisonResults] = useState<
-    Partial<
-      Record<
-        BgePrecision,
-        {
-          index?: BgeLabIndexResult;
-          performance?: BgePerformanceResult;
-          evaluation?: RetrievalEvaluationRun['summary'];
-        }
-      >
-    >
-  >({});
   const [error, setError] = useState<string | null>(null);
   const [evaluationInput, setEvaluationInput] = useState(getStoredEvaluationCases);
   const [evaluationCases, setEvaluationCases] = useState(getStoredEvaluationCaseDefinitions);
@@ -127,7 +109,7 @@ export default function LocalRetrievalSandbox() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshCorpusStats(): Promise<RetrievalEvaluationCorpusStats> {
-    const stats = await getBgeLabCorpusStats(precision);
+    const stats = await getBgeCorpusStats();
     setCorpusStats(stats);
     return stats;
   }
@@ -141,12 +123,8 @@ export default function LocalRetrievalSandbox() {
     setProgress(null);
 
     try {
-      const result = await rebuildBgeLabIndex(precision, setProgress, controller.signal);
+      const result = await rebuildBgeIndex(setProgress, controller.signal);
       setIndexResult(result);
-      setComparisonResults((current) => ({
-        ...current,
-        [precision]: { ...current[precision], index: result },
-      }));
       await refreshCorpusStats();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地索引建立失败。'));
@@ -166,9 +144,9 @@ export default function LocalRetrievalSandbox() {
     setError(null);
 
     try {
-      const search = await searchBgeLab(precision, query, { strategy: retrievalStrategy });
+      const search = await searchBge(query, retrievalStrategy);
       setResults(search.results);
-      setSearchTiming({ durationMs: search.durationMs, inferenceMs: search.inferenceMs });
+      setSearchTiming(search.durationMs);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地检索失败。'));
     } finally {
@@ -179,7 +157,7 @@ export default function LocalRetrievalSandbox() {
   async function handleLoadEvaluationCases(raw = evaluationInput) {
     try {
       const parsedCases = parseRetrievalEvaluationCases(raw);
-      const availableSources = await listBgeLabSources(precision);
+      const availableSources = await listBgeSources();
       validateRetrievalEvaluationSources(parsedCases, availableSources);
       window.localStorage.setItem(EVALUATION_CASES_STORAGE_KEY, raw);
       setEvaluationInput(raw);
@@ -208,7 +186,7 @@ export default function LocalRetrievalSandbox() {
 
   async function handleListSources() {
     try {
-      setSources(await listBgeLabSources(precision));
+      setSources(await listBgeSources());
       await refreshCorpusStats();
       setError(null);
     } catch (caughtError) {
@@ -225,7 +203,7 @@ export default function LocalRetrievalSandbox() {
       if (stats.chunkCount === 0) {
         throw new Error('当前没有已建立索引的文档，请先建立本地索引。');
       }
-      setWarmupMs(await warmupBgeLab(precision));
+      setWarmupMs(await warmupBge());
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '模型预热失败。'));
     } finally {
@@ -249,35 +227,31 @@ export default function LocalRetrievalSandbox() {
       if (stats.chunkCount === 0) {
         throw new Error('当前没有已建立索引的文档，请先建立本地索引。');
       }
-      const availableSources = await listBgeLabSources(precision);
+      const availableSources = await listBgeSources();
       validateRetrievalEvaluationSources(evaluationCases, availableSources);
       setSources(availableSources);
 
       let activeWarmupMs = warmupMs;
       if (activeWarmupMs === null) {
         setIsWarmingUp(true);
-        activeWarmupMs = await warmupBgeLab(precision);
+        activeWarmupMs = await warmupBge();
         setWarmupMs(activeWarmupMs);
         setIsWarmingUp(false);
       }
 
-      const run = await runBgeLabEvaluation(precision, evaluationCases, {
+      const run = await runBgeEvaluation(evaluationCases, {
         strategy: retrievalStrategy,
         shouldContinue: () => !stopEvaluationRef.current,
         onProgress: (completed, total) => setEvaluationProgress({ completed, total }),
       });
       setEvaluationRun(run);
-      setComparisonResults((current) => ({
-        ...current,
-        [precision]: { ...current[precision], evaluation: run.summary },
-      }));
       setReport(
         createRetrievalEvaluationReport(
           evaluationLabel,
           activeWarmupMs,
           stats,
           run,
-          `${BGE_MODEL}-${precision}`,
+          `${BGE_MODEL}-fp16`,
           BGE_DIMENSION,
           BGE_CHUNKER_VERSION,
         ),
@@ -298,12 +272,8 @@ export default function LocalRetrievalSandbox() {
     setIsBenchmarking(true);
     setError(null);
     try {
-      const result = await runBgePerformanceBenchmark(precision);
+      const result = await runBgePerformanceBenchmark();
       setPerformanceResult(result);
-      setComparisonResults((current) => ({
-        ...current,
-        [precision]: { ...current[precision], performance: result },
-      }));
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '性能基准运行失败。'));
     } finally {
@@ -315,29 +285,12 @@ export default function LocalRetrievalSandbox() {
     setIsExportingCompatibility(true);
     setError(null);
     try {
-      await exportBgeCompatibilityFixture(precision);
+      await exportBgeCompatibilityFixture();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '导出兼容性样本失败。'));
     } finally {
       setIsExportingCompatibility(false);
     }
-  }
-
-  function handlePrecisionChange(nextPrecision: BgePrecision) {
-    if (nextPrecision === precision) return;
-    setPrecision(nextPrecision);
-    setEvaluationLabel(`${BGE_MODEL}-${nextPrecision}`);
-    setProgress(null);
-    setIndexResult(null);
-    setResults([]);
-    setSearchTiming(null);
-    setPerformanceResult(null);
-    setWarmupMs(null);
-    setCorpusStats(null);
-    setEvaluationRun(null);
-    setReport(null);
-    setSources(null);
-    setError(null);
   }
 
   function handleExportReport() {
@@ -367,7 +320,7 @@ export default function LocalRetrievalSandbox() {
           <p className="text-sm font-medium text-accent">Developer sandbox</p>
           <h1 className="mt-2 text-2xl font-bold">本地知识库检索验证</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-text-secondary">
-            使用浏览器端 BGE Large 中文 Q4F16 模型，验证响应速度、吞吐量与召回效果。
+            使用正式的 BGE Large 中文 FP16 索引验证响应速度、吞吐量与召回效果。
           </p>
           <p className="mt-2 text-xs text-text-secondary">
             模型：<code className="font-mono">{BGE_MODEL}</code> · 维度 {BGE_DIMENSION} · CLS
@@ -376,31 +329,6 @@ export default function LocalRetrievalSandbox() {
         </header>
 
         <section className="mt-6 border border-border-color bg-white p-5">
-          <div className="mb-5">
-            <p className="text-xs font-medium text-text-secondary">量化精度</p>
-            <div className="mt-2 inline-flex h-10 overflow-hidden rounded-md border border-border-color">
-              {BGE_PRECISIONS.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => handlePrecisionChange(item)}
-                  disabled={
-                    isIndexing || isEvaluating || isBenchmarking || isExportingCompatibility
-                  }
-                  className={`min-w-24 px-4 text-sm font-semibold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                    precision === item
-                      ? 'bg-accent text-white'
-                      : 'bg-white text-text-primary hover:bg-hover-bg'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs leading-5 text-text-secondary">
-              切换精度会清空上一精度的实验向量并重新建立索引，不影响正式 E5 索引和云同步。
-            </p>
-          </div>
           <div className="mb-4 flex gap-3 border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
             <AlertTriangle className="mt-0.5 shrink-0" size={16} />
             <p>本地索引仅在这里手动执行。开始前请预留充足显存，运行期间端侧补全会暂停。</p>
@@ -409,7 +337,7 @@ export default function LocalRetrievalSandbox() {
             <div>
               <h2 className="text-sm font-semibold">建立或更新索引</h2>
               <p className="mt-1 text-xs text-text-secondary">
-                当前精度 {precision.toUpperCase()}。同一精度下仅重建内容发生变化的文档。
+                使用 FP16。只重建缺失或内容发生变化的文档。
               </p>
             </div>
             {isIndexing ? (
@@ -449,11 +377,7 @@ export default function LocalRetrievalSandbox() {
                 {indexResult.skippedDocuments} 篇，失败 {indexResult.failedDocuments} 篇。
                 {indexResult.stopped ? '任务已停止，未完成的文档保留原索引。' : ''}
               </p>
-              <p className="mt-2 font-mono text-xs">
-                模型加载 {formatDuration(indexResult.modelLoadMs)} · Embedding{' '}
-                {formatDuration(indexResult.embeddingMs)} · 总耗时{' '}
-                {formatDuration(indexResult.totalMs)} · 新生成 {indexResult.embeddedChunks} 个向量
-              </p>
+              <p className="mt-2 font-mono text-xs">总耗时 {formatDuration(indexResult.totalMs)}</p>
               {indexResult.failures.length > 0 && (
                 <ul className="mt-3 space-y-1 border-l-2 border-rose-200 pl-3 text-xs text-rose-700">
                   {indexResult.failures.slice(0, 3).map((failure) => (
@@ -520,89 +444,7 @@ export default function LocalRetrievalSandbox() {
                 />
               ))}
               <Metric label="运行设备" value={performanceResult.deviceName} />
-              <Metric label="精度" value={performanceResult.precision.toUpperCase()} />
-            </div>
-          )}
-          {Object.keys(comparisonResults).length > 0 && (
-            <div className="mt-5 overflow-x-auto border border-border-color">
-              <table className="w-full min-w-[860px] border-collapse text-left text-xs">
-                <thead className="bg-bg-panel text-text-secondary">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">精度</th>
-                    <th className="px-3 py-2 font-medium">冷加载</th>
-                    <th className="px-3 py-2 font-medium">索引总耗时</th>
-                    <th className="px-3 py-2 font-medium">查询平均</th>
-                    <th className="px-3 py-2 font-medium">查询 P95</th>
-                    <th className="px-3 py-2 font-medium">Batch 1</th>
-                    <th className="px-3 py-2 font-medium">Batch 2</th>
-                    <th className="px-3 py-2 font-medium">Batch 4</th>
-                    <th className="px-3 py-2 font-medium">Batch 8</th>
-                    <th className="px-3 py-2 font-medium">Hit@5</th>
-                    <th className="px-3 py-2 font-medium">MRR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {BGE_PRECISIONS.map((item) => {
-                    const comparison = comparisonResults[item];
-                    if (!comparison) return null;
-                    const batch1 = comparison.performance?.batches.find(
-                      (batch) => batch.batchSize === 1,
-                    );
-                    const batch2 = comparison.performance?.batches.find(
-                      (batch) => batch.batchSize === 2,
-                    );
-                    const batch4 = comparison.performance?.batches.find(
-                      (batch) => batch.batchSize === 4,
-                    );
-                    const batch8 = comparison.performance?.batches.find(
-                      (batch) => batch.batchSize === 8,
-                    );
-                    return (
-                      <tr key={item} className="border-t border-border-color">
-                        <td className="px-3 py-2 font-semibold uppercase">{item}</td>
-                        <td className="px-3 py-2 font-mono">
-                          {comparison.performance
-                            ? formatDuration(comparison.performance.modelLoadMs)
-                            : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {comparison.index ? formatDuration(comparison.index.totalMs) : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {comparison.performance
-                            ? formatDuration(comparison.performance.singleQuery.averageMs)
-                            : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {comparison.performance
-                            ? formatDuration(comparison.performance.singleQuery.p95Ms)
-                            : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {batch1 ? `${batch1.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {batch2 ? `${batch2.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {batch4 ? `${batch4.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {batch8 ? `${batch8.chunksPerSecond.toFixed(2)} 块/秒` : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {comparison.evaluation
-                            ? formatPercent(comparison.evaluation.hitAt5)
-                            : '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {comparison.evaluation ? comparison.evaluation.mrr.toFixed(3) : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <Metric label="精度" value="FP16" />
             </div>
           )}
         </section>
@@ -632,8 +474,7 @@ export default function LocalRetrievalSandbox() {
 
           {searchTiming && (
             <p className="mt-3 font-mono text-xs text-text-secondary">
-              总耗时 {formatDuration(searchTiming.durationMs)} · 模型推理{' '}
-              {formatDuration(searchTiming.inferenceMs)}
+              总耗时 {formatDuration(searchTiming)}
             </p>
           )}
 

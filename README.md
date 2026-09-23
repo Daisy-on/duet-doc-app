@@ -66,7 +66,7 @@ VITE_API_BASE_URL=
 | 本地语义检索 | BGE Large Zh v1.5 | FP16  | 620 MiB  |
 | 幽灵文本     | Qwen3.5 0.8B      | Q4F16 | 634 MiB  |
 
-旧评测页仍保留 BGE Q4F16 对照入口；正式索引只使用 FP16。
+检索测试页和正式索引共用 FP16 模型与 IndexedDB 索引。建立索引后，手动云同步会上传当前版本的文档向量。
 
 后端为私有 OSS 文件签发短期 URL，前端下载后写入当前站点 Origin 的 Cache Storage。同一 Origin 下切换 DuetDoc 账号会复用模型缓存；不同协议、域名或端口的缓存彼此隔离。
 

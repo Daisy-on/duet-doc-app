@@ -306,6 +306,9 @@ export async function openUserDatabase(userId: string) {
   const target = new DuetDocDB(databaseName);
   await target.open();
   db = target;
+  void Dexie.delete(`${databaseName}:BgeLab`).catch((error) => {
+    console.warn('Failed to remove legacy BGE evaluation indexes.', error);
+  });
 }
 
 export function closeUserDatabase() {
