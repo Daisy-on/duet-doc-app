@@ -25,6 +25,7 @@ export default function CloudRagGate({ onMessage }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [plan, setPlan] = useState<CloudRagPlan | null>(null);
+  const [includeText, setIncludeText] = useState(false);
   const [includeImages, setIncludeImages] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,6 +90,7 @@ export default function CloudRagGate({ onMessage }: Props) {
         onMessage('暂无待建立索引的云端资源，请先完成同步');
         return;
       }
+      setIncludeText(false);
       setIncludeImages(false);
       setPlan(nextPlan);
     } catch (reason) {
@@ -103,7 +105,11 @@ export default function CloudRagGate({ onMessage }: Props) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const run = await createCloudRagRun(workspaceId, !hasLocalModel, includeImages);
+      const run = await createCloudRagRun(
+        workspaceId,
+        !hasLocalModel && includeText,
+        includeImages,
+      );
       onMessage(`已创建云端索引任务（${run.total_jobs} 项）`);
       setPlan(null);
       setActiveRunId(run.run_id);
@@ -137,6 +143,8 @@ export default function CloudRagGate({ onMessage }: Props) {
         <CloudRagSetupModal
           plan={plan}
           hasLocalModel={hasLocalModel}
+          includeText={includeText}
+          onIncludeTextChange={setIncludeText}
           includeImages={includeImages}
           onIncludeImagesChange={setIncludeImages}
           isSubmitting={isSubmitting}

@@ -4,6 +4,8 @@ import type { CloudRagPlan } from '../../rag/cloudRagClient';
 interface Props {
   plan: CloudRagPlan;
   hasLocalModel: boolean;
+  includeText: boolean;
+  onIncludeTextChange: (value: boolean) => void;
   includeImages: boolean;
   onIncludeImagesChange: (value: boolean) => void;
   isSubmitting: boolean;
@@ -15,6 +17,8 @@ interface Props {
 export default function CloudRagSetupModal({
   plan,
   hasLocalModel,
+  includeText,
+  onIncludeTextChange,
   includeImages,
   onIncludeImagesChange,
   isSubmitting,
@@ -62,8 +66,20 @@ export default function CloudRagSetupModal({
             <span className="text-xs text-text-secondary">张图片</span>
           </div>
         </div>
-        {plan.image_count > 0 && (
+        {!hasLocalModel && plan.document_count > 0 && (
           <label className="mt-4 flex items-start gap-2 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              checked={includeText}
+              onChange={(event) => onIncludeTextChange(event.target.checked)}
+              disabled={isSubmitting}
+              className="mt-1"
+            />
+            <span>同意将 {plan.document_count} 篇文档交由云端模型建立文本索引</span>
+          </label>
+        )}
+        {plan.image_count > 0 && (
+          <label className="mt-3 flex items-start gap-2 text-sm text-text-primary">
             <input
               type="checkbox"
               checked={includeImages}
@@ -93,7 +109,7 @@ export default function CloudRagSetupModal({
             onClick={onConfirm}
             disabled={
               isSubmitting ||
-              (!hasLocalModel ? plan.document_count : 0) +
+              (!hasLocalModel && includeText ? plan.document_count : 0) +
                 (includeImages ? plan.image_count : 0) ===
                 0
             }
