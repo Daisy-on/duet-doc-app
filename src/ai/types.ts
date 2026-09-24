@@ -2,7 +2,7 @@ export type CloudAITask = 'chat' | 'rewrite' | 'expand' | 'explain' | 'summarize
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
 
-export type ContextSourceType = 'document' | 'memo' | 'selection';
+export type ContextSourceType = 'document' | 'memo' | 'image' | 'selection';
 export type ContextOrigin = 'manual' | 'local_retrieval' | 'cloud_retrieval';
 export type AICapability = 'knowledge_search';
 export type ToolChoice = 'none' | 'auto';
@@ -23,6 +23,7 @@ export interface AIContext {
   chunkIndex?: number;
   headingPath?: string[];
   score?: number;
+  assetId?: string;
 }
 
 export interface AIToolCall {
@@ -31,9 +32,13 @@ export interface AIToolCall {
   arguments: {
     query?: string;
     sourceTypes?: ContextSourceType[];
+    source_types?: ContextSourceType[];
     sortBy?: 'relevance' | 'updatedAt';
+    sort_by?: 'relevance' | 'updatedAt';
     timeRangeDays?: number;
+    time_range_days?: number;
     topK?: number;
+    top_k?: number;
   };
   reasoningContent?: string;
 }

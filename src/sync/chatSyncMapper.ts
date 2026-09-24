@@ -28,6 +28,9 @@ export function toChatMessageSyncData(message: ChatMessage): ChatMessageSyncData
       message.knowledgeSources?.map((source) => ({
         source_id: source.sourceId,
         source_type: source.sourceType,
+        document_id: source.documentId,
+        kb_id: source.kbId,
+        asset_id: source.assetId,
         title: source.title,
         chunk_index: source.chunkIndex,
         heading_path: [...source.headingPath],

@@ -29,7 +29,8 @@ type QueuedRequest = {
         type: 'search';
         requestId: string;
         payload: {
-          query: string;
+          query?: string;
+          queryVector?: Float32Array;
           candidates: Array<{ id: string; embedding: Float32Array }>;
           limit: number;
         };
@@ -281,14 +282,18 @@ export async function embedPassagesInBatches(
 }
 
 export function rankLocalCandidates(
-  query: string,
+  query: string | Float32Array,
   candidates: Array<{ id: string; embedding: Float32Array }>,
   limit: number,
 ): Promise<LocalSearchRanking> {
   return enqueue<LocalSearchRanking>('interactive', (requestId) => ({
     type: 'search',
     requestId,
-    payload: { query, candidates, limit },
+    payload: {
+      ...(typeof query === 'string' ? { query } : { queryVector: query }),
+      candidates,
+      limit,
+    },
   }));
 }
 

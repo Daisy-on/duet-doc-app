@@ -16,6 +16,8 @@ import {
   FilePlus,
   StickyNote,
   Check,
+  Cloud,
+  Image as ImageIcon,
 } from 'lucide-react';
 import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
@@ -37,6 +39,7 @@ import { renderMarkdownToHtml } from '../utils/markdownRenderer';
 import { markdownToHtml, getSmartTitle } from '../utils/markdownUtils';
 import { buildApiUrl } from '../utils/apiUtils';
 import CloudRagGate from '../components/CloudRagGate';
+import { inspectModelInstallation } from '../models/modelCache';
 
 function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
   if (msg.status === 'streaming' && !msg.content) {
@@ -81,9 +84,27 @@ export default function AIWriting() {
   );
   const currentSession = sessions.find((s) => s.id === currentSessionId);
 
+  const [hasLocalEmbeddingModel, setHasLocalEmbeddingModel] = useState<boolean | null>(null);
+  const [allowCloudQuery, setAllowCloudQuery] = useState(false);
+
   const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(
     currentSessionId || null,
+    allowCloudQuery,
   );
+
+  useEffect(() => {
+    let active = true;
+    void inspectModelInstallation('bge-large-zh-v1.5-fp16')
+      .then((installation) => {
+        if (active) setHasLocalEmbeddingModel(Boolean(installation));
+      })
+      .catch(() => {
+        if (active) setHasLocalEmbeddingModel(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Local state
   const [inputText, setInputText] = useState('');
@@ -298,6 +319,24 @@ export default function AIWriting() {
     navigator.clipboard.writeText(content);
     setCopiedMsgId(msgId);
     setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  const openKnowledgeSource = (source: KnowledgeSource) => {
+    const documentId = source.documentId ?? source.sourceId;
+    if (source.sourceType === 'memo') {
+      navigate(`/memo/${documentId}`);
+      return;
+    }
+    const kbId =
+      source.kbId ??
+      useKnowledgeBaseStore.getState().documents.find((document) => document.id === documentId)
+        ?.kbId;
+    if (!kbId) {
+      setToastText('来源文档已不可用');
+      return;
+    }
+    const imageQuery = source.assetId ? `?assetId=${encodeURIComponent(source.assetId)}` : '';
+    navigate(`/kb/${kbId}/doc/${documentId}${imageQuery}`);
   };
 
   // 一键保存到小记
@@ -539,18 +578,26 @@ export default function AIWriting() {
                               {uniqueKnowledgeSources(msg.knowledgeSources)
                                 .slice(0, 3)
                                 .map((source) => (
-                                  <span
+                                  <button
+                                    type="button"
                                     key={source.sourceId}
-                                    className="inline-flex items-center gap-1 min-w-0"
+                                    onClick={() => openKnowledgeSource(source)}
+                                    className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
                                     title={source.headingPath.join(' > ') || source.title}
                                   >
-                                    {source.sourceType === 'memo' ? (
+                                    {source.sourceType === 'image' ? (
+                                      <ImageIcon size={11} className="shrink-0 text-sky-500" />
+                                    ) : source.sourceType === 'memo' ? (
                                       <StickyNote size={11} className="shrink-0 text-emerald-500" />
                                     ) : (
                                       <FileText size={11} className="shrink-0 text-indigo-500" />
                                     )}
-                                    <span className="max-w-[190px] truncate">{source.title}</span>
-                                  </span>
+                                    <span className="max-w-[190px] truncate">
+                                      {source.sourceType === 'image'
+                                        ? `${source.title} · 图片`
+                                        : source.title}
+                                    </span>
+                                  </button>
                                 ))}
                               {uniqueKnowledgeSources(msg.knowledgeSources).length > 3 && (
                                 <span>
@@ -719,7 +766,7 @@ export default function AIWriting() {
 
                 {/* Input Toolbar (Unified 0px inner padding for exact symmetric margins) */}
                 <div className="p-0 bg-transparent flex justify-between items-center shrink-0">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2.5">
                     <div className="relative">
                       <button
                         type="button"
@@ -751,6 +798,22 @@ export default function AIWriting() {
                       />
                       <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
                     </button>
+                    {hasLocalEmbeddingModel === false && (
+                      <label
+                        className="inline-flex h-8 items-center gap-1.5 text-xs text-text-secondary"
+                        title="开启后，仅在助手需要检索时调用云端 BGE 生成查询向量；不会自动建立索引"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allowCloudQuery}
+                          onChange={(event) => setAllowCloudQuery(event.target.checked)}
+                          disabled={isGenerating}
+                        />
+                        <Cloud size={13} />
+                        <span className="sm:hidden">云检索（付费）</span>
+                        <span className="hidden sm:inline">云端检索（按次计费）</span>
+                      </label>
+                    )}
                   </div>
 
                   {/* Send or Stop Button (Circular) */}

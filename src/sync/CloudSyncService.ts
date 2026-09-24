@@ -118,7 +118,7 @@ function parseKnowledgeSources(snapshot: SyncRemoteSnapshot): KnowledgeSource[] 
     const chunkIndex = source.chunk_index;
     const headingPath = source.heading_path;
     if (
-      (sourceType !== 'document' && sourceType !== 'memo') ||
+      (sourceType !== 'document' && sourceType !== 'memo' && sourceType !== 'image') ||
       typeof chunkIndex !== 'number' ||
       !Array.isArray(headingPath) ||
       headingPath.some((heading) => typeof heading !== 'string')
@@ -128,6 +128,9 @@ function parseKnowledgeSources(snapshot: SyncRemoteSnapshot): KnowledgeSource[] 
     return {
       sourceId: requiredString(source, 'source_id'),
       sourceType,
+      documentId: typeof source.document_id === 'string' ? source.document_id : undefined,
+      kbId: typeof source.kb_id === 'string' ? source.kb_id : undefined,
+      assetId: typeof source.asset_id === 'string' ? source.asset_id : undefined,
       title: requiredString(source, 'title'),
       chunkIndex,
       headingPath,

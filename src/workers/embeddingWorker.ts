@@ -29,7 +29,8 @@ type SearchRequest = {
   type: 'search';
   requestId: string;
   payload: {
-    query: string;
+    query?: string;
+    queryVector?: Float32Array;
     candidates: Array<{ id: string; embedding: Float32Array }>;
     limit: number;
   };
@@ -164,7 +165,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       return;
     }
 
-    const [queryVector] = await embed([message.payload.query]);
+    const queryVector =
+      message.payload.queryVector ?? (await embed([message.payload.query ?? '']))[0];
     const matches = message.payload.candidates
       .map((candidate) => ({
         id: candidate.id,

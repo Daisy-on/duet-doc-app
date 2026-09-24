@@ -18,8 +18,8 @@ import {
 } from '../store/aiWritingStore';
 import { db } from '../db';
 import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
-import { searchLocalKnowledge } from '../rag/localRetriever';
-import type { RetrievedChunk } from '../rag/types';
+import { searchAssistantKnowledge, type AssistantHit } from '../rag/assistantRetriever';
+import { useAuthStore } from '../store/authStore';
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARS = 30000;
@@ -54,31 +54,22 @@ function toResponseMetadata(event?: AIFinishEvent): Partial<AIResponseMetadata> 
   };
 }
 
-function toRetrievedContext(chunk: RetrievedChunk): AIContext {
+function toRetrievedContext(hit: AssistantHit): AIContext {
   return {
-    sourceId: chunk.sourceId,
-    title: chunk.title,
-    content: chunk.content,
-    sourceType: chunk.sourceType,
-    origin: 'local_retrieval',
-    chunkId: chunk.id,
-    chunkIndex: chunk.chunkIndex,
-    headingPath: chunk.headingPath,
-    score: chunk.score,
+    sourceId: hit.source.sourceId,
+    title: hit.source.title,
+    content: hit.content,
+    sourceType: hit.source.sourceType,
+    origin: hit.origin,
+    chunkId: hit.chunkId,
+    chunkIndex: hit.source.chunkIndex,
+    headingPath: hit.source.headingPath.slice(0, 10),
+    assetId: hit.source.assetId,
+    score: hit.score,
   };
 }
 
-function toKnowledgeSource(chunk: RetrievedChunk): KnowledgeSource {
-  return {
-    sourceId: chunk.sourceId,
-    sourceType: chunk.sourceType,
-    title: chunk.title,
-    chunkIndex: chunk.chunkIndex,
-    headingPath: chunk.headingPath,
-  };
-}
-
-export function useAIChat(sessionId: string | null) {
+export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
   const [isGenerating, setIsGenerating] = useState(false);
   const activeStreamRef = useRef<StreamRun | null>(null);
   const activeSessionIdRef = useRef<string | null>(sessionId);
@@ -457,27 +448,37 @@ export function useAIChat(sessionId: string | null) {
         }
 
         if (requestedToolCall) {
-          // The gateway requests a capability; the browser executes the local search.
+          // The gateway requests a capability; the browser selects the query embedding path.
           run.textBuffer = '';
-          const { query, sourceTypes, sortBy, timeRangeDays, topK } = requestedToolCall.arguments;
-          const localSourceTypes = sourceTypes?.filter(
-            (sourceType): sourceType is 'document' | 'memo' => sourceType !== 'selection',
+          const args = requestedToolCall.arguments;
+          const requestedSourceTypes = args.sourceTypes ?? args.source_types;
+          const sourceTypes = requestedSourceTypes?.length ? requestedSourceTypes : undefined;
+          const workspaceId = useAuthStore.getState().workspaceId;
+          if (!workspaceId) throw new Error('未找到当前工作区，无法检索知识库。');
+          const retrieval = await searchAssistantKnowledge(
+            workspaceId,
+            args.query?.trim() || userContent.trim(),
+            {
+              sourceTypes,
+              sortBy: args.sortBy ?? args.sort_by,
+              timeRangeDays: args.timeRangeDays ?? args.time_range_days,
+              topK: args.topK ?? args.top_k,
+              allowCloudQuery,
+            },
+            run.controller.signal,
           );
-          const minimumUpdatedAt = timeRangeDays
-            ? Date.now() - timeRangeDays * 24 * 60 * 60 * 1000
-            : undefined;
-          const retrievedChunks = await searchLocalKnowledge(query?.trim() || userContent.trim(), {
-            sourceTypes: localSourceTypes,
-            sortBy,
-            limit: topK,
-            strategy: 'hybrid',
-          });
-          const retrievedContexts = retrievedChunks
-            .filter((chunk) => !minimumUpdatedAt || chunk.sourceUpdatedAt >= minimumUpdatedAt)
-            .map(toRetrievedContext);
-          run.knowledgeSources = retrievedChunks
-            .filter((chunk) => !minimumUpdatedAt || chunk.sourceUpdatedAt >= minimumUpdatedAt)
-            .map(toKnowledgeSource);
+          if (!retrieval.hasIndex) {
+            run.textBuffer = '当前工作区暂无可用的语义索引。请先建立文本索引，或按需建立图片索引。';
+            await finalizeStream(run, 'complete');
+            return;
+          }
+          if (retrieval.hits.length === 0) {
+            run.textBuffer = '已有语义索引，但没有找到符合本次检索条件的内容。';
+            await finalizeStream(run, 'complete');
+            return;
+          }
+          const retrievedContexts = retrieval.hits.map(toRetrievedContext);
+          run.knowledgeSources = retrieval.hits.map((hit) => hit.source);
 
           if (run.stopRequested || run.controller.signal.aborted) {
             await finalizeStream(run, 'stopped');
@@ -508,6 +509,7 @@ export function useAIChat(sessionId: string | null) {
         if (err instanceof Error && err.name === 'AbortError') {
           run.finalizationPromise = finalizeStream(run, 'stopped');
         } else {
+          run.textBuffer = `知识检索或回答失败：${err instanceof Error ? err.message : '未知错误'}`;
           run.finalizationPromise = finalizeStream(run, 'error');
         }
       }
@@ -529,6 +531,7 @@ export function useAIChat(sessionId: string | null) {
       finalizeStream,
       stopGeneration,
       summarizeAndSetTitle,
+      allowCloudQuery,
     ],
   );
 

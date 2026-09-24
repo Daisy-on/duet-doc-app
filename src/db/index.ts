@@ -71,7 +71,10 @@ export interface ChatMessageSyncData {
   referenced_docs: Array<{ id: string; title: string }>;
   knowledge_sources: Array<{
     source_id: string;
-    source_type: 'document' | 'memo';
+    source_type: 'document' | 'memo' | 'image';
+    document_id?: string;
+    kb_id?: string;
+    asset_id?: string;
     title: string;
     chunk_index: number;
     heading_path: string[];

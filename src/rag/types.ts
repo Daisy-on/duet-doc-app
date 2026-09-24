@@ -81,6 +81,7 @@ export interface LocalSearchOptions {
   limit?: number;
   sortBy?: 'relevance' | 'updatedAt';
   strategy?: LocalRetrievalStrategy;
+  queryEmbedding?: Float32Array;
 }
 
 export interface IndexProgress {
