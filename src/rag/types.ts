@@ -1,6 +1,6 @@
 export const LOCAL_EMBEDDING_MODEL = 'bge-large-zh-v1.5';
 export const LOCAL_EMBEDDING_DIMENSION = 1024;
-export const DOCUMENT_CHUNKER_VERSION = 'v2';
+export const DOCUMENT_CHUNKER_VERSION = 'v3';
 
 export type DocumentSourceType = 'document' | 'memo';
 export type DocumentIndexStatus = 'indexed' | 'indexing' | 'error';

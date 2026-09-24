@@ -1,4 +1,5 @@
 import { listIndexedChunks } from './chunkRepository';
+import { createDocumentPassageText } from './documentChunker';
 import { rebuildLocalDocumentIndex } from './documentIndexer';
 import {
   embedPassages,
@@ -105,10 +106,7 @@ export interface BgePerformanceResult {
 }
 
 export async function runBgePerformanceBenchmark(): Promise<BgePerformanceResult> {
-  const chunks = (await listIndexedChunks({})).slice(0, 16).map((chunk) => {
-    const heading = chunk.headingPath.length ? `\n${chunk.headingPath.join(' > ')}` : '';
-    return `${chunk.title}${heading}\n${chunk.content}`;
-  });
+  const chunks = (await listIndexedChunks({})).slice(0, 16).map(createDocumentPassageText);
   if (chunks.length < 4) throw new Error('至少需要 4 个索引分块才能运行性能基准。');
 
   const startedAt = performance.now();

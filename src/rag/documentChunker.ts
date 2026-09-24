@@ -1,9 +1,10 @@
 import { stableHash } from './hash';
 import type { DocumentChunkDraft, DocumentSourceType, IndexableDocument } from './types';
 
-const TARGET_CHUNK_CHARS = 320;
-const MAX_CHUNK_CHARS = 480;
-const OVERLAP_CHARS = 60;
+const TARGET_CHUNK_CHARS = 280;
+const MAX_PASSAGE_CHARS = 320;
+const MIN_BREAK_CHARS = 140;
+const SEPARATORS = ['\n', '。', '！', '？', '.', '!', '?', '；', ';', '，', ',', ' '];
 const MIN_DOCUMENT_TEXT_CHARS = 30;
 const MIN_MEMO_TEXT_CHARS = 8;
 const MEMO_KB_ID = 'kb-memo-system';
@@ -23,6 +24,25 @@ interface TextBlock {
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function passagePrefix(title: string, headingPath: string[]): string {
+  const name = Array.from(title.trim()).slice(0, 60).join('');
+  const section = Array.from(headingPath.join(' > ')).slice(0, 60).join('');
+  return [name, section].filter(Boolean).join('\n');
+}
+
+export function createDocumentPassageText(chunk: {
+  title: string;
+  headingPath: string[];
+  content: string;
+}): string {
+  return [passagePrefix(chunk.title, chunk.headingPath), chunk.content].filter(Boolean).join('\n');
+}
+
+function bodyLimit(title: string, headingPath: string[]): number {
+  const prefix = passagePrefix(title, headingPath);
+  return MAX_PASSAGE_CHARS - Array.from(prefix).length - (prefix ? 1 : 0);
 }
 
 function removeDefaultPlaceholder(value: string): string {
@@ -87,6 +107,7 @@ function collectHtmlBlocks(content: string): TextBlock[] {
   for (const element of document.body.querySelectorAll(
     'h1, h2, h3, h4, h5, h6, p, li, pre, blockquote',
   )) {
+    if (element.parentElement?.closest('p, li, pre, blockquote')) continue;
     const text = normalizeText(element.textContent ?? '');
     if (!text) continue;
 
@@ -100,7 +121,9 @@ function collectHtmlBlocks(content: string): TextBlock[] {
     blocks.push({ text, headingPath: [...headingPath] });
   }
 
-  return blocks;
+  if (blocks.length > 0) return blocks;
+  const text = normalizeText(document.body.textContent ?? '');
+  return text ? [{ text, headingPath: [] }] : [];
 }
 
 function extractBlocks(content: string): TextBlock[] {
@@ -116,33 +139,51 @@ function extractBlocks(content: string): TextBlock[] {
   return collectHtmlBlocks(content);
 }
 
-function splitLongBlock(block: TextBlock): TextBlock[] {
-  if (block.text.length <= MAX_CHUNK_CHARS) return [block];
+function splitLongBlock(block: TextBlock, title: string): TextBlock[] {
+  const limit = bodyLimit(title, block.headingPath);
+  if (Array.from(block.text).length <= limit) return [block];
 
   const parts: TextBlock[] = [];
-  let offset = 0;
-  while (offset < block.text.length) {
-    const end = Math.min(block.text.length, offset + MAX_CHUNK_CHARS);
-    parts.push({ text: block.text.slice(offset, end), headingPath: block.headingPath });
-    if (end >= block.text.length) break;
-    offset = end - OVERLAP_CHARS;
+  let remaining = block.text;
+  while (remaining) {
+    const characters = Array.from(remaining);
+    let end = Math.min(characters.length, limit);
+    if (end < characters.length) {
+      let found = false;
+      for (const separator of SEPARATORS) {
+        for (let index = end - 1; index >= MIN_BREAK_CHARS; index -= 1) {
+          if (characters[index] === separator) {
+            end = index + 1;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+    }
+    const text = characters.slice(0, end).join('').trim();
+    if (text) parts.push({ text, headingPath: block.headingPath });
+    remaining = characters.slice(end).join('').trimStart();
   }
   return parts;
 }
 
-function packBlocks(blocks: TextBlock[]): TextBlock[] {
+function packBlocks(blocks: TextBlock[], title: string): TextBlock[] {
   const chunks: TextBlock[] = [];
   let current: TextBlock | null = null;
 
-  for (const block of blocks.flatMap(splitLongBlock)) {
+  for (const block of blocks.flatMap((item) => splitLongBlock(item, title))) {
     if (!current) {
       current = { text: block.text, headingPath: block.headingPath };
       continue;
     }
 
     const sameSection = current.headingPath.join('\u0000') === block.headingPath.join('\u0000');
-    const nextLength = current.text.length + 1 + block.text.length;
-    if (sameSection && nextLength <= TARGET_CHUNK_CHARS) {
+    const nextLength = Array.from(current.text).length + 1 + Array.from(block.text).length;
+    if (
+      sameSection &&
+      nextLength <= Math.min(TARGET_CHUNK_CHARS, bodyLimit(title, block.headingPath))
+    ) {
       current.text = `${current.text}\n${block.text}`;
       continue;
     }
@@ -178,7 +219,7 @@ export function chunkDocument(document: IndexableDocument): DocumentChunkDraft[]
     return [];
   }
 
-  const chunks = packBlocks(blocks);
+  const chunks = packBlocks(blocks, document.title);
 
   return chunks.map((chunk, chunkIndex) => {
     const contentHash = stableHash(chunk.text);

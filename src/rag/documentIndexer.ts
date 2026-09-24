@@ -1,5 +1,10 @@
 import { db } from '../db';
-import { chunkDocument, getDocumentFingerprint, getDocumentSourceType } from './documentChunker';
+import {
+  chunkDocument,
+  createDocumentPassageText,
+  getDocumentFingerprint,
+  getDocumentSourceType,
+} from './documentChunker';
 import {
   EMBEDDING_BATCH_SIZE,
   embedPassagesInBatches,
@@ -24,15 +29,6 @@ interface DocumentEmbeddingProgress {
   completedChunks: number;
   totalChunks: number;
   reusedChunks: number;
-}
-
-function createPassageText(chunk: {
-  title: string;
-  headingPath: string[];
-  content: string;
-}): string {
-  const section = chunk.headingPath.length > 0 ? `\n${chunk.headingPath.join(' > ')}` : '';
-  return `${chunk.title}${section}\n${chunk.content}`;
 }
 
 function getReusableEmbeddingKey(chunk: {
@@ -124,7 +120,7 @@ async function indexDocumentInternal(
 
     if (missingDrafts.length > 0) {
       const embeddingResult = await embedPassagesInBatches(
-        missingDrafts.map(({ draft }) => createPassageText(draft)),
+        missingDrafts.map(({ draft }) => createDocumentPassageText(draft)),
         (completed) => {
           onProgress?.({
             completedChunks: reusedChunks + completed,
