@@ -29,6 +29,7 @@ import {
   type BgePerformanceResult,
 } from '../rag/bgeLab';
 import { exportBgeCompatibilityFixture } from '../rag/bgeCompatibility';
+import { exportRealDocumentComparison } from '../rag/realDocumentComparison';
 import {
   createRetrievalEvaluationReport,
   parseRetrievalEvaluationCases,
@@ -84,6 +85,9 @@ export default function LocalRetrievalSandbox() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [isExportingCompatibility, setIsExportingCompatibility] = useState(false);
+  const [comparisonSourceId, setComparisonSourceId] = useState('');
+  const [comparisonCases, setComparisonCases] = useState('');
+  const [comparisonMessage, setComparisonMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('浏览器中的本地 AI 模型推理');
   const [progress, setProgress] = useState<IndexProgress | null>(null);
   const [indexResult, setIndexResult] = useState<BgeIndexResult | null>(null);
@@ -107,6 +111,7 @@ export default function LocalRetrievalSandbox() {
   const stopEvaluationRef = useRef(false);
   const indexAbortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const comparisonFileInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshCorpusStats(): Promise<RetrievalEvaluationCorpusStats> {
     const stats = await getBgeCorpusStats();
@@ -293,6 +298,38 @@ export default function LocalRetrievalSandbox() {
     }
   }
 
+  async function handleExportRealDocument() {
+    setIsExportingCompatibility(true);
+    setError(null);
+    setComparisonMessage(null);
+    try {
+      const result = await exportRealDocumentComparison(comparisonSourceId.trim(), comparisonCases);
+      setComparisonMessage(`已导出 ${result.passageCount} 个分块、${result.queryCount} 条问题。`);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '导出真实文档样本失败。'));
+    } finally {
+      setIsExportingCompatibility(false);
+    }
+  }
+
+  async function handleImportComparisonCases(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const raw = await file.text();
+      if (!Array.isArray(JSON.parse(raw))) {
+        throw new Error('真实文档对照评测集必须是 JSON 数组。');
+      }
+      setComparisonCases(raw);
+      setComparisonMessage(`已导入 ${file.name}。`);
+      setError(null);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '无法读取真实文档对照评测集。'));
+    } finally {
+      event.target.value = '';
+    }
+  }
+
   function handleExportReport() {
     if (!report) return;
 
@@ -417,6 +454,58 @@ export default function LocalRetrievalSandbox() {
               <Download size={15} />
               {isExportingCompatibility ? '生成中' : '导出 BGE 兼容性样本'}
             </button>
+            <div className="mt-3 grid gap-2">
+              <input
+                value={comparisonSourceId}
+                onChange={(event) => setComparisonSourceId(event.target.value)}
+                placeholder="真实文档 ID（如 doc-...）"
+                aria-label="真实文档 ID"
+                className="h-9 w-full rounded-md border border-border-color bg-transparent px-3 text-sm"
+              />
+              <textarea
+                value={comparisonCases}
+                onChange={(event) => setComparisonCases(event.target.value)}
+                placeholder={
+                  '[{"id":"q1","query":"问题？","expectedText":"答案所在块的一小段原文"}]'
+                }
+                aria-label="真实文档检索对照问题 JSON"
+                rows={3}
+                className="w-full rounded-md border border-border-color bg-transparent px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => comparisonFileInputRef.current?.click()}
+                className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg"
+              >
+                <Upload size={15} />
+                导入对照 JSON
+              </button>
+              <input
+                ref={comparisonFileInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => void handleImportComparisonCases(event)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => void handleExportRealDocument()}
+                disabled={
+                  isExportingCompatibility ||
+                  isIndexing ||
+                  isEvaluating ||
+                  !comparisonSourceId.trim() ||
+                  !comparisonCases.trim()
+                }
+                className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download size={15} />
+                {isExportingCompatibility ? '生成中' : '导出真实文档检索对照'}
+              </button>
+              {comparisonMessage && (
+                <p className="text-xs text-text-secondary">{comparisonMessage}</p>
+              )}
+            </div>
             <p className="mt-2 text-xs text-text-secondary">
               运行 10 次热查询，并使用相同的 16 个分块比较 batch=1、2、4、8。
             </p>
