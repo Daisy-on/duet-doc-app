@@ -1,0 +1,24 @@
+{
+  "id": "doc-chunker-fixture",
+  "kbId": "kb-fixture",
+  "title": "分块文件样例",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 1 },
+        "content": [{ "type": "text", "text": "数据库" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "PostgreSQL 保存同步后的文档，pgvector 保存用于语义检索的向量。用户可以在另一台设备上复用已经上传的索引。"
+          }
+        ]
+      }
+    ]
+  }
+}
