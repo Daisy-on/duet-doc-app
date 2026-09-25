@@ -477,8 +477,9 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
             await finalizeStream(run, 'complete');
             return;
           }
-          const retrievedContexts = retrieval.hits.map(toRetrievedContext);
-          run.knowledgeSources = retrieval.hits.map((hit) => hit.source);
+          const evidence = retrieval.hits.slice(0, Math.max(0, 20 - contexts.length));
+          const retrievedContexts = evidence.map(toRetrievedContext);
+          run.knowledgeSources = evidence.map((hit) => hit.source);
 
           if (run.stopRequested || run.controller.signal.aborted) {
             await finalizeStream(run, 'stopped');

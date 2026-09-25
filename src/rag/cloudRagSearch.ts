@@ -13,6 +13,12 @@ export interface CloudRagHit {
   asset_id: string | null;
   score: number;
   source_updated_at: string;
+  neighbors?: Array<{
+    chunk_id: string;
+    chunk_index: number;
+    heading_path: string[];
+    content: string;
+  }>;
 }
 
 export interface CloudRagSearchResult {

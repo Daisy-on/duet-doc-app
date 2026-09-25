@@ -1,6 +1,7 @@
 import { inspectModelInstallation } from '../models/modelCache';
 import type { KnowledgeSource } from '../store/aiWritingStore';
-import { getCurrentLocalSourceIds } from './chunkRepository';
+import { getCurrentLocalSourceIds, listIndexedChunks } from './chunkRepository';
+import { appendAdjacentEvidence } from './adjacentEvidence';
 import { searchCloudRag, type CloudRagHit } from './cloudRagSearch';
 import { embedPassages, withEmbeddingRuntime } from './embeddingClient';
 import { searchLocalKnowledge } from './localRetriever';
@@ -119,9 +120,10 @@ export async function searchAssistantKnowledge(
     );
     const localSources = installed ? await getCurrentLocalSourceIds() : new Set<string>();
     const localHits = currentLocal.map(fromLocal);
-    const cloudHits = remote.hits
-      .filter((hit) => hit.source_type === 'image' || !localSources.has(hit.source_id))
-      .map(fromCloud);
+    const selectedCloud = remote.hits.filter(
+      (hit) => hit.source_type === 'image' || !localSources.has(hit.source_id),
+    );
+    const cloudHits = selectedCloud.map(fromCloud);
     const hits = [
       ...localHits.map((hit, index) => ({ ...hit, score: 1 / (60 + index + 1) })),
       ...cloudHits.map((hit, index) => ({ ...hit, score: 1 / (60 + index + 1) })),
@@ -131,7 +133,25 @@ export async function searchAssistantKnowledge(
     } else {
       hits.sort((left, right) => right.score - left.score);
     }
-    return { hasIndex: remote.has_index || currentLocal.length > 0, hits: hits.slice(0, limit) };
+    const primary = hits.slice(0, limit);
+    const localIds = new Set(
+      primary.filter((hit) => hit.origin === 'local_retrieval').map((hit) => hit.source.sourceId),
+    );
+    const localCandidates = localIds.size
+      ? (await listIndexedChunks({}))
+          .filter((chunk) => localIds.has(chunk.sourceId))
+          .map((chunk) => fromLocal({ ...chunk, score: 0 }))
+      : [];
+    const cloudCandidates = selectedCloud.flatMap((hit) =>
+      (hit.neighbors ?? []).map((neighbor) =>
+        fromCloud({ ...hit, ...neighbor, neighbors: [], score: hit.score }),
+      ),
+    );
+    signal?.throwIfAborted();
+    return {
+      hasIndex: remote.has_index || currentLocal.length > 0,
+      hits: appendAdjacentEvidence(primary, [...localCandidates, ...cloudCandidates]),
+    };
   };
   return installed ? withEmbeddingRuntime(search) : search();
 }
