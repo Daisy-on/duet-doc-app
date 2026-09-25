@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { JSONContent } from '@tiptap/core';
 import CatalogPanel from '../components/CatalogPanel';
 import OutlinePanel from '../components/OutlinePanel';
@@ -80,6 +80,8 @@ function replaceFirstH1(content: string, newTitle: string): string {
 export default function DocEdit() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetAssetId = searchParams.get('assetId');
 
   const doc = useKnowledgeBaseStore((state) => state.documents.find((item) => item.id === docId));
   const updateDocument = useKnowledgeBaseStore((state) => state.updateDocument);
@@ -94,6 +96,22 @@ export default function DocEdit() {
   const [isFavOpen, setIsFavOpen] = useState(false);
   const [favBtnEl, setFavBtnEl] = useState<HTMLButtonElement | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!targetAssetId) return;
+    const revealImage = () => {
+      const image = document.querySelector(`[data-asset-id="${CSS.escape(targetAssetId)}"]`);
+      if (!image) return false;
+      image.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
+    };
+    if (revealImage()) return;
+    const observer = new MutationObserver(() => {
+      if (revealImage()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [docId, targetAssetId]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

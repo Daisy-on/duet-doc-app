@@ -15,7 +15,10 @@ export interface ReferencedDoc {
 
 export interface KnowledgeSource {
   sourceId: string;
-  sourceType: 'document' | 'memo';
+  sourceType: 'document' | 'memo' | 'image';
+  documentId?: string;
+  kbId?: string;
+  assetId?: string;
   title: string;
   chunkIndex: number;
   headingPath: string[];

@@ -97,7 +97,10 @@ export default function LocalImageNodeView(props: NodeViewProps) {
   }
 
   return (
-    <NodeViewWrapper className="my-3 flex justify-start group select-none">
+    <NodeViewWrapper
+      data-asset-id={assetId || undefined}
+      className="my-3 flex justify-start group select-none"
+    >
       <div
         className={`relative max-w-full overflow-hidden rounded-lg border border-gray-200/80 transition-all ${
           selected ? 'ring-2 ring-accent shadow-md' : 'shadow-xs hover:shadow-sm'

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   ClipboardList,
   Database,
@@ -13,30 +14,34 @@ import {
   Zap,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { rebuildLocalDocumentIndex } from '../rag/documentIndexer';
+import {
+  BGE_DIMENSION,
+  BGE_CHUNKER_VERSION,
+  BGE_MODEL,
+  getBgeCorpusStats,
+  listBgeSources,
+  rebuildBgeIndex,
+  runBgeEvaluation,
+  runBgePerformanceBenchmark,
+  searchBge,
+  warmupBge,
+  type BgeIndexResult,
+  type BgePerformanceResult,
+} from '../rag/bgeLab';
+import { exportRealDocumentComparison } from '../rag/realDocumentComparison';
 import {
   createRetrievalEvaluationReport,
-  getRetrievalEvaluationCorpusStats,
-  listRetrievalEvaluationSources,
   parseRetrievalEvaluationCases,
-  runRetrievalEvaluation,
   validateRetrievalEvaluationSources,
-  warmupRetrievalEvaluation,
   type RetrievalEvaluationCase,
   type RetrievalEvaluationCorpusStats,
   type RetrievalEvaluationReport,
   type RetrievalEvaluationRun,
 } from '../rag/retrievalEvaluation';
-import { searchLocalKnowledge } from '../rag/localRetriever';
-import type {
-  IndexProgress,
-  IndexRunResult,
-  LocalRetrievalStrategy,
-  RetrievedChunk,
-} from '../rag/types';
+import type { IndexProgress, LocalRetrievalStrategy, RetrievedChunk } from '../rag/types';
 
 const EVALUATION_CASES_STORAGE_KEY = 'duet-doc:local-rag:evaluation-cases';
-const DEFAULT_EVALUATION_LABEL = 'V0-vector-baseline';
+const DEFAULT_EVALUATION_LABEL = 'bge-large-zh-v1.5-fp16';
 
 function getStoredEvaluationCases(): string {
   return window.localStorage.getItem(EVALUATION_CASES_STORAGE_KEY) ?? '';
@@ -77,10 +82,17 @@ export default function LocalRetrievalSandbox() {
   const [isSearching, setIsSearching] = useState(false);
   const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const [isExportingComparison, setIsExportingComparison] = useState(false);
+  const [comparisonSourceId, setComparisonSourceId] = useState('');
+  const [comparisonCases, setComparisonCases] = useState('');
+  const [comparisonMessage, setComparisonMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('浏览器中的本地 AI 模型推理');
   const [progress, setProgress] = useState<IndexProgress | null>(null);
-  const [indexResult, setIndexResult] = useState<IndexRunResult | null>(null);
+  const [indexResult, setIndexResult] = useState<BgeIndexResult | null>(null);
   const [results, setResults] = useState<RetrievedChunk[]>([]);
+  const [searchTiming, setSearchTiming] = useState<number | null>(null);
+  const [performanceResult, setPerformanceResult] = useState<BgePerformanceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [evaluationInput, setEvaluationInput] = useState(getStoredEvaluationCases);
   const [evaluationCases, setEvaluationCases] = useState(getStoredEvaluationCaseDefinitions);
@@ -96,28 +108,38 @@ export default function LocalRetrievalSandbox() {
   const [report, setReport] = useState<RetrievalEvaluationReport | null>(null);
   const [sources, setSources] = useState<Array<{ id: string; title: string }> | null>(null);
   const stopEvaluationRef = useRef(false);
+  const indexAbortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const comparisonFileInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshCorpusStats(): Promise<RetrievalEvaluationCorpusStats> {
-    const stats = await getRetrievalEvaluationCorpusStats();
+    const stats = await getBgeCorpusStats();
     setCorpusStats(stats);
     return stats;
   }
 
   async function handleBuildIndex() {
+    const controller = new AbortController();
+    indexAbortControllerRef.current = controller;
     setIsIndexing(true);
     setError(null);
     setIndexResult(null);
+    setProgress(null);
 
     try {
-      const result = await rebuildLocalDocumentIndex(setProgress);
+      const result = await rebuildBgeIndex(setProgress, controller.signal);
       setIndexResult(result);
       await refreshCorpusStats();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地索引建立失败。'));
     } finally {
+      indexAbortControllerRef.current = null;
       setIsIndexing(false);
     }
+  }
+
+  function handleStopIndexing() {
+    indexAbortControllerRef.current?.abort();
   }
 
   async function handleSearch() {
@@ -126,7 +148,9 @@ export default function LocalRetrievalSandbox() {
     setError(null);
 
     try {
-      setResults(await searchLocalKnowledge(query, { strategy: retrievalStrategy }));
+      const search = await searchBge(query, retrievalStrategy);
+      setResults(search.results);
+      setSearchTiming(search.durationMs);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '本地检索失败。'));
     } finally {
@@ -137,7 +161,7 @@ export default function LocalRetrievalSandbox() {
   async function handleLoadEvaluationCases(raw = evaluationInput) {
     try {
       const parsedCases = parseRetrievalEvaluationCases(raw);
-      const availableSources = await listRetrievalEvaluationSources();
+      const availableSources = await listBgeSources();
       validateRetrievalEvaluationSources(parsedCases, availableSources);
       window.localStorage.setItem(EVALUATION_CASES_STORAGE_KEY, raw);
       setEvaluationInput(raw);
@@ -166,7 +190,7 @@ export default function LocalRetrievalSandbox() {
 
   async function handleListSources() {
     try {
-      setSources(await listRetrievalEvaluationSources());
+      setSources(await listBgeSources());
       await refreshCorpusStats();
       setError(null);
     } catch (caughtError) {
@@ -183,7 +207,7 @@ export default function LocalRetrievalSandbox() {
       if (stats.chunkCount === 0) {
         throw new Error('当前没有已建立索引的文档，请先建立本地索引。');
       }
-      setWarmupMs(await warmupRetrievalEvaluation());
+      setWarmupMs(await warmupBge());
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '模型预热失败。'));
     } finally {
@@ -207,25 +231,35 @@ export default function LocalRetrievalSandbox() {
       if (stats.chunkCount === 0) {
         throw new Error('当前没有已建立索引的文档，请先建立本地索引。');
       }
-      const availableSources = await listRetrievalEvaluationSources();
+      const availableSources = await listBgeSources();
       validateRetrievalEvaluationSources(evaluationCases, availableSources);
       setSources(availableSources);
 
       let activeWarmupMs = warmupMs;
       if (activeWarmupMs === null) {
         setIsWarmingUp(true);
-        activeWarmupMs = await warmupRetrievalEvaluation();
+        activeWarmupMs = await warmupBge();
         setWarmupMs(activeWarmupMs);
         setIsWarmingUp(false);
       }
 
-      const run = await runRetrievalEvaluation(evaluationCases, {
+      const run = await runBgeEvaluation(evaluationCases, {
         strategy: retrievalStrategy,
         shouldContinue: () => !stopEvaluationRef.current,
         onProgress: (completed, total) => setEvaluationProgress({ completed, total }),
       });
       setEvaluationRun(run);
-      setReport(createRetrievalEvaluationReport(evaluationLabel, activeWarmupMs, stats, run));
+      setReport(
+        createRetrievalEvaluationReport(
+          evaluationLabel,
+          activeWarmupMs,
+          stats,
+          run,
+          `${BGE_MODEL}-fp16`,
+          BGE_DIMENSION,
+          BGE_CHUNKER_VERSION,
+        ),
+      );
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '批量评测失败。'));
     } finally {
@@ -236,6 +270,51 @@ export default function LocalRetrievalSandbox() {
 
   function handleStopEvaluation() {
     stopEvaluationRef.current = true;
+  }
+
+  async function handleRunPerformanceBenchmark() {
+    setIsBenchmarking(true);
+    setError(null);
+    try {
+      const result = await runBgePerformanceBenchmark();
+      setPerformanceResult(result);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '性能基准运行失败。'));
+    } finally {
+      setIsBenchmarking(false);
+    }
+  }
+
+  async function handleExportRealDocument() {
+    setIsExportingComparison(true);
+    setError(null);
+    setComparisonMessage(null);
+    try {
+      const result = await exportRealDocumentComparison(comparisonSourceId.trim(), comparisonCases);
+      setComparisonMessage(`已导出 ${result.passageCount} 个分块、${result.queryCount} 条问题。`);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '导出真实文档样本失败。'));
+    } finally {
+      setIsExportingComparison(false);
+    }
+  }
+
+  async function handleImportComparisonCases(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const raw = await file.text();
+      if (!Array.isArray(JSON.parse(raw))) {
+        throw new Error('真实文档对照评测集必须是 JSON 数组。');
+      }
+      setComparisonCases(raw);
+      setComparisonMessage(`已导入 ${file.name}。`);
+      setError(null);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '无法读取真实文档对照评测集。'));
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function handleExportReport() {
@@ -265,36 +344,54 @@ export default function LocalRetrievalSandbox() {
           <p className="text-sm font-medium text-accent">Developer sandbox</p>
           <h1 className="mt-2 text-2xl font-bold">本地知识库检索验证</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-text-secondary">
-            使用浏览器端 FP16 Embedding
-            模型建立文档和小记索引，并对固定问题集进行可重复的本地检索评测。
+            使用正式的 BGE Large 中文 FP16 索引验证响应速度、吞吐量与召回效果。
           </p>
           <p className="mt-2 text-xs text-text-secondary">
-            当前本地数据源：<code className="font-mono">{window.location.origin}</code>
+            模型：<code className="font-mono">{BGE_MODEL}</code> · 维度 {BGE_DIMENSION} · CLS
+            pooling + L2 normalize
           </p>
         </header>
 
         <section className="mt-6 border border-border-color bg-white p-5">
+          <div className="mb-4 flex gap-3 border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <AlertTriangle className="mt-0.5 shrink-0" size={16} />
+            <p>本地索引仅在这里手动执行。开始前请预留充足显存，运行期间端侧补全会暂停。</p>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold">建立或更新索引</h2>
               <p className="mt-1 text-xs text-text-secondary">
-                首次执行会加载本地模型；之后只会重建内容、标题或分块规则发生变化的文档。
+                使用 FP16。只重建缺失或内容发生变化的文档。
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleBuildIndex}
-              disabled={isIndexing}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Database size={15} />
-              {isIndexing ? '正在建立索引' : '建立本地索引'}
-            </button>
+            {isIndexing ? (
+              <button
+                type="button"
+                onClick={handleStopIndexing}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg"
+              >
+                <Square size={14} />
+                停止索引
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBuildIndex}
+                disabled={isExportingComparison || isBenchmarking}
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Database size={15} />
+                建立本地索引
+              </button>
+            )}
           </div>
 
           {progress && (
             <p className="mt-4 text-sm text-text-secondary">
               {progress.completedDocuments} / {progress.totalDocuments}：{progress.title}
+              {progress.totalChunks !== undefined && progress.completedChunks !== undefined
+                ? ` · 分块 ${progress.completedChunks} / ${progress.totalChunks}${progress.reusedChunks ? `（复用 ${progress.reusedChunks}）` : ''}`
+                : ''}
             </p>
           )}
           {indexResult && (
@@ -302,7 +399,9 @@ export default function LocalRetrievalSandbox() {
               <p>
                 本次完成：新增或更新 {indexResult.indexedDocuments} 篇，跳过{' '}
                 {indexResult.skippedDocuments} 篇，失败 {indexResult.failedDocuments} 篇。
+                {indexResult.stopped ? '任务已停止，未完成的文档保留原索引。' : ''}
               </p>
+              <p className="mt-2 font-mono text-xs">总耗时 {formatDuration(indexResult.totalMs)}</p>
               {indexResult.failures.length > 0 && (
                 <ul className="mt-3 space-y-1 border-l-2 border-rose-200 pl-3 text-xs text-rose-700">
                   {indexResult.failures.slice(0, 3).map((failure) => (
@@ -320,6 +419,100 @@ export default function LocalRetrievalSandbox() {
               个已索引来源，
               {corpusStats.chunkCount} 个分块。
             </p>
+          )}
+          <div className="mt-4 border-t border-border-color pt-4">
+            <button
+              type="button"
+              onClick={() => void handleRunPerformanceBenchmark()}
+              disabled={
+                isBenchmarking || isIndexing || isExportingComparison || !corpusStats?.chunkCount
+              }
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Zap size={15} />
+              {isBenchmarking ? '基准运行中' : '运行性能基准'}
+            </button>
+            <div className="mt-3 grid gap-2">
+              <input
+                value={comparisonSourceId}
+                onChange={(event) => setComparisonSourceId(event.target.value)}
+                placeholder="真实文档 ID（如 doc-...）"
+                aria-label="真实文档 ID"
+                className="h-9 w-full rounded-md border border-border-color bg-transparent px-3 text-sm"
+              />
+              <textarea
+                value={comparisonCases}
+                onChange={(event) => setComparisonCases(event.target.value)}
+                placeholder={
+                  '[{"id":"q1","query":"问题？","expectedTexts":["答案原文片段 1","答案原文片段 2"]}]'
+                }
+                aria-label="真实文档检索对照问题 JSON"
+                rows={3}
+                className="w-full rounded-md border border-border-color bg-transparent px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => comparisonFileInputRef.current?.click()}
+                className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg"
+              >
+                <Upload size={15} />
+                导入对照 JSON
+              </button>
+              <input
+                ref={comparisonFileInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => void handleImportComparisonCases(event)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => void handleExportRealDocument()}
+                disabled={
+                  isExportingComparison ||
+                  isIndexing ||
+                  isEvaluating ||
+                  !comparisonSourceId.trim() ||
+                  !comparisonCases.trim()
+                }
+                className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download size={15} />
+                {isExportingComparison ? '生成中' : '导出全文检索对照'}
+              </button>
+              {comparisonMessage && (
+                <p className="text-xs text-text-secondary">{comparisonMessage}</p>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-text-secondary">
+              运行 10 次热查询，并使用相同的 16 个分块比较 batch=1、2、4、8。
+            </p>
+          </div>
+          {performanceResult && (
+            <div className="mt-4 grid grid-cols-2 border border-border-color text-sm sm:grid-cols-4">
+              <Metric label="冷加载" value={formatDuration(performanceResult.modelLoadMs)} />
+              <Metric
+                label="查询平均"
+                value={formatDuration(performanceResult.singleQuery.averageMs)}
+              />
+              <Metric
+                label="查询 P50"
+                value={formatDuration(performanceResult.singleQuery.p50Ms)}
+              />
+              <Metric
+                label="查询 P95"
+                value={formatDuration(performanceResult.singleQuery.p95Ms)}
+              />
+              {performanceResult.batches.map((batch) => (
+                <Metric
+                  key={batch.batchSize}
+                  label={`Batch ${batch.batchSize} 吞吐`}
+                  value={`${batch.chunksPerSecond.toFixed(2)} 块/秒`}
+                />
+              ))}
+              <Metric label="运行设备" value={performanceResult.deviceName} />
+              <Metric label="精度" value="FP16" />
+            </div>
           )}
         </section>
 
@@ -345,6 +538,12 @@ export default function LocalRetrievalSandbox() {
               {isSearching ? '检索中' : '检索'}
             </button>
           </div>
+
+          {searchTiming && (
+            <p className="mt-3 font-mono text-xs text-text-secondary">
+              总耗时 {formatDuration(searchTiming)}
+            </p>
+          )}
 
           {results.length > 0 && (
             <ol className="mt-5 space-y-3">

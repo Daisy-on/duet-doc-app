@@ -1,6 +1,6 @@
-export const LOCAL_EMBEDDING_MODEL = 'multilingual-e5-base';
-export const LOCAL_EMBEDDING_DIMENSION = 768;
-export const DOCUMENT_CHUNKER_VERSION = 'v2';
+export const LOCAL_EMBEDDING_MODEL = 'bge-large-zh-v1.5';
+export const LOCAL_EMBEDDING_DIMENSION = 1024;
+export const DOCUMENT_CHUNKER_VERSION = 'v3';
 
 export type DocumentSourceType = 'document' | 'memo';
 export type DocumentIndexStatus = 'indexed' | 'indexing' | 'error';
@@ -48,6 +48,9 @@ export interface DocumentIndexState {
   chunkerVersion: string;
   indexedAt?: number;
   errorMessage?: string;
+  cloudUploadStatus?: 'pending' | 'uploaded' | 'error';
+  cloudUploadError?: string;
+  cloudUploadedRevision?: number;
 }
 
 export interface RetrievedChunk {
@@ -78,6 +81,7 @@ export interface LocalSearchOptions {
   limit?: number;
   sortBy?: 'relevance' | 'updatedAt';
   strategy?: LocalRetrievalStrategy;
+  queryEmbedding?: Float32Array;
 }
 
 export interface IndexProgress {
@@ -85,6 +89,9 @@ export interface IndexProgress {
   totalDocuments: number;
   sourceId: string;
   title: string;
+  completedChunks?: number;
+  totalChunks?: number;
+  reusedChunks?: number;
 }
 
 export interface EmbeddingProgress {
@@ -96,6 +103,7 @@ export interface IndexRunResult {
   indexedDocuments: number;
   skippedDocuments: number;
   failedDocuments: number;
+  stopped: boolean;
   failures: Array<{
     sourceId: string;
     title: string;

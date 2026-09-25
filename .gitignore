@@ -25,3 +25,5 @@ dist-ssr
 
 # AI model files (大文件不要提交到 git 仓库里)
 public/ai-models/
+public/models/
+public/fixtures/

@@ -151,7 +151,7 @@ export default function EmbeddingBenchmark() {
             <section className="mt-6 rounded-lg border border-border-color bg-white p-5">
               <h2 className="text-sm font-semibold">检索正确性</h2>
               <p className="mt-1 text-xs text-text-secondary">
-                查询内容与 WebGPU 相关的 passage 应位于第一名，向量维度应为 768。
+                查询内容与 WebGPU 相关的 passage 应位于第一名，向量维度应为 1024。
               </p>
               <ol className="mt-4 space-y-3">
                 {result.ranking.map((item, index) => (

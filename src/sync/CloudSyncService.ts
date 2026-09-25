@@ -16,7 +16,7 @@ import type {
   ReferencedDoc,
 } from '../store/aiWritingStore';
 import type { AIResponseMetadata } from '../ai/types';
-import { scheduleDocumentIndex } from '../rag/documentIndexer';
+import { uploadReadyTextIndexes } from '../rag/cloudTextIndex';
 import { authFetch } from '../auth/authClient';
 import { getActiveSyncIdentity } from './syncIdentity';
 import { MediaSyncError } from '../media/mediaClient';
@@ -118,7 +118,7 @@ function parseKnowledgeSources(snapshot: SyncRemoteSnapshot): KnowledgeSource[] 
     const chunkIndex = source.chunk_index;
     const headingPath = source.heading_path;
     if (
-      (sourceType !== 'document' && sourceType !== 'memo') ||
+      (sourceType !== 'document' && sourceType !== 'memo' && sourceType !== 'image') ||
       typeof chunkIndex !== 'number' ||
       !Array.isArray(headingPath) ||
       headingPath.some((heading) => typeof heading !== 'string')
@@ -128,6 +128,9 @@ function parseKnowledgeSources(snapshot: SyncRemoteSnapshot): KnowledgeSource[] 
     return {
       sourceId: requiredString(source, 'source_id'),
       sourceType,
+      documentId: typeof source.document_id === 'string' ? source.document_id : undefined,
+      kbId: typeof source.kb_id === 'string' ? source.kb_id : undefined,
+      assetId: typeof source.asset_id === 'string' ? source.asset_id : undefined,
       title: requiredString(source, 'title'),
       chunkIndex,
       headingPath,
@@ -419,10 +422,6 @@ export class CloudSyncService {
       cursor = page.next_cursor;
     }
 
-    for (const documentId of changedDocumentIds) {
-      const document = await db.documents.get(documentId);
-      if (document) scheduleDocumentIndex(document);
-    }
     const conflicts = await this.listConflicts(workspaceId);
     return {
       appliedCount,
@@ -681,6 +680,8 @@ export class CloudSyncService {
         };
       }
 
+      await uploadReadyTextIndexes(workspaceId);
+
       const afterPush = await this.pullAllUnlocked(workspaceId);
       return {
         ...pushed,
@@ -902,11 +903,6 @@ export class CloudSyncService {
         conflict: undefined,
       });
     });
-
-    if (resolution === 'use-cloud' && conflict.entityType === 'document') {
-      const document = await db.documents.get(conflict.entityId);
-      if (document) scheduleDocumentIndex(document);
-    }
   }
 
   async resolveConflict(

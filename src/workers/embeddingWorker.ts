@@ -29,7 +29,8 @@ type SearchRequest = {
   type: 'search';
   requestId: string;
   payload: {
-    query: string;
+    query?: string;
+    queryVector?: Float32Array;
     candidates: Array<{ id: string; embedding: Float32Array }>;
     limit: number;
   };
@@ -111,8 +112,16 @@ async function embed(texts: string[]): Promise<Float32Array[]> {
   if (!extractor) throw new Error('Embedding model is not ready.');
   if (texts.length === 0) return [];
 
-  const output = await extractor(texts, { pooling: 'mean', normalize: true });
-  return (output.tolist() as number[][]).map((vector) => new Float32Array(vector));
+  const output = await extractor(texts, { pooling: 'cls', normalize: true });
+  try {
+    const vectors = (output.tolist() as number[][]).map((vector) => new Float32Array(vector));
+    if (vectors.some((vector) => vector.length !== 1024)) {
+      throw new Error('BGE embedding dimension must be 1024.');
+    }
+    return vectors;
+  } finally {
+    output.dispose();
+  }
 }
 
 function cosineSimilarity(left: Float32Array, right: Float32Array): number {
@@ -156,7 +165,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       return;
     }
 
-    const [queryVector] = await embed([message.payload.query]);
+    const queryVector =
+      message.payload.queryVector ?? (await embed([message.payload.query ?? '']))[0];
     const matches = message.payload.candidates
       .map((candidate) => ({
         id: candidate.id,

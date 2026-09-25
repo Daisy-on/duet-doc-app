@@ -2,9 +2,16 @@ import type { EmbeddingProgress } from './types';
 import { getModelBasePath, type ModelId } from '../models/catalog';
 import { requireModelInstallation } from '../models/modelCache';
 import { ensureModelCacheServiceWorkerReady } from '../models/modelCacheServiceWorker';
+import {
+  activateLocalModelRuntime,
+  notifyLocalModelRuntimeIdle,
+  registerLocalModelRuntime,
+  releaseLocalModelRuntime,
+} from '../models/localModelRuntime';
 
-const MODEL_ID: ModelId = 'multilingual-e5-base-fp16';
+const MODEL_ID: ModelId = 'bge-large-zh-v1.5-fp16';
 const MODEL_PATH = getModelBasePath(MODEL_ID);
+export const EMBEDDING_BATCH_SIZE = 2;
 
 type QueuePriority = 'interactive' | 'background';
 
@@ -22,7 +29,8 @@ type QueuedRequest = {
         type: 'search';
         requestId: string;
         payload: {
-          query: string;
+          query?: string;
+          queryVector?: Float32Array;
           candidates: Array<{ id: string; embedding: Float32Array }>;
           limit: number;
         };
@@ -61,10 +69,37 @@ let rejectReady: ((error: Error) => void) | null = null;
 let activeRequestId: string | null = null;
 let deviceName = 'webgpu';
 let lastProgress: EmbeddingProgress | null = null;
+let isLoadingModel = false;
+let runtimeGeneration = 0;
+let runtimeLeaseCount = 0;
 
 const pendingRequests = new Map<string, PendingRequest>();
 const interactiveQueue: QueuedRequest[] = [];
 const backgroundQueue: QueuedRequest[] = [];
+
+function disposeEmbeddingRuntimeState(reason = 'Embedding runtime was released.') {
+  runtimeGeneration += 1;
+  worker?.terminate();
+  worker = null;
+  readyPromise = null;
+  resolveReady = null;
+  rejectReady?.(new Error(reason));
+  rejectReady = null;
+  activeRequestId = null;
+  isLoadingModel = false;
+  lastProgress = null;
+
+  const error = new Error(reason);
+  pendingRequests.forEach((pending) => pending.reject(error));
+  pendingRequests.clear();
+  interactiveQueue.length = 0;
+  backgroundQueue.length = 0;
+}
+
+registerLocalModelRuntime('embedding', {
+  dispose: disposeEmbeddingRuntimeState,
+  isBusy: () => runtimeLeaseCount > 0 || isLoadingModel || Boolean(activeRequestId),
+});
 
 function pumpQueue() {
   if (!worker || activeRequestId) return;
@@ -106,9 +141,10 @@ function getWorker() {
     }
 
     if (message.type === 'ready') {
+      isLoadingModel = false;
       deviceName = message.payload.deviceName;
       console.info('[LocalRAG] Embedding model ready', {
-        model: 'multilingual-e5-base',
+        model: 'bge-large-zh-v1.5',
         dtype: 'fp16',
         device: deviceName,
       });
@@ -126,11 +162,14 @@ function getWorker() {
       });
       if (message.requestId) {
         settleRequest(message.requestId, undefined, error);
+        disposeEmbeddingRuntime();
       } else {
+        isLoadingModel = false;
         rejectReady?.(error);
         readyPromise = null;
         resolveReady = null;
         rejectReady = null;
+        disposeEmbeddingRuntime();
       }
       return;
     }
@@ -142,7 +181,7 @@ function getWorker() {
     const error = new Error(event.message || 'Embedding worker failed.');
     if (activeRequestId) settleRequest(activeRequestId, undefined, error);
     rejectReady?.(error);
-    readyPromise = null;
+    disposeEmbeddingRuntime();
   });
 
   return worker;
@@ -152,11 +191,17 @@ export function ensureEmbeddingModelReady(): Promise<void> {
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
+    isLoadingModel = true;
+    await activateLocalModelRuntime('embedding');
+    const generation = runtimeGeneration;
     await requireModelInstallation(MODEL_ID);
     await ensureModelCacheServiceWorkerReady();
+    if (generation !== runtimeGeneration) {
+      throw new Error('Embedding runtime was superseded.');
+    }
     const instance = getWorker();
     console.info('[LocalRAG] Loading embedding model', {
-      model: 'multilingual-e5-base',
+      model: 'bge-large-zh-v1.5',
       dtype: 'fp16',
     });
     await new Promise<void>((resolve, reject) => {
@@ -168,6 +213,7 @@ export function ensureEmbeddingModelReady(): Promise<void> {
       });
     });
   })().catch((error) => {
+    isLoadingModel = false;
     readyPromise = null;
     throw error;
   });
@@ -207,15 +253,47 @@ export function embedPassages(texts: string[]): Promise<EmbeddingResult> {
   }));
 }
 
+export async function embedPassagesInBatches(
+  texts: string[],
+  onProgress?: (completed: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<EmbeddingResult> {
+  const vectors: Float32Array[] = [];
+  let inferenceMs = 0;
+
+  for (let offset = 0; offset < texts.length; offset += EMBEDDING_BATCH_SIZE) {
+    signal?.throwIfAborted();
+    const batch = texts.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+    const result = await embedPassages(batch);
+    if (result.vectors.length !== batch.length) {
+      throw new Error('Embedding worker returned an unexpected vector count.');
+    }
+
+    vectors.push(...result.vectors);
+    inferenceMs += result.inferenceMs;
+    onProgress?.(vectors.length, texts.length);
+
+    if (offset + EMBEDDING_BATCH_SIZE < texts.length) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+  }
+
+  return { vectors, inferenceMs };
+}
+
 export function rankLocalCandidates(
-  query: string,
+  query: string | Float32Array,
   candidates: Array<{ id: string; embedding: Float32Array }>,
   limit: number,
 ): Promise<LocalSearchRanking> {
   return enqueue<LocalSearchRanking>('interactive', (requestId) => ({
     type: 'search',
     requestId,
-    payload: { query, candidates, limit },
+    payload: {
+      ...(typeof query === 'string' ? { query } : { queryVector: query }),
+      candidates,
+      limit,
+    },
   }));
 }
 
@@ -226,4 +304,22 @@ export function getEmbeddingRuntimeStatus() {
     deviceName,
     progress: lastProgress,
   };
+}
+
+export function disposeEmbeddingRuntime() {
+  disposeEmbeddingRuntimeState();
+  releaseLocalModelRuntime('embedding');
+}
+
+export async function withEmbeddingRuntime<T>(task: () => Promise<T>): Promise<T> {
+  runtimeLeaseCount += 1;
+  try {
+    return await task();
+  } finally {
+    runtimeLeaseCount -= 1;
+    if (runtimeLeaseCount === 0) {
+      disposeEmbeddingRuntime();
+      notifyLocalModelRuntimeIdle('embedding');
+    }
+  }
 }

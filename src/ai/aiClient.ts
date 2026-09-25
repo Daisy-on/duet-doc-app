@@ -2,6 +2,11 @@ import { logAITrace } from './aiLogger';
 import { getModelBasePath, type ModelId } from '../models/catalog';
 import { ModelNotInstalledError, requireModelInstallation } from '../models/modelCache';
 import { ensureModelCacheServiceWorkerReady } from '../models/modelCacheServiceWorker';
+import {
+  activateLocalModelRuntime,
+  registerLocalModelRuntime,
+  releaseLocalModelRuntime,
+} from '../models/localModelRuntime';
 
 const GHOST_TEXT_MODEL_ID: ModelId = 'qwen3.5-0.8b-opt-q4f16';
 const GHOST_TEXT_MODEL_PATH = getModelBasePath(GHOST_TEXT_MODEL_ID);
@@ -41,6 +46,34 @@ let hasDroppedRequest = false;
 let cooldownTimer: number | null = null;
 let modelLoadStartedAt: number | null = null;
 let waitingForInstallation = false;
+let modelInstalledHandler: ((event: Event) => void) | null = null;
+let runtimeGeneration = 0;
+
+function disposeGhostTextRuntimeState() {
+  runtimeGeneration += 1;
+  worker?.terminate();
+  worker = null;
+  status = 'idle';
+  latestRequestId = null;
+  isWorkerBusy = false;
+  hasDroppedRequest = false;
+  modelLoadStartedAt = null;
+  inFlightResolve?.(null);
+  inFlightResolve = null;
+  inFlightRequestId = null;
+
+  if (cooldownTimer) window.clearTimeout(cooldownTimer);
+  cooldownTimer = null;
+  if (modelInstalledHandler)
+    window.removeEventListener('duet-model-installed', modelInstalledHandler);
+  modelInstalledHandler = null;
+  waitingForInstallation = false;
+}
+
+registerLocalModelRuntime('ghost-text', {
+  dispose: disposeGhostTextRuntimeState,
+  isBusy: () => status === 'loading' || isWorkerBusy,
+});
 
 function getModelLoadElapsedMs(): number | undefined {
   return modelLoadStartedAt === null ? undefined : performance.now() - modelLoadStartedAt;
@@ -130,6 +163,8 @@ function getWorker() {
           }, 1000);
         }
       }
+      disposeGhostTextRuntime();
+      status = 'error';
       return;
     }
 
@@ -179,6 +214,23 @@ function getWorker() {
     }
   });
 
+  worker.addEventListener('error', (event) => {
+    logAITrace({
+      requestId: inFlightRequestId ?? 'model-init',
+      runtime: 'local',
+      kind: isWorkerBusy ? 'generation' : 'model-load',
+      task: isWorkerBusy ? 'ghost-text' : 'ghost-text-load',
+      status: 'failed',
+      model: 'qwen3.5-0.8b-opt',
+      device: detectedGpuDevice,
+      dtype: 'q4f16',
+      errorCode: 'WORKER_ERROR',
+      errorMessage: event.message || 'Ghost text worker failed.',
+    });
+    disposeGhostTextRuntime();
+    status = 'error';
+  });
+
   return worker;
 }
 
@@ -186,23 +238,28 @@ export function loadGhostTextModel() {
   if (status === 'loading' || status === 'ready') return;
 
   status = 'loading';
-  modelLoadStartedAt = performance.now();
-
-  logAITrace({
-    requestId: 'model-init',
-    runtime: 'local',
-    kind: 'model-load',
-    task: 'ghost-text-load',
-    status: 'started',
-    model: 'qwen3.5-0.8b-opt',
-    device: detectedGpuDevice,
-    dtype: 'q4f16',
-  });
 
   void (async () => {
     try {
+      if (!(await activateLocalModelRuntime('ghost-text'))) {
+        status = 'idle';
+        return;
+      }
+      const generation = runtimeGeneration;
+      modelLoadStartedAt = performance.now();
+      logAITrace({
+        requestId: 'model-init',
+        runtime: 'local',
+        kind: 'model-load',
+        task: 'ghost-text-load',
+        status: 'started',
+        model: 'qwen3.5-0.8b-opt',
+        device: detectedGpuDevice,
+        dtype: 'q4f16',
+      });
       await requireModelInstallation(GHOST_TEXT_MODEL_ID);
       await ensureModelCacheServiceWorkerReady();
+      if (generation !== runtimeGeneration) return;
       getWorker().postMessage({
         type: 'load',
         payload: {
@@ -212,6 +269,7 @@ export function loadGhostTextModel() {
         },
       });
     } catch (error) {
+      if (status === 'idle') return;
       status = error instanceof ModelNotInstalledError ? 'idle' : 'error';
       const modelLoadMs = getModelLoadElapsedMs();
       modelLoadStartedAt = null;
@@ -234,17 +292,25 @@ export function loadGhostTextModel() {
 
       if (error instanceof ModelNotInstalledError && !waitingForInstallation) {
         waitingForInstallation = true;
-        const handleModelInstalled = (event: Event) => {
+        modelInstalledHandler = (event: Event) => {
           const modelId = (event as CustomEvent<{ modelId: ModelId }>).detail.modelId;
           if (modelId !== GHOST_TEXT_MODEL_ID) return;
-          window.removeEventListener('duet-model-installed', handleModelInstalled);
+          if (modelInstalledHandler) {
+            window.removeEventListener('duet-model-installed', modelInstalledHandler);
+          }
+          modelInstalledHandler = null;
           waitingForInstallation = false;
           loadGhostTextModel();
         };
-        window.addEventListener('duet-model-installed', handleModelInstalled);
+        window.addEventListener('duet-model-installed', modelInstalledHandler);
       }
     }
   })();
+}
+
+export function disposeGhostTextRuntime() {
+  disposeGhostTextRuntimeState();
+  releaseLocalModelRuntime('ghost-text');
 }
 
 export function getGhostTextStatus() {

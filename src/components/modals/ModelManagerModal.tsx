@@ -47,7 +47,9 @@ export default function ModelManagerModal({ isOpen, onClose }: ModelManagerModal
         <div className="flex items-center justify-between border-b border-border-color px-5 py-3">
           <div>
             <h2 className="text-base font-bold text-text-primary">端侧模型</h2>
-            <p className="mt-0.5 text-xs text-text-secondary">已安装 {installedCount}/2</p>
+            <p className="mt-0.5 text-xs text-text-secondary">
+              已安装 {installedCount}/{MODEL_DEFINITIONS.length}
+            </p>
           </div>
           <button
             type="button"

@@ -1,5 +1,11 @@
 import { db } from '../db';
 import type { DocumentChunk, DocumentIndexState, DocumentSourceType } from './types';
+import { getDocumentFingerprint } from './documentChunker';
+import {
+  DOCUMENT_CHUNKER_VERSION,
+  LOCAL_EMBEDDING_DIMENSION,
+  LOCAL_EMBEDDING_MODEL,
+} from './types';
 
 export async function getDocumentIndexState(
   sourceId: string,
@@ -37,9 +43,39 @@ export async function listIndexedChunks(options: {
     ? await db.documentChunks.where('kbId').equals(options.kbId).toArray()
     : await db.documentChunks.toArray();
 
-  if (!options.sourceTypes || options.sourceTypes.length === 0) return chunks;
+  const currentSources = await getCurrentLocalSourceIds([
+    ...new Set(chunks.map((chunk) => chunk.sourceId)),
+  ]);
+  const currentChunks = chunks.filter((chunk) => currentSources.has(chunk.sourceId));
+  if (!options.sourceTypes || options.sourceTypes.length === 0) return currentChunks;
   const sourceTypes = new Set(options.sourceTypes);
-  return chunks.filter((chunk) => sourceTypes.has(chunk.sourceType));
+  return currentChunks.filter((chunk) => sourceTypes.has(chunk.sourceType));
+}
+
+export async function getCurrentLocalSourceIds(sourceIds?: string[]): Promise<Set<string>> {
+  const ids =
+    sourceIds ??
+    (await db.documentIndexStates.where('status').equals('indexed').toArray()).map(
+      (state) => state.sourceId,
+    );
+  const [documents, states] = await Promise.all([
+    db.documents.bulkGet(ids),
+    db.documentIndexStates.bulkGet(ids),
+  ]);
+  return new Set(
+    ids.filter((_, index) => {
+      const document = documents[index];
+      const state = states[index];
+      return (
+        document &&
+        state?.status === 'indexed' &&
+        state.sourceFingerprint === getDocumentFingerprint(document) &&
+        state.embeddingModel === LOCAL_EMBEDDING_MODEL &&
+        state.embeddingDimension === LOCAL_EMBEDDING_DIMENSION &&
+        state.chunkerVersion === DOCUMENT_CHUNKER_VERSION
+      );
+    }),
+  );
 }
 
 export async function updateDocumentChunkScope(

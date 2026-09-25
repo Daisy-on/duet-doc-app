@@ -71,7 +71,10 @@ export interface ChatMessageSyncData {
   referenced_docs: Array<{ id: string; title: string }>;
   knowledge_sources: Array<{
     source_id: string;
-    source_type: 'document' | 'memo';
+    source_type: 'document' | 'memo' | 'image';
+    document_id?: string;
+    kb_id?: string;
+    asset_id?: string;
     title: string;
     chunk_index: number;
     heading_path: string[];
@@ -281,6 +284,16 @@ export class DuetDocDB extends Dexie {
           }
         }
       });
+    this.version(8)
+      .stores({
+        documentChunks:
+          'id, sourceId, kbId, sourceType, contentHash, indexedAt, [sourceId+chunkIndex]',
+        documentIndexStates: 'sourceId, kbId, status, sourceUpdatedAt, embeddingModel',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('documentChunks').clear();
+        await tx.table('documentIndexStates').clear();
+      });
   }
 }
 
@@ -296,6 +309,9 @@ export async function openUserDatabase(userId: string) {
   const target = new DuetDocDB(databaseName);
   await target.open();
   db = target;
+  void Dexie.delete(`${databaseName}:BgeLab`).catch((error) => {
+    console.warn('Failed to remove legacy BGE evaluation indexes.', error);
+  });
 }
 
 export function closeUserDatabase() {

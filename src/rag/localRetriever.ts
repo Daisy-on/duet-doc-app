@@ -1,5 +1,5 @@
 import { listIndexedChunks } from './chunkRepository';
-import { rankLocalCandidates } from './embeddingClient';
+import { rankLocalCandidates, withEmbeddingRuntime } from './embeddingClient';
 import { DIVERSE_SOURCE_TARGET, fuseRankings, MAX_CHUNKS_PER_SOURCE } from './hybridRanker';
 import { rankLexicalCandidates } from './lexicalRetriever';
 import type {
@@ -60,9 +60,10 @@ async function rankVectorMatches(
   query: string,
   chunks: DocumentChunk[],
   limit: number,
+  queryEmbedding?: Float32Array,
 ): Promise<VectorRankingMatch[]> {
   const ranking = await rankLocalCandidates(
-    `query: ${query.trim()}`,
+    queryEmbedding ?? `为这个句子生成表示以用于检索相关文章：${query.trim()}`,
     chunks.map((chunk) => ({ id: chunk.id, embedding: chunk.embedding })),
     limit,
   );
@@ -117,8 +118,14 @@ async function searchByVector(
   query: string,
   chunks: DocumentChunk[],
   limit: number,
+  queryEmbedding?: Float32Array,
 ): Promise<RetrievedChunk[]> {
-  const vectorMatches = await rankVectorMatches(query, chunks, Math.min(chunks.length, limit * 3));
+  const vectorMatches = await rankVectorMatches(
+    query,
+    chunks,
+    Math.min(chunks.length, limit * 3),
+    queryEmbedding,
+  );
   const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
 
   return vectorMatches.slice(0, limit).map((match, index) =>
@@ -134,12 +141,13 @@ async function searchByHybrid(
   query: string,
   chunks: DocumentChunk[],
   limit: number,
+  queryEmbedding?: Float32Array,
 ): Promise<RetrievedChunk[]> {
   const candidateLimit = Math.min(
     chunks.length,
     Math.max(MIN_HYBRID_CANDIDATES, limit * HYBRID_CANDIDATE_MULTIPLIER),
   );
-  const vectorRankingPromise = rankVectorMatches(query, chunks, candidateLimit);
+  const vectorRankingPromise = rankVectorMatches(query, chunks, candidateLimit, queryEmbedding);
   const lexicalMatches = rankLexicalCandidates(query, chunks, candidateLimit);
   const vectorMatches = await vectorRankingPromise;
   const fusedMatches = fuseRankings(vectorMatches, lexicalMatches);
@@ -170,6 +178,13 @@ export async function searchLocalKnowledge(
   query: string,
   options: LocalSearchOptions = {},
 ): Promise<RetrievedChunk[]> {
+  return withEmbeddingRuntime(() => searchLocalKnowledgeInternal(query, options));
+}
+
+async function searchLocalKnowledgeInternal(
+  query: string,
+  options: LocalSearchOptions,
+): Promise<RetrievedChunk[]> {
   const limit = Math.min(Math.max(1, options.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
   const strategy: LocalRetrievalStrategy = options.strategy ?? 'vector';
   const chunks = await listIndexedChunks({
@@ -192,6 +207,6 @@ export async function searchLocalKnowledge(
   }
 
   return strategy === 'hybrid'
-    ? searchByHybrid(query, chunks, limit)
-    : searchByVector(query, chunks, limit);
+    ? searchByHybrid(query, chunks, limit, options.queryEmbedding)
+    : searchByVector(query, chunks, limit, options.queryEmbedding);
 }

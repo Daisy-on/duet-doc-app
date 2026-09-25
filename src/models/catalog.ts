@@ -2,12 +2,12 @@ export const MODEL_CACHE_PATH_PREFIX = '/__duet_models__/v1';
 
 export const MODEL_DEFINITIONS = [
   {
-    id: 'multilingual-e5-base-fp16',
-    directory: 'multilingual-e5-base',
-    name: '多语言语义检索',
-    modelName: 'multilingual-e5-base',
+    id: 'bge-large-zh-v1.5-fp16',
+    directory: 'bge-large-zh-v1.5-fp16',
+    name: '中文语义检索',
+    modelName: 'BGE Large Zh v1.5',
     precision: 'FP16',
-    estimatedSizeBytes: 572_319_632,
+    estimatedSizeBytes: 650_141_789,
   },
   {
     id: 'qwen3.5-0.8b-opt-q4f16',

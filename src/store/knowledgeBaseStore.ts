@@ -7,7 +7,6 @@ import { saveCoordinator, type SaveUpdates, type DeleteHandle } from '../utils/S
 import { extractAssetIds } from '../utils/assetUtils';
 import { runAssetGC } from '../assets/runAssetGC';
 import { useEditorStore } from './index';
-import { scheduleDocumentIndex } from '../rag/documentIndexer';
 import { updateDocumentChunkScope } from '../rag/chunkRepository';
 import { enqueueMutationInTx, detectContentFormat } from '../sync/syncOutboxHelper';
 import { cloudSyncService } from '../sync/CloudSyncService';
@@ -126,7 +125,6 @@ const enforceVersionLimitInTx = async (tx: Transaction, docId: string) => {
 
 const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
   const now = Date.now();
-  let persistedDocument: Document | null = null;
   await db.transaction(
     'rw',
     [
@@ -153,13 +151,6 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
         content: newContent,
         updatedAt: now,
       });
-      persistedDocument = {
-        ...existingDoc,
-        title: newTitle,
-        content: newContent,
-        updatedAt: now,
-      };
-
       // 变更原子入队 syncOutbox，支持 pending 原地合并与智能格式嗅探
       await enqueueMutationInTx(tx, [
         {
@@ -233,9 +224,6 @@ const internalPersistDocument = async (id: string, updates: SaveUpdates) => {
 
   if (updates.content !== undefined) {
     runAssetGC(id).catch((err) => console.error('Asset GC error:', err));
-  }
-  if (persistedDocument && (updates.content !== undefined || updates.title !== undefined)) {
-    scheduleDocumentIndex(persistedDocument);
   }
   void useSyncStore.getState().refreshCounts();
 };
@@ -737,7 +725,6 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       },
     )
       .then(() => {
-        scheduleDocumentIndex(newDoc);
         void useSyncStore.getState().refreshCounts();
       })
       .catch((err) => console.error('Dexie error:', err));
@@ -942,8 +929,6 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
         // Run Asset GC after restoring
         runAssetGC(docId).catch((err) => console.error('Asset GC error after restore:', err));
-        const restoredDocument = await db.documents.get(docId);
-        if (restoredDocument) scheduleDocumentIndex(restoredDocument);
         void useSyncStore.getState().refreshCounts();
 
         return { restored: true };
@@ -1152,7 +1137,6 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       throw error;
     }
 
-    scheduleDocumentIndex(memo);
     void useSyncStore.getState().refreshCounts();
     return memo.id;
   },
