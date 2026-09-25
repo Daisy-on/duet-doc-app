@@ -466,7 +466,7 @@ export default function LocalRetrievalSandbox() {
                 value={comparisonCases}
                 onChange={(event) => setComparisonCases(event.target.value)}
                 placeholder={
-                  '[{"id":"q1","query":"问题？","expectedText":"答案所在块的一小段原文"}]'
+                  '[{"id":"q1","query":"问题？","expectedTexts":["答案原文片段 1","答案原文片段 2"]}]'
                 }
                 aria-label="真实文档检索对照问题 JSON"
                 rows={3}
@@ -500,7 +500,7 @@ export default function LocalRetrievalSandbox() {
                 className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Download size={15} />
-                {isExportingCompatibility ? '生成中' : '导出真实文档检索对照'}
+                {isExportingCompatibility ? '生成中' : '导出全文检索对照'}
               </button>
               {comparisonMessage && (
                 <p className="text-xs text-text-secondary">{comparisonMessage}</p>
