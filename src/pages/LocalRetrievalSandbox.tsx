@@ -28,7 +28,6 @@ import {
   type BgeIndexResult,
   type BgePerformanceResult,
 } from '../rag/bgeLab';
-import { exportBgeCompatibilityFixture } from '../rag/bgeCompatibility';
 import { exportRealDocumentComparison } from '../rag/realDocumentComparison';
 import {
   createRetrievalEvaluationReport,
@@ -84,7 +83,7 @@ export default function LocalRetrievalSandbox() {
   const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
-  const [isExportingCompatibility, setIsExportingCompatibility] = useState(false);
+  const [isExportingComparison, setIsExportingComparison] = useState(false);
   const [comparisonSourceId, setComparisonSourceId] = useState('');
   const [comparisonCases, setComparisonCases] = useState('');
   const [comparisonMessage, setComparisonMessage] = useState<string | null>(null);
@@ -286,20 +285,8 @@ export default function LocalRetrievalSandbox() {
     }
   }
 
-  async function handleExportCompatibility() {
-    setIsExportingCompatibility(true);
-    setError(null);
-    try {
-      await exportBgeCompatibilityFixture();
-    } catch (caughtError) {
-      setError(getErrorMessage(caughtError, '导出兼容性样本失败。'));
-    } finally {
-      setIsExportingCompatibility(false);
-    }
-  }
-
   async function handleExportRealDocument() {
-    setIsExportingCompatibility(true);
+    setIsExportingComparison(true);
     setError(null);
     setComparisonMessage(null);
     try {
@@ -308,7 +295,7 @@ export default function LocalRetrievalSandbox() {
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '导出真实文档样本失败。'));
     } finally {
-      setIsExportingCompatibility(false);
+      setIsExportingComparison(false);
     }
   }
 
@@ -390,7 +377,7 @@ export default function LocalRetrievalSandbox() {
               <button
                 type="button"
                 onClick={handleBuildIndex}
-                disabled={isExportingCompatibility || isBenchmarking}
+                disabled={isExportingComparison || isBenchmarking}
                 className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Database size={15} />
@@ -438,21 +425,12 @@ export default function LocalRetrievalSandbox() {
               type="button"
               onClick={() => void handleRunPerformanceBenchmark()}
               disabled={
-                isBenchmarking || isIndexing || isExportingCompatibility || !corpusStats?.chunkCount
+                isBenchmarking || isIndexing || isExportingComparison || !corpusStats?.chunkCount
               }
               className="inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Zap size={15} />
               {isBenchmarking ? '基准运行中' : '运行性能基准'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleExportCompatibility()}
-              disabled={isExportingCompatibility || isBenchmarking || isIndexing || isEvaluating}
-              className="ml-2 inline-flex h-9 items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Download size={15} />
-              {isExportingCompatibility ? '生成中' : '导出 BGE 兼容性样本'}
             </button>
             <div className="mt-3 grid gap-2">
               <input
@@ -491,7 +469,7 @@ export default function LocalRetrievalSandbox() {
                 type="button"
                 onClick={() => void handleExportRealDocument()}
                 disabled={
-                  isExportingCompatibility ||
+                  isExportingComparison ||
                   isIndexing ||
                   isEvaluating ||
                   !comparisonSourceId.trim() ||
@@ -500,7 +478,7 @@ export default function LocalRetrievalSandbox() {
                 className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border-color px-3 text-sm font-medium hover:bg-hover-bg disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Download size={15} />
-                {isExportingCompatibility ? '生成中' : '导出全文检索对照'}
+                {isExportingComparison ? '生成中' : '导出全文检索对照'}
               </button>
               {comparisonMessage && (
                 <p className="text-xs text-text-secondary">{comparisonMessage}</p>

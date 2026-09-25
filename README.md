@@ -106,6 +106,8 @@ npm run lint
 npm run typecheck
 ```
 
+检索开发验证可运行 `npm run test:chunker`、`npm run test:adjacent-evidence` 和 `npm run compare:chunkers`。`/dev/local-retrieval` 可导出真实文档的全文检索样本；后端的 `app.bge_real_document_probe` 默认仅预览，只有显式加 `--confirm-cloud-calls` 才会调用付费接口。
+
 生产构建输出到 `dist/`。部署时应由 Nginx/OpenResty 托管静态文件，并将 `/api/` 反向代理到 FastAPI；前端路由需要回退到 `index.html`。模型由 OSS 按需交付，因此重新发布前端不会重复携带约 1.2 GiB 的模型权重。
 
 ## 常见问题
