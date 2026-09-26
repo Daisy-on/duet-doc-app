@@ -1,5 +1,6 @@
 import { useEditorStore } from '../store';
-import type { HeadingItem } from '../store';
+import { useParams } from 'react-router-dom';
+import { getOutlineHeadings } from './Editor/outlineHeadings';
 
 // h1 -> 无缩进；h2 -> 缩进 1 级；h3+ -> 缩进 2 级
 const indentClass: Record<number, string> = {
@@ -17,13 +18,21 @@ const textClass: Record<number, string> = {
   3: 'text-[11px] text-text-secondary',
 };
 
-function scrollToHeading(item: HeadingItem) {
-  const el = document.querySelector(`[data-heading-id="${item.id}"]`);
-  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
 export default function OutlinePanel() {
+  const { docId } = useParams<{ docId: string }>();
   const headings = useEditorStore((state) => state.headings);
+  const editor = useEditorStore((state) => state.editorInstance);
+  const activeDocumentId = useEditorStore((state) => state.activeEditorDocumentId);
+
+  const scrollToHeading = (index: number) => {
+    if (!editor || editor.isDestroyed || activeDocumentId !== docId) return;
+    const target = getOutlineHeadings(editor.state.doc)[index];
+    if (!target) return;
+    const element = editor.view.nodeDOM(target.pos);
+    if (element instanceof HTMLElement && editor.view.dom.contains(element)) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <aside className="w-[200px] min-w-[200px] border-l border-border-color bg-bg-panel flex flex-col h-full shrink-0 select-none overflow-hidden">
@@ -39,18 +48,20 @@ export default function OutlinePanel() {
         ) : (
           <ul className="list-none space-y-1">
             {headings.map((item, idx) => (
-              <li
-                key={`${item.id}-${idx}`}
-                className={[
-                  'cursor-pointer truncate leading-snug py-1 px-1.5 rounded transition-colors',
-                  'hover:text-accent hover:bg-hover-bg',
-                  indentClass[item.level] ?? 'pl-6',
-                  textClass[item.level] ?? 'text-[11px] text-text-secondary',
-                ].join(' ')}
-                title={item.text}
-                onClick={() => scrollToHeading(item)}
-              >
-                {item.text}
+              <li key={`${item.pos}-${idx}`}>
+                <button
+                  type="button"
+                  className={[
+                    'w-full cursor-pointer truncate text-left leading-snug py-1 px-1.5 rounded transition-colors',
+                    'hover:text-accent hover:bg-hover-bg focus-visible:outline-2 focus-visible:outline-accent',
+                    indentClass[item.level] ?? 'pl-6',
+                    textClass[item.level] ?? 'text-[11px] text-text-secondary',
+                  ].join(' ')}
+                  title={item.text}
+                  onClick={() => scrollToHeading(idx)}
+                >
+                  {item.text}
+                </button>
               </li>
             ))}
           </ul>

@@ -4,7 +4,7 @@ import type { Editor } from '@tiptap/core';
 export interface HeadingItem {
   level: number; // 1 | 2 | 3 | 4 | 5 | 6
   text: string;
-  id: string; // 用于滚动锚点
+  pos: number;
 }
 
 interface EditorUpdateController {

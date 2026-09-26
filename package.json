@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -b",
     "test:chunker": "node tests/documentChunker.test.cjs",
+    "test:outline": "node tests/outlineHeadings.test.cjs",
     "test:adjacent-evidence": "node tests/adjacentEvidence.test.cjs",
     "test:rag-failures": "node tests/assistantRetriever.test.cjs && node tests/cloudClient.test.cjs && node tests/generalAnswerFallback.test.cjs",
     "compare:chunkers": "node scripts/compareChunkers.cjs",

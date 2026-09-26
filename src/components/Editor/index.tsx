@@ -13,7 +13,8 @@ import { CustomCodeBlock } from './CodeBlockExtension';
 import LinkHoverPopover from './LinkHoverPopover';
 import { common, createLowlight } from 'lowlight';
 import { useParams } from 'react-router-dom';
-import { useEditorStore, type HeadingItem } from '../../store';
+import { useEditorStore } from '../../store';
+import { getOutlineHeadings } from './outlineHeadings';
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Sparkles, MoreVertical } from 'lucide-react';
@@ -55,33 +56,6 @@ function logGhostTextUIOutcome(
     task: 'ghost-text-ui',
     status,
     ...options,
-  });
-}
-
-// 从 ProseMirror 文档树中提取标题列表
-function extractHeadings(editor: TiptapEditor): HeadingItem[] {
-  const items: HeadingItem[] = [];
-  const counter: Record<string, number> = {};
-  editor.state.doc.forEach((node) => {
-    if (node.type.name === 'heading') {
-      const text = node.textContent;
-      const key = text.slice(0, 20);
-      counter[key] = (counter[key] ?? 0) + 1;
-      const id = `heading-${key.replace(/\s+/g, '-')}-${counter[key]}`;
-      items.push({ level: node.attrs.level as number, text, id });
-    }
-  });
-  return items;
-}
-
-// 给编辑器 DOM 里的标题元素打上 data-heading-id，用于点击大纲滚动
-function stampHeadingIds(editorEl: HTMLElement | null, headings: HeadingItem[]) {
-  if (!editorEl) return;
-  const domHeadings = editorEl.querySelectorAll('h1,h2,h3,h4,h5,h6');
-  domHeadings.forEach((el, i) => {
-    if (headings[i]) {
-      el.setAttribute('data-heading-id', headings[i].id);
-    }
   });
 }
 
@@ -156,7 +130,6 @@ export default function Editor() {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const ghostTextTimerRef = useRef<number | null>(null);
   const headingSyncTimerRef = useRef<number | null>(null);
-  const headingRafRef = useRef<number | null>(null);
   const lastHeadingSignatureRef = useRef('');
   const editorUpdateTimerRef = useRef<number | null>(null);
   const pendingDocumentUpdateRef = useRef<{
@@ -187,6 +160,8 @@ export default function Editor() {
   useEffect(() => {
     if (currentDocIdRef.current && currentDocIdRef.current !== currentDocId) {
       useEditorStore.getState().flushPendingDocumentUpdate(currentDocIdRef.current);
+      setHeadings([]);
+      lastHeadingSignatureRef.current = '';
     }
     currentDocIdRef.current = currentDocId;
     setActiveEditorDocumentId(currentDocId ?? null);
@@ -196,37 +171,21 @@ export default function Editor() {
         setActiveEditorDocumentId(null);
       }
     };
-  }, [currentDocId, setActiveEditorDocumentId]);
+  }, [currentDocId, setActiveEditorDocumentId, setHeadings]);
 
-  // 解析并同步标题到 Zustand，然后给 DOM 打标记。
-  // 普通输入延迟合并；创建编辑器或外部替换内容时可强制立即同步。
+  // 普通输入延迟合并；创建编辑器或外部替换内容时立即同步大纲。
   const commitHeadings = useCallback(
-    (editor: TiptapEditor, force = false) => {
+    (editor: TiptapEditor) => {
       if (editor.isDestroyed) return;
 
-      const headings = extractHeadings(editor);
-      const signature = JSON.stringify(headings.map(({ level, id, text }) => [level, id, text]));
+      const headings = getOutlineHeadings(editor.state.doc);
+      const signature = JSON.stringify(headings);
       const hasChanged = signature !== lastHeadingSignatureRef.current;
 
-      if (!hasChanged && !force) return;
+      if (!hasChanged) return;
 
-      if (hasChanged) {
-        lastHeadingSignatureRef.current = signature;
-        setHeadings(headings);
-      }
-
-      if (headingRafRef.current !== null) {
-        cancelAnimationFrame(headingRafRef.current);
-      }
-
-      // 等 DOM 更新完再打 id，并保证同一时刻最多只有一个待执行帧。
-      headingRafRef.current = requestAnimationFrame(() => {
-        headingRafRef.current = null;
-        const editorEl = editorContainerRef.current?.querySelector(
-          '.ProseMirror',
-        ) as HTMLElement | null;
-        stampHeadingIds(editorEl, headings);
-      });
+      lastHeadingSignatureRef.current = signature;
+      setHeadings(headings);
     },
     [setHeadings],
   );
@@ -239,7 +198,7 @@ export default function Editor() {
       }
 
       if (immediate) {
-        commitHeadings(editor, true);
+        commitHeadings(editor);
         return;
       }
 
@@ -823,9 +782,6 @@ export default function Editor() {
       }
       if (headingSyncTimerRef.current !== null) {
         clearTimeout(headingSyncTimerRef.current);
-      }
-      if (headingRafRef.current !== null) {
-        cancelAnimationFrame(headingRafRef.current);
       }
       if (editorUpdateTimerRef.current !== null) {
         clearTimeout(editorUpdateTimerRef.current);
