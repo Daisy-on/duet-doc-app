@@ -8,6 +8,7 @@ import type {
   AIResponseMetadata,
   AIToolCall,
   AIFinishEvent,
+  AIStreamError,
   StreamCallbacks,
 } from '../ai/types';
 import {
@@ -67,6 +68,16 @@ function toRetrievedContext(hit: AssistantHit): AIContext {
     assetId: hit.source.assetId,
     score: hit.score,
   };
+}
+
+function describeStreamError(error: AIStreamError): string {
+  if (error.code === 'HTTP_401') return '登录已失效，请重新登录后重试。';
+  if (error.code === 'HTTP_403') return '当前账号无权使用回答服务。';
+  if (error.code === 'HTTP_429') return '回答服务请求过于频繁，请稍后手动重试。';
+  if (error.code === 'INCOMPLETE_STREAM' || error.code === 'STREAM_ERROR') {
+    return '回答连接中断，内容可能不完整。';
+  }
+  return '回答服务暂不可用，请稍后手动重试。';
 }
 
 export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
@@ -388,7 +399,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
         };
 
         let requestedToolCall: AIToolCall | undefined;
-        let streamFailed = false;
+        let streamError: AIStreamError | null = null;
         let finishMetadata: Partial<AIResponseMetadata> = {};
         const createStreamCallbacks = (
           onToolCall?: (toolCall: AIToolCall) => void,
@@ -425,8 +436,8 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
           onFinish: (event) => {
             finishMetadata = toResponseMetadata(event);
           },
-          onError: () => {
-            streamFailed = true;
+          onError: (error) => {
+            streamError = error;
           },
         });
 
@@ -438,7 +449,11 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
           run.controller.signal,
         );
 
-        if (streamFailed) {
+        if (streamError) {
+          const error = streamError as AIStreamError;
+          run.currentResponseMetadata.errorCode = error.code;
+          run.currentResponseMetadata.errorMessage = describeStreamError(error);
+          if (!run.textBuffer.trim()) run.textBuffer = describeStreamError(error);
           await finalizeStream(run, 'error');
           return;
         }
@@ -467,14 +482,20 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
             },
             run.controller.signal,
           );
+          if (retrieval.notice) run.currentResponseMetadata.retrievalNotice = retrieval.notice;
           if (!retrieval.hasIndex) {
             run.textBuffer = '当前工作区暂无可用的语义索引。请先建立文本索引，或按需建立图片索引。';
             await finalizeStream(run, 'complete');
             return;
           }
           if (retrieval.hits.length === 0) {
-            run.textBuffer = '已有语义索引，但没有找到符合本次检索条件的内容。';
-            await finalizeStream(run, 'complete');
+            run.textBuffer = retrieval.notice
+              ? '部分知识来源暂不可用，本次无法确认是否存在相关内容。请稍后重试检索。'
+              : '已有语义索引，但没有找到符合本次检索条件的内容。';
+            if (retrieval.notice) {
+              run.currentResponseMetadata.errorMessage = '本次检索未完成。';
+            }
+            await finalizeStream(run, retrieval.notice ? 'error' : 'complete');
             return;
           }
           const evidence = retrieval.hits.slice(0, Math.max(0, 20 - contexts.length));
@@ -486,7 +507,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
             return;
           }
 
-          streamFailed = false;
+          streamError = null;
           finishMetadata = {};
           await AIDispatcher.streamCloudTask(
             {
@@ -499,7 +520,11 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
             run.controller.signal,
           );
 
-          if (streamFailed) {
+          if (streamError) {
+            const error = streamError as AIStreamError;
+            run.currentResponseMetadata.errorCode = error.code;
+            run.currentResponseMetadata.errorMessage = describeStreamError(error);
+            if (!run.textBuffer.trim()) run.textBuffer = describeStreamError(error);
             await finalizeStream(run, 'error');
             return;
           }

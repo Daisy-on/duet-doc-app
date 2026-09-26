@@ -103,6 +103,18 @@ export async function streamCloudAI(
   const reader = response.body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
+  let sawTerminalEvent = false;
+  const streamCallbacks: StreamCallbacks = {
+    ...callbacks,
+    onFinish: (event) => {
+      sawTerminalEvent = true;
+      callbacks.onFinish?.(event);
+    },
+    onError: (error, event) => {
+      sawTerminalEvent = true;
+      callbacks.onError?.(error, event);
+    },
+  };
 
   try {
     while (true) {
@@ -116,7 +128,7 @@ export async function streamCloudAI(
 
       for (const part of parts) {
         if (!part.trim()) continue;
-        parseAndEmitEvent(part, callbacks, trace, {
+        parseAndEmitEvent(part, streamCallbacks, trace, {
           onDeltaReceived: () => {
             if (clientFirstDeltaAt === null) clientFirstDeltaAt = performance.now();
           },
@@ -129,7 +141,7 @@ export async function streamCloudAI(
     }
 
     if (buffer.trim()) {
-      parseAndEmitEvent(buffer, callbacks, trace, {
+      parseAndEmitEvent(buffer, streamCallbacks, trace, {
         onDeltaReceived: () => {
           if (clientFirstDeltaAt === null) clientFirstDeltaAt = performance.now();
         },
@@ -140,6 +152,16 @@ export async function streamCloudAI(
       });
     }
 
+    if (!sawTerminalEvent) {
+      const error: AIStreamError = {
+        code: 'INCOMPLETE_STREAM',
+        message: 'Stream ended before a finish event',
+        requestId,
+      };
+      finalizeTrace('failed', { errorCode: error.code, errorMessage: error.message });
+      callbacks.onError?.(error);
+      return;
+    }
     finalizeTrace('completed');
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError') {

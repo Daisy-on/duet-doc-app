@@ -93,6 +93,9 @@ export interface AIResponseMetadata {
   ttftMs?: number;
   totalLatencyMs?: number;
   usage?: AIUsage;
+  retrievalNotice?: string;
+  errorCode?: string;
+  errorMessage?: string;
 }
 
 export type StreamEventType =

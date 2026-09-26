@@ -66,7 +66,7 @@ export async function searchAssistantKnowledge(
     allowCloudQuery: boolean;
   },
   signal?: AbortSignal,
-): Promise<{ hasIndex: boolean; hits: AssistantHit[] }> {
+): Promise<{ hasIndex: boolean; hits: AssistantHit[]; notice?: string }> {
   const installed = await inspectModelInstallation('bge-large-zh-v1.5-fp16').catch(() => null);
   if (!installed && !options.allowCloudQuery) {
     throw new Error('此设备未安装语义模型。请先下载模型，或在输入框启用按次计费的云端检索。');
@@ -91,34 +91,51 @@ export async function searchAssistantKnowledge(
     const embedding = installed
       ? (await embedPassages([`为这个句子生成表示以用于检索相关文章：${query.trim()}`])).vectors[0]
       : undefined;
-    const local =
-      installed && localSourceTypes.length > 0
-        ? await searchLocalKnowledge(query, {
-            sourceTypes: localSourceTypes,
-            sortBy: options.sortBy,
-            limit,
-            strategy: 'hybrid',
-            queryEmbedding: embedding,
-          })
-        : [];
+    const localSources = installed ? await getCurrentLocalSourceIds() : new Set<string>();
+    let local: RetrievedChunk[] = [];
+    let localFailed = false;
+    let localError: unknown;
+    if (installed && localSourceTypes.length > 0) {
+      try {
+        local = await searchLocalKnowledge(query, {
+          sourceTypes: localSourceTypes,
+          sortBy: options.sortBy,
+          limit,
+          strategy: 'hybrid',
+          queryEmbedding: embedding,
+        });
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        localFailed = true;
+        localError = error;
+      }
+    }
     const minimumUpdatedAt = options.timeRangeDays
       ? Date.now() - options.timeRangeDays * 24 * 60 * 60 * 1000
       : 0;
     const currentLocal = local.filter((chunk) => chunk.sourceUpdatedAt >= minimumUpdatedAt);
-    const remote = await searchCloudRag(
-      workspaceId,
-      {
-        query,
-        embedding,
-        allowCloudEmbedding: !installed && options.allowCloudQuery,
-        sourceTypes,
-        sortBy: options.sortBy,
-        timeRangeDays: options.timeRangeDays,
-        topK: limit,
-      },
-      signal,
-    );
-    const localSources = installed ? await getCurrentLocalSourceIds() : new Set<string>();
+    let remote: Awaited<ReturnType<typeof searchCloudRag>> = { has_index: false, hits: [] };
+    let cloudFailed = false;
+    try {
+      remote = await searchCloudRag(
+        workspaceId,
+        {
+          query,
+          embedding,
+          allowCloudEmbedding: !installed && options.allowCloudQuery,
+          sourceTypes,
+          sortBy: options.sortBy,
+          timeRangeDays: options.timeRangeDays,
+          topK: limit,
+        },
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      if (currentLocal.length === 0) throw error;
+      cloudFailed = true;
+    }
+    if (localFailed && !remote.has_index) throw localError;
     const localHits = currentLocal.map(fromLocal);
     const selectedCloud = remote.hits.filter(
       (hit) => hit.source_type === 'image' || !localSources.has(hit.source_id),
@@ -147,10 +164,21 @@ export async function searchAssistantKnowledge(
         fromCloud({ ...hit, ...neighbor, neighbors: [], score: hit.score }),
       ),
     );
+    const hasLocalIndex =
+      currentLocal.length > 0 ||
+      (!remote.has_index &&
+        Boolean(installed) &&
+        localSourceTypes.length > 0 &&
+        (await listIndexedChunks({ sourceTypes: localSourceTypes })).length > 0);
     signal?.throwIfAborted();
     return {
-      hasIndex: remote.has_index || currentLocal.length > 0,
+      hasIndex: remote.has_index || hasLocalIndex,
       hits: appendAdjacentEvidence(primary, [...localCandidates, ...cloudCandidates]),
+      notice: cloudFailed
+        ? '云端检索暂不可用，本次仅使用本地文字索引，未检索云端图片。'
+        : localFailed
+          ? '本地检索暂不可用，本次仅使用云端索引。'
+          : undefined,
     };
   };
   return installed ? withEmbeddingRuntime(search) : search();

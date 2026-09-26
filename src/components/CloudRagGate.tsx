@@ -66,7 +66,9 @@ export default function CloudRagGate({ onMessage }: Props) {
           onMessage('云端语义索引已建立');
         } else {
           setIsVisible(true);
-          onMessage('云端索引任务未完全成功，可以重新尝试');
+          onMessage(
+            `云端索引完成 ${run.completed_jobs} 项，失败 ${run.failed_jobs} 项。检查配置或网络后可手动重试。`,
+          );
         }
       } catch {
         // Keep the passive status visible and retry on the next interval.

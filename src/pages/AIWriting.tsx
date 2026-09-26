@@ -292,6 +292,22 @@ export default function AIWriting() {
     await sendChatMessage(textToSend, payloadDocs, targetSessionId);
   };
 
+  const handleRetryQuestion = (assistantId: string) => {
+    if (inputText.trim() || referencedDocs.length > 0) {
+      setToastText('请先处理输入框中未发送的内容');
+      return;
+    }
+    const index = sessionMessages.findIndex((message) => message.id === assistantId);
+    const question = sessionMessages
+      .slice(0, index)
+      .reverse()
+      .find((message) => message.role === 'user');
+    if (!question) return;
+    setInputText(question.content);
+    setReferencedDocs(question.referencedDocs ?? []);
+    textareaRef.current?.focus();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -608,6 +624,12 @@ export default function AIWriting() {
                           </div>
                         )}
 
+                        {!isUser && msg.aiMetadata?.retrievalNotice && (
+                          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                            {msg.aiMetadata.retrievalNotice}
+                          </p>
+                        )}
+
                         {/* 提示中断或失败状态 */}
                         {!isUser && msg.status === 'stopped' && (
                           <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
@@ -616,8 +638,18 @@ export default function AIWriting() {
                         )}
                         {!isUser && msg.status === 'error' && (
                           <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
-                            生成中断或网络异常
+                            {msg.aiMetadata?.errorMessage ?? '知识检索或回答未完成'}
                           </div>
+                        )}
+                        {!isUser && msg.status === 'error' && isLastAssistant && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetryQuestion(msg.id)}
+                            disabled={isGenerating}
+                            className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
+                          >
+                            重新提问
+                          </button>
                         )}
                       </div>
 
@@ -634,13 +666,19 @@ export default function AIWriting() {
                               setLiveThinkingSeconds(0);
                               regenerateResponse(msg.id);
                             }}
-                            disabled={isGenerating || !isLastAssistant}
+                            disabled={isGenerating || !isLastAssistant || msg.status === 'error'}
                             className={`p-1 rounded-lg transition-colors ${
-                              isGenerating || !isLastAssistant
+                              isGenerating || !isLastAssistant || msg.status === 'error'
                                 ? 'text-text-ghost cursor-not-allowed'
                                 : 'text-text-secondary hover:text-indigo-600 hover:bg-hover-bg cursor-pointer'
                             }`}
-                            title={isLastAssistant ? '重新生成回答' : '仅最新一条回答可重新生成'}
+                            title={
+                              msg.status === 'error'
+                                ? '失败后请使用重新提问'
+                                : isLastAssistant
+                                  ? '重新生成回答'
+                                  : '仅最新一条回答可重新生成'
+                            }
                           >
                             <RotateCcw size={12} />
                           </button>
