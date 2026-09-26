@@ -922,32 +922,32 @@ export default function Editor() {
       const result = locateCitation(editor.state.doc, citation);
       if (result.kind === 'exact') {
         if (citationTimerRef.current !== null) clearTimeout(citationTimerRef.current);
-        editor.view.dispatch(
-          editor.state.tr.setMeta(citationHighlightKey, { from: result.from, to: result.to }),
-        );
         const container = editorContainerRef.current;
         if (container) {
           const top = editor.view.coordsAtPos(result.from).top;
           container.scrollTo({
             top: container.scrollTop + top - container.getBoundingClientRect().top - 24,
-            behavior: 'smooth',
+            behavior: 'instant',
           });
         }
+        editor.view.dispatch(
+          editor.state.tr.setMeta(citationHighlightKey, { from: result.from, to: result.to }),
+        );
         citationTimerRef.current = window.setTimeout(() => {
           citationTimerRef.current = null;
           if (!editor.isDestroyed)
             editor.view.dispatch(editor.state.tr.setMeta(citationHighlightKey, null));
-        }, 2000);
+        }, 3000);
         return;
       }
 
       if (result.kind === 'section') {
         const heading = editor.view.nodeDOM(result.pos);
         if (heading instanceof HTMLElement) {
-          heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          heading.scrollIntoView({ behavior: 'instant', block: 'start' });
         }
       } else {
-        editorContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        editorContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
       }
       setCitationNotice(
         !citation.excerpt

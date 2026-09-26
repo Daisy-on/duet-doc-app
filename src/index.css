@@ -84,7 +84,7 @@ body {
 }
 
 .ProseMirror .citation-flash {
-  animation: citationFlash 2s ease-in-out;
+  animation: citationFlash 3s ease-in-out;
   border-radius: 2px;
 }
 
