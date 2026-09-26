@@ -68,6 +68,33 @@ body {
   outline: none;
 }
 
+@keyframes citationFlash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  20%,
+  60% {
+    background-color: rgb(56 189 248 / 28%);
+  }
+  40%,
+  80% {
+    background-color: rgb(56 189 248 / 10%);
+  }
+}
+
+.ProseMirror .citation-flash {
+  animation: citationFlash 2s ease-in-out;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ProseMirror .citation-flash {
+    animation: none;
+    background-color: rgb(56 189 248 / 20%);
+  }
+}
+
 .ProseMirror h1 {
   font-size: 32px;
   font-weight: bold;

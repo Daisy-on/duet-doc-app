@@ -57,7 +57,14 @@ function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
 }
 
 function uniqueKnowledgeSources(sources: KnowledgeSource[]): KnowledgeSource[] {
-  return Array.from(new Map(sources.map((source) => [source.sourceId, source])).values());
+  return Array.from(
+    new Map(
+      sources.map((source) => [
+        `${source.sourceType}:${source.sourceId}:${source.chunkIndex}`,
+        source,
+      ]),
+    ).values(),
+  );
 }
 
 export default function AIWriting() {
@@ -340,7 +347,11 @@ export default function AIWriting() {
   const openKnowledgeSource = (source: KnowledgeSource) => {
     const documentId = source.documentId ?? source.sourceId;
     if (source.sourceType === 'memo') {
-      navigate(`/memo/${documentId}`);
+      navigate(`/memo/${documentId}`, {
+        state: {
+          citation: { documentId, excerpt: source.excerpt, headingPath: source.headingPath },
+        },
+      });
       return;
     }
     const kbId =
@@ -352,7 +363,12 @@ export default function AIWriting() {
       return;
     }
     const imageQuery = source.assetId ? `?assetId=${encodeURIComponent(source.assetId)}` : '';
-    navigate(`/kb/${kbId}/doc/${documentId}${imageQuery}`);
+    navigate(`/kb/${kbId}/doc/${documentId}${imageQuery}`, {
+      state:
+        source.sourceType === 'image'
+          ? undefined
+          : { citation: { documentId, excerpt: source.excerpt, headingPath: source.headingPath } },
+    });
   };
 
   // 一键保存到小记
@@ -611,7 +627,7 @@ export default function AIWriting() {
                                     <span className="max-w-[190px] truncate">
                                       {source.sourceType === 'image'
                                         ? `${source.title} · 图片`
-                                        : source.title}
+                                        : `${source.title} · ${source.headingPath.at(-1) || `片段 ${source.chunkIndex + 1}`}`}
                                     </span>
                                   </button>
                                 ))}

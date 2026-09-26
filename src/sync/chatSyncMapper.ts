@@ -34,6 +34,7 @@ export function toChatMessageSyncData(message: ChatMessage): ChatMessageSyncData
         title: source.title,
         chunk_index: source.chunkIndex,
         heading_path: [...source.headingPath],
+        excerpt: source.excerpt,
       })) ?? [],
     ai_metadata: aiMetadata,
     created_at: new Date(message.createdAt).toISOString(),

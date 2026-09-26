@@ -78,6 +78,7 @@ export interface ChatMessageSyncData {
     title: string;
     chunk_index: number;
     heading_path: string[];
+    excerpt?: string;
   }>;
   ai_metadata: Record<string, unknown> | null;
   created_at: string;

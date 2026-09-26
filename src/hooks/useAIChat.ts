@@ -536,7 +536,10 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
           }
           const evidence = retrieval.hits.slice(0, Math.max(0, 20 - contexts.length));
           const retrievedContexts = evidence.map(toRetrievedContext);
-          run.knowledgeSources = evidence.map((hit) => hit.source);
+          run.knowledgeSources = evidence.map((hit) => ({
+            ...hit.source,
+            excerpt: hit.source.sourceType === 'image' ? undefined : hit.content,
+          }));
 
           if (run.stopRequested || run.controller.signal.aborted) {
             await finalizeStream(run, 'stopped');

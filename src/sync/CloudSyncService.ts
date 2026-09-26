@@ -134,6 +134,7 @@ function parseKnowledgeSources(snapshot: SyncRemoteSnapshot): KnowledgeSource[] 
       title: requiredString(source, 'title'),
       chunkIndex,
       headingPath,
+      excerpt: typeof source.excerpt === 'string' ? source.excerpt : undefined,
     };
   });
 }

@@ -22,6 +22,7 @@ export interface KnowledgeSource {
   title: string;
   chunkIndex: number;
   headingPath: string[];
+  excerpt?: string;
 }
 
 export interface ChatMessage {

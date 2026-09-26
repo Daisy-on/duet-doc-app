@@ -12,9 +12,11 @@ import { TableHeader } from '@tiptap/extension-table';
 import { CustomCodeBlock } from './CodeBlockExtension';
 import LinkHoverPopover from './LinkHoverPopover';
 import { common, createLowlight } from 'lowlight';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { useEditorStore } from '../../store';
 import { getOutlineHeadings } from './outlineHeadings';
+import { locateCitation, type CitationTarget } from './citationLocator';
+import { CitationHighlightExtension, citationHighlightKey } from './CitationHighlightExtension';
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Sparkles, MoreVertical } from 'lucide-react';
@@ -112,6 +114,7 @@ const assistantSelectionHighlightExtension = Extension.create({
 });
 
 export default function Editor() {
+  const location = useLocation();
   const { docId, memoId } = useParams<{ docId?: string; memoId?: string }>();
   const currentDocId = docId || memoId;
   const doc = useKnowledgeBaseStore((state) =>
@@ -130,6 +133,9 @@ export default function Editor() {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const ghostTextTimerRef = useRef<number | null>(null);
   const headingSyncTimerRef = useRef<number | null>(null);
+  const citationTimerRef = useRef<number | null>(null);
+  const citationNoticeTimerRef = useRef<number | null>(null);
+  const handledCitationKeyRef = useRef<string | null>(null);
   const lastHeadingSignatureRef = useRef('');
   const editorUpdateTimerRef = useRef<number | null>(null);
   const pendingDocumentUpdateRef = useRef<{
@@ -149,6 +155,7 @@ export default function Editor() {
     left: number;
   } | null>(null);
   const [assistantInput, setAssistantInput] = useState('');
+  const [citationNotice, setCitationNotice] = useState<string | null>(null);
   const [assistantTask, setAssistantTask] = useState<CloudAITask>('rewrite');
   const [savedSelection, setSavedSelection] = useState<{
     from: number;
@@ -423,6 +430,7 @@ export default function Editor() {
         getDocId: () => useEditorStore.getState().activeEditorDocumentId,
       }),
       assistantSelectionHighlightExtension,
+      CitationHighlightExtension,
     ],
     [],
   );
@@ -783,6 +791,8 @@ export default function Editor() {
       if (headingSyncTimerRef.current !== null) {
         clearTimeout(headingSyncTimerRef.current);
       }
+      if (citationTimerRef.current !== null) clearTimeout(citationTimerRef.current);
+      if (citationNoticeTimerRef.current !== null) clearTimeout(citationNoticeTimerRef.current);
       if (editorUpdateTimerRef.current !== null) {
         clearTimeout(editorUpdateTimerRef.current);
       }
@@ -899,6 +909,63 @@ export default function Editor() {
     });
   }, [docContent, editor, flushPendingDocumentUpdate, syncHeadings]);
 
+  useEffect(() => {
+    const citation = (location.state as { citation?: CitationTarget } | null)?.citation;
+    if (!editor || !currentDocId || citation?.documentId !== currentDocId) return;
+    if (handledCitationKeyRef.current === location.key) return;
+
+    queueMicrotask(() => {
+      if (editor.isDestroyed || currentDocIdRef.current !== currentDocId) return;
+      if (handledCitationKeyRef.current === location.key) return;
+      handledCitationKeyRef.current = location.key;
+
+      const result = locateCitation(editor.state.doc, citation);
+      if (result.kind === 'exact') {
+        if (citationTimerRef.current !== null) clearTimeout(citationTimerRef.current);
+        editor.view.dispatch(
+          editor.state.tr.setMeta(citationHighlightKey, { from: result.from, to: result.to }),
+        );
+        const container = editorContainerRef.current;
+        if (container) {
+          const top = editor.view.coordsAtPos(result.from).top;
+          container.scrollTo({
+            top: container.scrollTop + top - container.getBoundingClientRect().top - 24,
+            behavior: 'smooth',
+          });
+        }
+        citationTimerRef.current = window.setTimeout(() => {
+          citationTimerRef.current = null;
+          if (!editor.isDestroyed)
+            editor.view.dispatch(editor.state.tr.setMeta(citationHighlightKey, null));
+        }, 2000);
+        return;
+      }
+
+      if (result.kind === 'section') {
+        const heading = editor.view.nodeDOM(result.pos);
+        if (heading instanceof HTMLElement) {
+          heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } else {
+        editorContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      setCitationNotice(
+        !citation.excerpt
+          ? result.kind === 'section'
+            ? '旧引用未保存片段内容，已跳转到对应章节。'
+            : '旧引用未保存片段内容，已打开文档。'
+          : result.kind === 'section'
+            ? '原引用片段已变化或无法唯一定位，已跳转到对应章节。'
+            : '原引用片段已变化或无法定位，已打开文档。',
+      );
+      if (citationNoticeTimerRef.current !== null) clearTimeout(citationNoticeTimerRef.current);
+      citationNoticeTimerRef.current = window.setTimeout(() => {
+        citationNoticeTimerRef.current = null;
+        setCitationNotice(null);
+      }, 5000);
+    });
+  }, [currentDocId, docContent, editor, location]);
+
   // 拦截链接点击（包含 CTRL+点击 / CMD+点击），确保始终在外部新标签页中打开规范化外链
   useEffect(() => {
     const container = editorContainerRef.current;
@@ -929,6 +996,11 @@ export default function Editor() {
 
   return (
     <div ref={editorContainerRef} className="flex-1 px-16 py-10 overflow-y-auto relative">
+      {citationNotice && (
+        <div className="sticky top-0 z-40 mx-auto mb-4 w-fit max-w-full rounded bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm dark:bg-amber-950 dark:text-amber-200">
+          {citationNotice}
+        </div>
+      )}
       {/* 气泡菜单：fixed 定位跟随选区，并加入弹出动画 */}
       {bubblePos && (
         <div
