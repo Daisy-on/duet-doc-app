@@ -18,6 +18,7 @@ const state = {
   localStale: false,
   cloudStale: 0,
   remoteClientStale: 0,
+  unavailableStaleIds: [],
 };
 const imports = {
   '../models/modelCache': { inspectModelInstallation: async () => ({ installed: true }) },
@@ -40,6 +41,7 @@ const imports = {
     getCloudRagCoverage: async () => ({
       stale_sources: state.cloudStale,
       stale_client_sources: state.remoteClientStale,
+      unavailable_stale_source_ids: state.unavailableStaleIds,
     }),
   },
   './embeddingClient': {
@@ -69,6 +71,7 @@ test.beforeEach(() => {
   state.localStale = false;
   state.cloudStale = 0;
   state.remoteClientStale = 0;
+  state.unavailableStaleIds = [];
 });
 
 test('keeps local evidence when cloud search fails', async () => {
@@ -123,7 +126,7 @@ test('reports an expired local index when no current evidence exists', async () 
 });
 
 test('reports an expired cloud index when no current evidence exists', async () => {
-  state.cloudStale = 1;
+  state.unavailableStaleIds = ['doc-2'];
   const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
   assert.equal(result.hasIndex, false);
   assert.equal(result.indexState, 'stale');
@@ -131,10 +134,55 @@ test('reports an expired cloud index when no current evidence exists', async () 
 });
 
 test('recognizes an expired uploaded client index on another device', async () => {
-  state.remoteClientStale = 1;
+  state.unavailableStaleIds = ['doc-2'];
   const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
   assert.equal(result.indexState, 'stale');
   assert.equal(result.localReindexAvailable, true);
+});
+
+test('warns when a different document is excluded by a stale index', async () => {
+  state.local = [
+    {
+      id: 'chunk-1',
+      sourceId: 'doc-1',
+      sourceType: 'document',
+      kbId: 'kb-1',
+      title: '当前文档',
+      chunkIndex: 0,
+      headingPath: [],
+      content: '可用内容',
+      score: 0.9,
+      sourceUpdatedAt: Date.now(),
+    },
+  ];
+  state.unavailableStaleIds = ['doc-2'];
+  const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
+  assert.equal(result.hasIndex, true);
+  assert.match(result.notice, /另有 1 项资源的索引已过期/);
+  assert.deepEqual(
+    result.hits.map((hit) => hit.chunkId),
+    ['chunk-1'],
+  );
+});
+
+test('does not warn when a current local index covers a stale cloud copy', async () => {
+  state.local = [
+    {
+      id: 'chunk-1',
+      sourceId: 'doc-1',
+      sourceType: 'document',
+      kbId: 'kb-1',
+      title: '当前文档',
+      chunkIndex: 0,
+      headingPath: [],
+      content: '可用内容',
+      score: 0.9,
+      sourceUpdatedAt: Date.now(),
+    },
+  ];
+  state.unavailableStaleIds = ['doc-1'];
+  const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
+  assert.equal(result.notice, undefined);
 });
 
 test('fails when cloud search fails and local search found no evidence', async () => {

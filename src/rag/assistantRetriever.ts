@@ -179,27 +179,34 @@ export async function searchAssistantKnowledge(
         (await listIndexedChunks({ sourceTypes: localSourceTypes })).length > 0);
     signal?.throwIfAborted();
     const hasIndex = remote.has_index || hasLocalIndex;
+    const coverage =
+      !options.sourceTypes && !options.timeRangeDays
+        ? await getCloudRagCoverage(workspaceId).catch(() => null)
+        : null;
+    const unavailableStale = (coverage?.unavailable_stale_source_ids ?? []).filter(
+      (sourceId) => !localSources.has(sourceId),
+    );
     let indexState: 'stale' | 'missing' | undefined;
     if (!hasIndex) {
       const localIndexStale = await hasStaleLocalIndex(localSourceTypes);
-      const coverage =
-        !options.sourceTypes && !options.timeRangeDays
-          ? await getCloudRagCoverage(workspaceId).catch(() => null)
-          : null;
-      const cloudStale = (coverage?.stale_sources ?? 0) + (coverage?.stale_client_sources ?? 0);
-      indexState = localIndexStale || cloudStale > 0 ? 'stale' : 'missing';
+      indexState = localIndexStale || unavailableStale.length > 0 ? 'stale' : 'missing';
     }
+    const failureNotice = cloudFailed
+      ? '云端检索暂不可用，本次仅使用本地文字索引，未检索云端图片。'
+      : localFailed
+        ? '本地检索暂不可用，本次仅使用云端索引。'
+        : undefined;
+    const staleNotice =
+      hasIndex && unavailableStale.length > 0
+        ? `另有 ${unavailableStale.length} 项资源的索引已过期，本次回答未覆盖这些内容。请手动更新语义索引。`
+        : undefined;
     return {
       hasIndex,
       indexState,
       localReindexAvailable:
         indexState === 'stale' && Boolean(installed) && localSourceTypes.length > 0,
       hits: appendAdjacentEvidence(primary, [...localCandidates, ...cloudCandidates]),
-      notice: cloudFailed
-        ? '云端检索暂不可用，本次仅使用本地文字索引，未检索云端图片。'
-        : localFailed
-          ? '本地检索暂不可用，本次仅使用云端索引。'
-          : undefined,
+      notice: [failureNotice, staleNotice].filter(Boolean).join(' ') || undefined,
     };
   };
   return installed ? withEmbeddingRuntime(search) : search();

@@ -5,6 +5,7 @@ export interface CloudRagCoverage {
   ready_sources: number;
   stale_sources: number;
   stale_client_sources: number;
+  unavailable_stale_source_ids: string[];
   missing_sources: number;
   pending_images: number;
   has_client_index: boolean;
