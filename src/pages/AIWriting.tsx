@@ -629,6 +629,15 @@ export default function AIWriting() {
                             {msg.aiMetadata.retrievalNotice}
                           </p>
                         )}
+                        {!isUser && msg.aiMetadata?.localReindexAvailable && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/dev/local-retrieval')}
+                            className="mt-2 text-xs text-accent hover:underline"
+                          >
+                            更新本地索引
+                          </button>
+                        )}
 
                         {/* 提示中断或失败状态 */}
                         {!isUser && msg.status === 'stopped' && (

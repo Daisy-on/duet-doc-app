@@ -71,6 +71,7 @@ interface AIWritingStore {
       content?: string;
       thinkingContent?: string;
       status?: 'streaming' | 'complete' | 'stopped' | 'error';
+      aiMetadata?: AIResponseMetadata;
     },
   ) => void;
   commitMessage: (msg: ChatMessage) => Promise<void>;

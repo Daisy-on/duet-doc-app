@@ -94,6 +94,8 @@ export interface AIResponseMetadata {
   totalLatencyMs?: number;
   usage?: AIUsage;
   retrievalNotice?: string;
+  indexState?: 'stale' | 'missing';
+  localReindexAvailable?: boolean;
   errorCode?: string;
   errorMessage?: string;
 }

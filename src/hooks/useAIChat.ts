@@ -20,6 +20,7 @@ import {
 import { db } from '../db';
 import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
 import { searchAssistantKnowledge, type AssistantHit } from '../rag/assistantRetriever';
+import { generalAnswerFallback } from '../ai/generalAnswerFallback';
 import { useAuthStore } from '../store/authStore';
 
 const MAX_HISTORY_MESSAGES = 20;
@@ -470,21 +471,56 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
           const sourceTypes = requestedSourceTypes?.length ? requestedSourceTypes : undefined;
           const workspaceId = useAuthStore.getState().workspaceId;
           if (!workspaceId) throw new Error('未找到当前工作区，无法检索知识库。');
-          const retrieval = await searchAssistantKnowledge(
-            workspaceId,
-            args.query?.trim() || userContent.trim(),
-            {
-              sourceTypes,
-              sortBy: args.sortBy ?? args.sort_by,
-              timeRangeDays: args.timeRangeDays ?? args.time_range_days,
-              topK: args.topK ?? args.top_k,
-              allowCloudQuery,
-            },
-            run.controller.signal,
-          );
+          let retrieval: Awaited<ReturnType<typeof searchAssistantKnowledge>>;
+          try {
+            retrieval = await searchAssistantKnowledge(
+              workspaceId,
+              args.query?.trim() || userContent.trim(),
+              {
+                sourceTypes,
+                sortBy: args.sortBy ?? args.sort_by,
+                timeRangeDays: args.timeRangeDays ?? args.time_range_days,
+                topK: args.topK ?? args.top_k,
+                allowCloudQuery,
+              },
+              run.controller.signal,
+            );
+          } catch (error) {
+            if (run.controller.signal.aborted) throw error;
+            run.knowledgeSources = [];
+            run.reasoningBuffer = '';
+            run.currentResponseMetadata.retrievalNotice =
+              '知识库检索失败。以下仅为通用回答，未参考你的文档或图片，请勿将其当作知识库结论。';
+            updateMessageStream(run.assistantMsgId, {
+              aiMetadata: { ...run.currentResponseMetadata },
+            });
+            streamError = null;
+            finishMetadata = {};
+            await AIDispatcher.streamCloudTask(
+              generalAnswerFallback(request),
+              createStreamCallbacks(),
+              run.controller.signal,
+            );
+            if (streamError) {
+              const failure = streamError as AIStreamError;
+              run.currentResponseMetadata.retrievalNotice = '知识库检索失败，通用回答也未完成。';
+              run.currentResponseMetadata.errorCode = failure.code;
+              run.currentResponseMetadata.errorMessage = describeStreamError(failure);
+              if (!run.textBuffer.trim()) run.textBuffer = describeStreamError(failure);
+              await finalizeStream(run, 'error');
+              return;
+            }
+            await finalizeStream(run, run.stopRequested ? 'stopped' : 'complete', finishMetadata);
+            return;
+          }
           if (retrieval.notice) run.currentResponseMetadata.retrievalNotice = retrieval.notice;
           if (!retrieval.hasIndex) {
-            run.textBuffer = '当前工作区暂无可用的语义索引。请先建立文本索引，或按需建立图片索引。';
+            run.currentResponseMetadata.indexState = retrieval.indexState;
+            run.currentResponseMetadata.localReindexAvailable = retrieval.localReindexAvailable;
+            run.textBuffer =
+              retrieval.indexState === 'stale'
+                ? '当前没有可用的语义索引，检测到已有索引过期。请手动更新；未安装端侧模型时，可通过顶栏确认建立云端索引。'
+                : '当前工作区暂无可用的语义索引。请先建立文本索引，或按需建立图片索引。';
             await finalizeStream(run, 'complete');
             return;
           }

@@ -15,11 +15,15 @@ const state = {
   remote: { has_index: false, hits: [] },
   cloudError: null,
   localError: null,
+  localStale: false,
+  cloudStale: 0,
+  remoteClientStale: 0,
 };
 const imports = {
   '../models/modelCache': { inspectModelInstallation: async () => ({ installed: true }) },
   './chunkRepository': {
     getCurrentLocalSourceIds: async () => new Set(['doc-1']),
+    hasStaleLocalIndex: async () => state.localStale,
     listIndexedChunks: async ({ sourceTypes }) =>
       sourceTypes
         ? state.indexedChunks.filter((chunk) => sourceTypes.includes(chunk.sourceType))
@@ -31,6 +35,12 @@ const imports = {
       if (state.cloudError) throw state.cloudError;
       return state.remote;
     },
+  },
+  './cloudRagClient': {
+    getCloudRagCoverage: async () => ({
+      stale_sources: state.cloudStale,
+      stale_client_sources: state.remoteClientStale,
+    }),
   },
   './embeddingClient': {
     embedPassages: async () => ({ vectors: [new Float32Array(1024)] }),
@@ -56,6 +66,9 @@ test.beforeEach(() => {
   state.remote = { has_index: false, hits: [] };
   state.cloudError = null;
   state.localError = null;
+  state.localStale = false;
+  state.cloudStale = 0;
+  state.remoteClientStale = 0;
 });
 
 test('keeps local evidence when cloud search fails', async () => {
@@ -98,6 +111,30 @@ test('does not count a document index for an image-only search', async () => {
     sourceTypes: ['image'],
   });
   assert.equal(result.hasIndex, false);
+  assert.equal(result.indexState, 'missing');
+});
+
+test('reports an expired local index when no current evidence exists', async () => {
+  state.localStale = true;
+  const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
+  assert.equal(result.hasIndex, false);
+  assert.equal(result.indexState, 'stale');
+  assert.equal(result.localReindexAvailable, true);
+});
+
+test('reports an expired cloud index when no current evidence exists', async () => {
+  state.cloudStale = 1;
+  const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
+  assert.equal(result.hasIndex, false);
+  assert.equal(result.indexState, 'stale');
+  assert.equal(result.localReindexAvailable, true);
+});
+
+test('recognizes an expired uploaded client index on another device', async () => {
+  state.remoteClientStale = 1;
+  const result = await searchAssistantKnowledge('workspace', '问题', { allowCloudQuery: false });
+  assert.equal(result.indexState, 'stale');
+  assert.equal(result.localReindexAvailable, true);
 });
 
 test('fails when cloud search fails and local search found no evidence', async () => {

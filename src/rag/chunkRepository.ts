@@ -78,6 +78,17 @@ export async function getCurrentLocalSourceIds(sourceIds?: string[]): Promise<Se
   );
 }
 
+export async function hasStaleLocalIndex(sourceTypes: DocumentSourceType[]): Promise<boolean> {
+  if (sourceTypes.length === 0) return false;
+  const states = (await db.documentIndexStates.where('status').equals('indexed').toArray()).filter(
+    (state) => sourceTypes.includes(state.sourceType),
+  );
+  if (states.length === 0) return false;
+  const current = await getCurrentLocalSourceIds(states.map((state) => state.sourceId));
+  const documents = await db.documents.bulkGet(states.map((state) => state.sourceId));
+  return states.some((state, index) => Boolean(documents[index]) && !current.has(state.sourceId));
+}
+
 export async function updateDocumentChunkScope(
   sourceId: string,
   kbId: string,

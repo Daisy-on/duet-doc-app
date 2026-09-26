@@ -1,6 +1,7 @@
 import { inspectModelInstallation } from '../models/modelCache';
 import type { KnowledgeSource } from '../store/aiWritingStore';
-import { getCurrentLocalSourceIds, listIndexedChunks } from './chunkRepository';
+import { getCurrentLocalSourceIds, hasStaleLocalIndex, listIndexedChunks } from './chunkRepository';
+import { getCloudRagCoverage } from './cloudRagClient';
 import { appendAdjacentEvidence } from './adjacentEvidence';
 import { searchCloudRag, type CloudRagHit } from './cloudRagSearch';
 import { embedPassages, withEmbeddingRuntime } from './embeddingClient';
@@ -66,7 +67,13 @@ export async function searchAssistantKnowledge(
     allowCloudQuery: boolean;
   },
   signal?: AbortSignal,
-): Promise<{ hasIndex: boolean; hits: AssistantHit[]; notice?: string }> {
+): Promise<{
+  hasIndex: boolean;
+  hits: AssistantHit[];
+  notice?: string;
+  indexState?: 'stale' | 'missing';
+  localReindexAvailable?: boolean;
+}> {
   const installed = await inspectModelInstallation('bge-large-zh-v1.5-fp16').catch(() => null);
   if (!installed && !options.allowCloudQuery) {
     throw new Error('此设备未安装语义模型。请先下载模型，或在输入框启用按次计费的云端检索。');
@@ -171,8 +178,22 @@ export async function searchAssistantKnowledge(
         localSourceTypes.length > 0 &&
         (await listIndexedChunks({ sourceTypes: localSourceTypes })).length > 0);
     signal?.throwIfAborted();
+    const hasIndex = remote.has_index || hasLocalIndex;
+    let indexState: 'stale' | 'missing' | undefined;
+    if (!hasIndex) {
+      const localIndexStale = await hasStaleLocalIndex(localSourceTypes);
+      const coverage =
+        !options.sourceTypes && !options.timeRangeDays
+          ? await getCloudRagCoverage(workspaceId).catch(() => null)
+          : null;
+      const cloudStale = (coverage?.stale_sources ?? 0) + (coverage?.stale_client_sources ?? 0);
+      indexState = localIndexStale || cloudStale > 0 ? 'stale' : 'missing';
+    }
     return {
-      hasIndex: remote.has_index || hasLocalIndex,
+      hasIndex,
+      indexState,
+      localReindexAvailable:
+        indexState === 'stale' && Boolean(installed) && localSourceTypes.length > 0,
       hits: appendAdjacentEvidence(primary, [...localCandidates, ...cloudCandidates]),
       notice: cloudFailed
         ? '云端检索暂不可用，本次仅使用本地文字索引，未检索云端图片。'
