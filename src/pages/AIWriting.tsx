@@ -513,28 +513,26 @@ export default function AIWriting() {
                 </div>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto flex flex-col space-y-6">
+              <div className="max-w-4xl mx-auto flex flex-col space-y-8">
                 {sessionMessages.map((msg) => {
                   const isUser = msg.role === 'user';
                   const isExpanded = expandedThinking[msg.id] !== false;
                   const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
+                  const timestamp = new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
 
                   return (
                     <div
                       key={msg.id}
                       className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                     >
-                      {!isUser && (
-                        <div className="text-[14px] text-text-secondary font-bold mb-1 px-1">
-                          Duet 助手
-                        </div>
-                      )}
-
                       <div
-                        className={`relative rounded-2xl shadow-sm border ${
+                        className={`relative ${
                           isUser
-                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-100 dark:border-indigo-900 rounded-tr-none text-text-primary max-w-[85%] self-end px-4 py-3'
-                            : 'bg-bg-main border-border-color rounded-tl-none text-text-primary w-full px-5 py-4'
+                            ? 'max-w-[85%] self-end rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-text-primary shadow-sm dark:border-indigo-900 dark:bg-indigo-950/60'
+                            : 'w-full min-w-0 py-1 text-text-primary'
                         }`}
                       >
                         {/* 引用文档标签 */}
@@ -554,11 +552,11 @@ export default function AIWriting() {
 
                         {/* 深度思考过程 (ChatGPT 风格: "思考了 12s ›") */}
                         {!isUser && msg.thinkingContent && (
-                          <div className="mb-2">
+                          <div className="mb-4">
                             <button
                               type="button"
                               onClick={() => toggleThinkingNode(msg.id)}
-                              className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors py-1 cursor-pointer font-sans select-none"
+                              className="flex items-center gap-1.5 py-1 text-[13px] text-text-secondary transition-colors hover:text-text-primary cursor-pointer font-sans select-none"
                             >
                               <span className="font-medium">
                                 {getThinkingLabel(msg, liveThinkingSeconds)}
@@ -582,13 +580,13 @@ export default function AIWriting() {
                         {/* 消息正文 */}
                         <div className="space-y-1.5">
                           {isUser ? (
-                            <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+                            <p className="text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap">
                               {msg.content}
                             </p>
                           ) : (
                             <div className="relative">
                               <div
-                                className="markdown-body text-sm text-text-primary leading-relaxed"
+                                className="markdown-body assistant-answer text-[15px] text-text-primary leading-relaxed"
                                 dangerouslySetInnerHTML={{
                                   __html: renderMarkdownToHtml(msg.content),
                                 }}
@@ -601,7 +599,7 @@ export default function AIWriting() {
                         </div>
 
                         {!isUser && msg.knowledgeSources && msg.knowledgeSources.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-border-color/70">
+                          <div className="mt-5 border-t border-border-color/70 pt-3">
                             <div className="flex items-center gap-1.5 text-[11px] text-text-secondary">
                               <Sparkles size={11} className="text-indigo-500" />
                               <span className="font-medium">已检索知识库</span>
@@ -612,7 +610,7 @@ export default function AIWriting() {
                                 .map((source) => (
                                   <button
                                     type="button"
-                                    key={source.sourceId}
+                                    key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}`}
                                     onClick={() => openKnowledgeSource(source)}
                                     className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
                                     title={source.headingPath.join(' > ') || source.title}
@@ -680,11 +678,7 @@ export default function AIWriting() {
 
                       {/* AI 消息底部操作工具栏 (仅非 streaming 状态展示) */}
                       {!isUser && msg.status !== 'streaming' && msg.content && (
-                        <div
-                          className={`flex items-center gap-1.5 mt-1.5 px-1 transition-all duration-200 ${
-                            isLastAssistant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                          }`}
-                        >
+                        <div className="mt-2 flex items-center gap-1.5 text-text-secondary/80 transition-colors hover:text-text-secondary">
                           {/* 重新生成 (仅最新一条 AI 回答可用) */}
                           <button
                             onClick={() => {
@@ -705,7 +699,7 @@ export default function AIWriting() {
                                   : '仅最新一条回答可重新生成'
                             }
                           >
-                            <RotateCcw size={12} />
+                            <RotateCcw size={15} />
                           </button>
 
                           {/* 复制 */}
@@ -715,9 +709,9 @@ export default function AIWriting() {
                             title="复制回答"
                           >
                             {copiedMsgId === msg.id ? (
-                              <Check size={12} className="text-emerald-500" />
+                              <Check size={15} className="text-emerald-500" />
                             ) : (
-                              <Copy size={12} />
+                              <Copy size={15} />
                             )}
                           </button>
 
@@ -726,30 +720,32 @@ export default function AIWriting() {
                           {/* 生成文档 */}
                           <button
                             onClick={() => handleOpenDocChooser(msg.content)}
-                            className="h-6 px-2 rounded-lg bg-hover-bg hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-indigo-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
+                            className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
                           >
-                            <FilePlus size={11} />
+                            <FilePlus size={14} />
                             <span>生成文档</span>
                           </button>
 
                           {/* 保存到小记 */}
                           <button
                             onClick={() => handleSaveToMemo(msg.content)}
-                            className="h-6 px-2 rounded-lg bg-hover-bg hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-600 text-text-secondary text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-border-color/60"
+                            className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
                           >
-                            <StickyNote size={11} />
+                            <StickyNote size={14} />
                             <span>保存到小记</span>
                           </button>
+
+                          <div className="w-px h-3 bg-border-color mx-0.5" />
+
+                          <span className="ml-auto shrink-0 text-[13px] text-text-secondary">
+                            {timestamp}
+                          </span>
                         </div>
                       )}
 
-                      {/* Timestamp */}
-                      <div className="text-[12px] text-text-secondary mt-1 px-1">
-                        {new Date(msg.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
+                      {(isUser || msg.status === 'streaming' || !msg.content) && (
+                        <div className="mt-1 text-[13px] text-text-secondary">{timestamp}</div>
+                      )}
                     </div>
                   );
                 })}
@@ -758,14 +754,9 @@ export default function AIWriting() {
                 {isGenerating &&
                   sessionMessages.length > 0 &&
                   sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
-                    <div className="flex flex-col items-start animate-pulse">
-                      <div className="text-[10px] text-text-secondary font-bold mb-1 px-1">
-                        Duet 助手
-                      </div>
-                      <div className="bg-bg-main border border-border-color rounded-2xl rounded-tl-none px-4 py-3 text-xs text-text-secondary flex items-center gap-2 shadow-sm">
-                        <Loader2 size={14} className="animate-spin text-accent" />
-                        <span>AI 正在思考并撰写内容...</span>
-                      </div>
+                    <div className="flex items-center gap-2 py-1 text-[13px] text-text-secondary">
+                      <Loader2 size={14} className="animate-spin text-accent" />
+                      <span>正在思考并撰写内容...</span>
                     </div>
                   )}
               </div>
