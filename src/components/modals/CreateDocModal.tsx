@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, ChevronDown, FolderOpen, Folder, Check } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
+import { getKnowledgeBaseColor } from '../../utils/knowledgeBaseColor';
 
 interface CreateDocModalProps {
   isOpen: boolean;
@@ -121,7 +122,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
                         <Folder
                           size={15}
                           className="shrink-0 transition-colors"
-                          style={{ color: selectedKb.icon }}
+                          style={{ color: getKnowledgeBaseColor(selectedKb.icon) }}
                         />
                         <span className="truncate font-medium">{selectedKb.name}</span>
                       </>
@@ -156,7 +157,11 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <Folder size={15} className="shrink-0" style={{ color: kb.icon }} />
+                            <Folder
+                              size={15}
+                              className="shrink-0"
+                              style={{ color: getKnowledgeBaseColor(kb.icon) }}
+                            />
                             <span className="truncate">{kb.name}</span>
                           </div>
                           {isSelected && <Check size={14} className="text-accent shrink-0" />}

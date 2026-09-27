@@ -28,6 +28,7 @@ import KbActionMenu from './menus/KbActionMenu';
 import UserActionMenu from './menus/UserActionMenu';
 import SyncStatusPopover from './modals/SyncStatusPopover';
 import ModelManagerModal from './modals/ModelManagerModal';
+import { getKnowledgeBaseColor } from '../utils/knowledgeBaseColor';
 
 export default function Sidebar() {
   const { kbId: activeKbId } = useParams<{ kbId?: string }>();
@@ -150,7 +151,7 @@ export default function Sidebar() {
         className="flex items-center gap-2 mb-6 cursor-pointer hover:bg-hover-bg p-1.5 -mx-1.5 rounded-lg transition-colors shrink-0"
         onClick={(e) => setUserMenuAnchor(e.currentTarget)}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-xs font-bold text-accent shadow-sm border border-indigo-100/50">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-active-bg text-xs font-bold text-active-fg shadow-sm border border-active-border/50">
           {(currentUser?.display_name || currentUser?.username || 'D').slice(0, 1).toUpperCase()}
         </div>
         <div className="flex flex-col min-w-0 flex-1">
@@ -182,7 +183,7 @@ export default function Sidebar() {
             end
             tabIndex={-1}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-active-bg text-active-fg' : 'text-text-secondary hover:bg-hover-bg'}`
             }
           >
             <Home size={16} /> 开始
@@ -193,12 +194,12 @@ export default function Sidebar() {
             to={lastVisitedSessionId ? `/ai-writing/${lastVisitedSessionId}` : '/ai-writing'}
             tabIndex={-1}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-active-bg text-active-fg' : 'text-text-secondary hover:bg-hover-bg'}`
             }
           >
             {({ isActive }) => (
               <>
-                <Sparkles size={16} className={isActive ? 'text-accent' : ''} /> Duet 助手
+                <Sparkles size={16} className={isActive ? 'text-active-fg' : ''} /> Duet 助手
               </>
             )}
           </NavLink>
@@ -208,7 +209,7 @@ export default function Sidebar() {
             to="/memo"
             tabIndex={-1}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-active-bg text-active-fg' : 'text-text-secondary hover:bg-hover-bg'}`
             }
           >
             <StickyNote size={16} /> 小记
@@ -219,7 +220,7 @@ export default function Sidebar() {
             to="/favorites"
             tabIndex={-1}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-indigo-50 text-accent' : 'text-text-secondary hover:bg-hover-bg'}`
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${isActive ? 'bg-active-bg text-active-fg' : 'text-text-secondary hover:bg-hover-bg'}`
             }
           >
             {({ isActive }) => (
@@ -256,12 +257,16 @@ export default function Sidebar() {
               <li key={kb.id} className="space-y-0.5 group/row">
                 <div
                   className={`flex items-center justify-between rounded-md transition-colors ${
-                    isActiveKb ? 'bg-indigo-50/80' : 'hover:bg-hover-bg'
+                    isActiveKb ? 'bg-active-bg' : 'hover:bg-hover-bg'
                   } ${activeMenuKbId === kb.id ? 'bg-hover-bg' : ''}`}
                 >
                   {isRenaming ? (
                     <div className="flex items-center gap-2 px-3 py-1.5 w-full">
-                      <Folder size={14} className="shrink-0" style={{ color: kb.icon }} />
+                      <Folder
+                        size={14}
+                        className="shrink-0"
+                        style={{ color: getKnowledgeBaseColor(kb.icon) }}
+                      />
                       <input
                         type="text"
                         value={renamingKbName}
@@ -286,14 +291,14 @@ export default function Sidebar() {
                         }}
                         className={`flex items-center gap-2.5 truncate flex-1 px-3 py-2 min-w-0 ${
                           isActiveKb
-                            ? 'text-accent font-semibold'
+                            ? 'text-active-fg font-semibold'
                             : 'text-text-secondary hover:text-text-primary'
                         }`}
                       >
                         <Folder
                           size={14}
                           className="shrink-0 transition-colors"
-                          style={{ color: kb.icon }}
+                          style={{ color: getKnowledgeBaseColor(kb.icon) }}
                         />
                         <span className="truncate">{kb.name}</span>
                       </NavLink>

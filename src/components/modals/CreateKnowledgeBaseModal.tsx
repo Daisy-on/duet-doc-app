@@ -2,22 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
+import { KNOWLEDGE_BASE_COLORS } from '../../utils/knowledgeBaseColor';
 
 interface CreateKnowledgeBaseModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const COLORS = [
-  '#f97316', // Orange
-  '#3b82f6', // Blue
-  '#10b981', // Emerald
-  '#a855f7', // Purple
-  '#ef4444', // Red
-  '#f59e0b', // Amber
-  '#6366f1', // Indigo
-  '#ec4899', // Pink
-];
 
 export default function CreateKnowledgeBaseModal({
   isOpen,
@@ -25,7 +15,7 @@ export default function CreateKnowledgeBaseModal({
 }: CreateKnowledgeBaseModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+  const [selectedColor, setSelectedColor] = useState(KNOWLEDGE_BASE_COLORS[0]);
   const createKnowledgeBase = useKnowledgeBaseStore((state) => state.createKnowledgeBase);
   const navigate = useNavigate();
 
@@ -97,7 +87,7 @@ export default function CreateKnowledgeBaseModal({
               选择图标颜色
             </label>
             <div className="flex gap-2.5 flex-wrap py-1">
-              {COLORS.map((color) => (
+              {KNOWLEDGE_BASE_COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"

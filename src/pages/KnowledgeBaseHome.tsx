@@ -14,6 +14,7 @@ import {
 import CatalogPanel from '../components/CatalogPanel';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
+import { getKnowledgeBaseColor } from '../utils/knowledgeBaseColor';
 
 // Helper to format date relative to today/yesterday or absolute
 function formatRelativeTime(timestamp: number): string {
@@ -79,6 +80,9 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
     );
   }
 
+  const kbColor = getKnowledgeBaseColor(kb.icon);
+  const kbTint = `${kbColor}20`;
+
   const allDocs = documents.filter((d) => d.kbId === kbId);
   const allGroups = groups.filter((g) => g.kbId === kbId).sort((a, b) => a.order - b.order);
 
@@ -116,8 +120,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
             </button>
             <div className="flex items-center gap-3 ml-1 min-w-0">
               <div
-                className="w-4 h-4 rounded-md shadow-sm shrink-0"
-                style={{ backgroundColor: kb.icon }}
+                className="w-4 h-4 rounded-md shrink-0 border"
+                style={{ backgroundColor: kbTint, borderColor: `${kbColor}40` }}
               />
               <div className="text-[15px] font-semibold text-text-primary truncate">{kb.name}</div>
               <div className="text-[11px] text-text-secondary bg-bg-panel border border-border-color px-2 py-0.5 rounded-full font-medium shrink-0">
@@ -140,8 +144,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
         <div className="px-10 py-10 border-b border-border-color bg-bg-main shrink-0">
           <div className="max-w-4xl mx-auto flex items-start gap-6">
             <div
-              className="w-16 h-16 rounded-xl flex items-center justify-center text-white shadow-md shrink-0 transition-transform duration-300 hover:scale-105"
-              style={{ backgroundColor: kb.icon }}
+              className="w-16 h-16 rounded-xl flex items-center justify-center shadow-sm shrink-0 transition-transform duration-300 hover:scale-105"
+              style={{ backgroundColor: kbTint, color: kbColor }}
             >
               <Folder size={32} />
             </div>
@@ -184,11 +188,12 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                   onClick={() => setCurrentGroupId(null)}
                   className={`flex items-center gap-1.5 transition-all px-2.5 py-1.5 rounded-lg ${
                     !activeGroupId
-                      ? 'text-accent bg-indigo-50 border border-indigo-100/50 shadow-sm'
+                      ? 'border border-border-color shadow-sm text-text-primary'
                       : 'hover:text-accent cursor-pointer hover:bg-gray-200/50'
                   }`}
+                  style={!activeGroupId ? { backgroundColor: kbTint } : undefined}
                 >
-                  <Folder size={14} className={!activeGroupId ? 'text-accent' : ''} />
+                  <Folder size={14} style={{ color: kbColor }} />
                   <span className={!activeGroupId ? 'font-bold' : ''}>{kb.name}</span>
                 </div>
 
@@ -201,9 +206,10 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                         onClick={!isLast ? () => setCurrentGroupId(ancestor.id) : undefined}
                         className={`flex items-center gap-1.5 transition-all px-2.5 py-1.5 rounded-lg ${
                           isLast
-                            ? 'text-accent bg-indigo-50 border border-indigo-100/50 shadow-sm'
+                            ? 'border border-border-color shadow-sm text-text-primary'
                             : 'hover:text-accent cursor-pointer hover:bg-gray-200/50'
                         }`}
+                        style={isLast ? { backgroundColor: kbTint } : undefined}
                       >
                         <span className={`truncate max-w-[150px] ${isLast ? 'font-bold' : ''}`}>
                           {ancestor.name}
@@ -238,8 +244,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                         className="bg-bg-main border border-border-color rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-accent hover:-translate-y-0.5 transition-all duration-200 group flex items-start gap-3.5"
                       >
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform"
-                          style={{ backgroundColor: `${kb.icon}20`, color: kb.icon }}
+                          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"
+                          style={{ backgroundColor: kbTint, color: kbColor }}
                         >
                           <Folder size={18} />
                         </div>
@@ -267,8 +273,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
               /* Empty State */
               <div className="bg-bg-main border border-border-color rounded-2xl p-16 text-center shadow-sm flex flex-col items-center">
                 <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center mb-4 text-white opacity-90 shadow-inner"
-                  style={{ backgroundColor: kb.icon }}
+                  className="w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-inner"
+                  style={{ backgroundColor: kbTint, color: kbColor }}
                 >
                   <FolderOpen size={28} />
                 </div>

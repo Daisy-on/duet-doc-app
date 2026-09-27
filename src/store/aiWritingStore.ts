@@ -77,6 +77,7 @@ interface AIWritingStore {
   ) => void;
   commitMessage: (msg: ChatMessage) => Promise<void>;
   removeMessage: (id: string) => Promise<void>;
+  removeMessages: (ids: string[]) => Promise<void>;
 }
 
 const generateId = () => nanoid(12);
@@ -424,25 +425,30 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
     });
   },
 
-  removeMessage: async (id) => {
+  removeMessage: async (id) => get().removeMessages([id]),
+
+  removeMessages: async (ids) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
     await db.transaction('rw', [db.chatMessages, ...syncTables()], async (tx) => {
       const messages = tx.table<ChatMessage, string>('chatMessages');
-      const message = await messages.get(id);
-      await messages.delete(id);
-      if (message && toChatMessageSyncData(message)) {
-        await enqueueMutationInTx(tx, [
-          {
-            entity_type: 'chat_message',
-            entity_id: id,
-            operation: 'delete',
-            base_revision: 0,
-          },
-        ]);
-      }
+      const storedMessages = await messages.bulkGet(ids);
+      await messages.bulkDelete(ids);
+      const operations: SyncOperation[] = storedMessages
+        .filter((message): message is ChatMessage =>
+          Boolean(message && toChatMessageSyncData(message)),
+        )
+        .map((message) => ({
+          entity_type: 'chat_message',
+          entity_id: message.id,
+          operation: 'delete',
+          base_revision: 0,
+        }));
+      if (operations.length > 0) await enqueueMutationInTx(tx, operations);
     });
     refreshSyncCounts();
     set((state) => ({
-      messages: state.messages.filter((m) => m.id !== id),
+      messages: state.messages.filter((m) => !idSet.has(m.id)),
     }));
   },
 }));

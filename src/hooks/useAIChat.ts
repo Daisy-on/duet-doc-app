@@ -90,8 +90,14 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
     activeSessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  const { isThinkingEnabled, addMessage, updateMessageStream, commitMessage, removeMessage } =
-    useAIWritingStore();
+  const {
+    isThinkingEnabled,
+    addMessage,
+    updateMessageStream,
+    commitMessage,
+    removeMessage,
+    removeMessages,
+  } = useAIWritingStore();
 
   const stopGeneration = useCallback(() => {
     const run = activeStreamRef.current;
@@ -637,6 +643,26 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
     [sessionId, isGenerating, removeMessage, sendChatMessage],
   );
 
+  const resendEditedMessage = useCallback(
+    async (userMessageId: string, content: string, referencedDocs: ReferencedDoc[]) => {
+      if (!sessionId || isGenerating || !content.trim()) return false;
+
+      const sessionMsgs = useAIWritingStore
+        .getState()
+        .messages.filter((message) => message.sessionId === sessionId)
+        .sort((a, b) => a.createdAt - b.createdAt);
+      const targetIdx = sessionMsgs.findIndex(
+        (message) => message.id === userMessageId && message.role === 'user',
+      );
+      if (targetIdx === -1) return false;
+
+      await removeMessages(sessionMsgs.slice(targetIdx).map((message) => message.id));
+      void sendChatMessage(content, referencedDocs);
+      return true;
+    },
+    [sessionId, isGenerating, removeMessages, sendChatMessage],
+  );
+
   useEffect(() => {
     return () => {
       stopGeneration();
@@ -647,6 +673,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
     isGenerating,
     sendChatMessage,
     regenerateResponse,
+    resendEditedMessage,
     stopGeneration,
   };
 }

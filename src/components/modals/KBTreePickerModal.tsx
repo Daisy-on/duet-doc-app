@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../../store/knowledgeBaseStore';
 import type { Group, Document, KnowledgeBase } from '../../store/knowledgeBaseStore';
+import { getKnowledgeBaseColor } from '../../utils/knowledgeBaseColor';
 
 export interface KBTreePickerModalProps {
   isOpen: boolean;
@@ -470,7 +471,11 @@ export default function KBTreePickerModal({
                         ) : (
                           <span className="w-4 shrink-0" />
                         )}
-                        <Folder size={14} style={{ color: kb.icon }} className="shrink-0" />
+                        <Folder
+                          size={14}
+                          style={{ color: getKnowledgeBaseColor(kb.icon) }}
+                          className="shrink-0"
+                        />
                         <span className="truncate">
                           {kb.name}
                           {(mode === 'folder' || mode === 'create-doc') && (

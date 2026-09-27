@@ -10,11 +10,13 @@ import {
   FileText,
   FileUp,
   Sparkles,
+  PanelLeft,
   Square,
   RotateCcw,
   Copy,
   FilePlus,
   StickyNote,
+  Pencil,
   Check,
   Cloud,
   Image as ImageIcon,
@@ -94,10 +96,8 @@ export default function AIWriting() {
   const [hasLocalEmbeddingModel, setHasLocalEmbeddingModel] = useState<boolean | null>(null);
   const [allowCloudQuery, setAllowCloudQuery] = useState(false);
 
-  const { isGenerating, sendChatMessage, regenerateResponse, stopGeneration } = useAIChat(
-    currentSessionId || null,
-    allowCloudQuery,
-  );
+  const { isGenerating, sendChatMessage, regenerateResponse, resendEditedMessage, stopGeneration } =
+    useAIChat(currentSessionId || null, allowCloudQuery);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +117,9 @@ export default function AIWriting() {
   const [inputText, setInputText] = useState('');
   const [referencedDocs, setReferencedDocs] = useState<ReferencedDoc[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
 
   // Copied toast state per message
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -135,6 +137,7 @@ export default function AIWriting() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editingSendRef = useRef(false);
   const lastMsgCountRef = useRef(0);
   const lastSessionIdRef = useRef<string | null>(null);
 
@@ -188,6 +191,11 @@ export default function AIWriting() {
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setLiveThinkingSeconds(0);
+    if (editingMessageId) {
+      setEditingMessageId(null);
+      setInputText('');
+      setReferencedDocs([]);
+    }
   }
 
   useEffect(() => {
@@ -280,6 +288,29 @@ export default function AIWriting() {
       return;
     }
 
+    if (editingMessageId) {
+      if (!inputText.trim() || editingSendRef.current) return;
+      editingSendRef.current = true;
+      try {
+        const sent = await resendEditedMessage(editingMessageId, inputText, [...referencedDocs]);
+        if (!sent) {
+          setToastText('原消息已不存在，请重新发送');
+          return;
+        }
+        setEditingMessageId(null);
+        setInputText('');
+        setReferencedDocs([]);
+        setAttachedFiles([]);
+        setLiveThinkingSeconds(0);
+      } catch (error) {
+        console.error('Failed to resend edited message:', error);
+        setToastText('修改消息失败，请重试');
+      } finally {
+        editingSendRef.current = false;
+      }
+      return;
+    }
+
     if (!inputText.trim() && referencedDocs.length === 0) return;
 
     let targetSessionId = currentSessionId;
@@ -312,6 +343,22 @@ export default function AIWriting() {
     if (!question) return;
     setInputText(question.content);
     setReferencedDocs(question.referencedDocs ?? []);
+    textareaRef.current?.focus();
+  };
+
+  const handleEditQuestion = (message: ChatMessage) => {
+    if (editingMessageId === message.id) {
+      textareaRef.current?.focus();
+      return;
+    }
+    if (inputText.trim() || referencedDocs.length > 0 || attachedFiles.length > 0) {
+      setToastText('请先处理输入框中未发送的内容');
+      return;
+    }
+    if (isGenerating) stopGeneration();
+    setEditingMessageId(message.id);
+    setInputText(message.content);
+    setReferencedDocs(message.referencedDocs ?? []);
     textareaRef.current?.focus();
   };
 
@@ -427,13 +474,13 @@ export default function AIWriting() {
             <button
               onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
               className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title={isCatalogCollapsed ? '展开' : '折叠'}
+              title={isCatalogCollapsed ? '展开会话栏' : '折叠会话栏'}
             >
-              <Sparkles size={14} className="text-indigo-500" />
+              <PanelLeft size={16} />
             </button>
             <div className="flex items-center gap-3 ml-1 min-w-0">
               <h2 className="text-[15px] font-bold text-text-primary truncate">Duet 助手</h2>
-              <span className="text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-accent px-2 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800/60 shrink-0">
+              <span className="text-[10px] font-semibold bg-active-bg text-active-fg px-2 py-0.5 rounded-full border border-active-border shrink-0">
                 {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
               </span>
             </div>
@@ -478,7 +525,11 @@ export default function AIWriting() {
         )}
 
         {/* Main Scrollable Viewport (holds both messages AND sticky bottom input like DeepSeek) */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col"
+          style={{ scrollbarGutter: 'stable' }}
+        >
           {/* Messages Stream */}
           <div className="flex-1 py-6">
             {sessionMessages.length === 0 ? (
@@ -518,6 +569,10 @@ export default function AIWriting() {
                   const isUser = msg.role === 'user';
                   const isExpanded = expandedThinking[msg.id] !== false;
                   const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
+                  const knowledgeSources = msg.knowledgeSources
+                    ? uniqueKnowledgeSources(msg.knowledgeSources)
+                    : [];
+                  const showAllSources = expandedSources[msg.id] === true;
                   const timestamp = new Date(msg.createdAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -531,7 +586,7 @@ export default function AIWriting() {
                       <div
                         className={`relative ${
                           isUser
-                            ? 'max-w-[85%] self-end rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-text-primary shadow-sm dark:border-indigo-900 dark:bg-indigo-950/60'
+                            ? 'max-w-[85%] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
                             : 'w-full min-w-0 py-1 text-text-primary'
                         }`}
                       >
@@ -598,41 +653,52 @@ export default function AIWriting() {
                           )}
                         </div>
 
-                        {!isUser && msg.knowledgeSources && msg.knowledgeSources.length > 0 && (
+                        {!isUser && knowledgeSources.length > 0 && (
                           <div className="mt-5 border-t border-border-color/70 pt-3">
-                            <div className="flex items-center gap-1.5 text-[11px] text-text-secondary">
-                              <Sparkles size={11} className="text-indigo-500" />
+                            <div className="flex items-center gap-1.5 text-[13px] text-text-secondary">
+                              <Sparkles size={13} className="text-indigo-500" />
                               <span className="font-medium">已检索知识库</span>
                             </div>
-                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-text-secondary">
-                              {uniqueKnowledgeSources(msg.knowledgeSources)
-                                .slice(0, 3)
-                                .map((source) => (
-                                  <button
-                                    type="button"
-                                    key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}`}
-                                    onClick={() => openKnowledgeSource(source)}
-                                    className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
-                                    title={source.headingPath.join(' > ') || source.title}
-                                  >
-                                    {source.sourceType === 'image' ? (
-                                      <ImageIcon size={11} className="shrink-0 text-sky-500" />
-                                    ) : source.sourceType === 'memo' ? (
-                                      <StickyNote size={11} className="shrink-0 text-emerald-500" />
-                                    ) : (
-                                      <FileText size={11} className="shrink-0 text-indigo-500" />
-                                    )}
-                                    <span className="max-w-[190px] truncate">
-                                      {source.sourceType === 'image'
-                                        ? `${source.title} · 图片`
-                                        : `${source.title} · ${source.headingPath.at(-1) || `片段 ${source.chunkIndex + 1}`}`}
-                                    </span>
-                                  </button>
-                                ))}
-                              {uniqueKnowledgeSources(msg.knowledgeSources).length > 3 && (
-                                <span>
-                                  +{uniqueKnowledgeSources(msg.knowledgeSources).length - 3}
-                                </span>
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-text-secondary">
+                              {(showAllSources
+                                ? knowledgeSources
+                                : knowledgeSources.slice(0, 3)
+                              ).map((source) => (
+                                <button
+                                  type="button"
+                                  key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}`}
+                                  onClick={() => openKnowledgeSource(source)}
+                                  className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
+                                  title={source.headingPath.join(' > ') || source.title}
+                                >
+                                  {source.sourceType === 'image' ? (
+                                    <ImageIcon size={13} className="shrink-0 text-sky-500" />
+                                  ) : source.sourceType === 'memo' ? (
+                                    <StickyNote size={13} className="shrink-0 text-emerald-500" />
+                                  ) : (
+                                    <FileText size={13} className="shrink-0 text-indigo-500" />
+                                  )}
+                                  <span className="max-w-[190px] truncate">
+                                    {source.sourceType === 'image'
+                                      ? `${source.title} · 图片`
+                                      : `${source.title} · ${source.headingPath.at(-1) || `片段 ${source.chunkIndex + 1}`}`}
+                                  </span>
+                                </button>
+                              ))}
+                              {knowledgeSources.length > 3 && (
+                                <button
+                                  type="button"
+                                  aria-expanded={showAllSources}
+                                  onClick={() =>
+                                    setExpandedSources((current) => ({
+                                      ...current,
+                                      [msg.id]: !showAllSources,
+                                    }))
+                                  }
+                                  className="shrink-0 text-text-secondary hover:text-accent hover:underline cursor-pointer"
+                                >
+                                  {showAllSources ? '收起' : `+${knowledgeSources.length - 3} 展开`}
+                                </button>
                               )}
                             </div>
                           </div>
@@ -743,7 +809,35 @@ export default function AIWriting() {
                         </div>
                       )}
 
-                      {(isUser || msg.status === 'streaming' || !msg.content) && (
+                      {isUser && (
+                        <div className="mt-1 flex items-center justify-end gap-1 text-[13px] text-text-secondary">
+                          <span className="mr-1">{timestamp}</span>
+                          <span className="mx-1 h-3 w-px bg-border-color" />
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(msg.id, msg.content)}
+                            className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                            title="复制消息"
+                            aria-label="复制消息"
+                          >
+                            {copiedMsgId === msg.id ? (
+                              <Check size={15} className="text-emerald-500" />
+                            ) : (
+                              <Copy size={15} />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditQuestion(msg)}
+                            className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                            title="修改消息"
+                            aria-label="修改消息"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        </div>
+                      )}
+                      {!isUser && (msg.status === 'streaming' || !msg.content) && (
                         <div className="mt-1 text-[13px] text-text-secondary">{timestamp}</div>
                       )}
                     </div>
@@ -766,6 +860,25 @@ export default function AIWriting() {
           {/* Bottom Input Area (Sticky at bottom of scroll container) */}
           <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
             <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
+              {editingMessageId && (
+                <div className="flex items-center justify-between gap-2 border-l-2 border-accent pl-2 text-[13px] text-text-secondary">
+                  <span>修改消息 · 发送后将替换此轮及后续对话</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMessageId(null);
+                      setInputText('');
+                      setReferencedDocs([]);
+                      setAttachedFiles([]);
+                    }}
+                    className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                    title="取消修改"
+                    aria-label="取消修改"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {/* Attachment badges above input */}
               {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
                 <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
@@ -803,7 +916,7 @@ export default function AIWriting() {
               )}
 
               {/* Main Textarea Container (Kimi Unified Style) */}
-              <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-sm transition-all overflow-hidden flex flex-col p-2 gap-2">
+              <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
                 <textarea
                   ref={textareaRef}
                   value={inputText}

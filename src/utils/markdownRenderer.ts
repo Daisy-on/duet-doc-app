@@ -91,7 +91,7 @@ renderer.link = function ({
 
 // Custom inline code span renderer
 renderer.codespan = function ({ text }: { text: string }) {
-  return `<code class="bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100/80 dark:border-indigo-900/50 font-mono text-xs select-text">${text}</code>`;
+  return `<code class="bg-gray-100/70 dark:bg-gray-800/70 text-gray-900 dark:text-gray-200 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-xs select-text">${text}</code>`;
 };
 
 // Custom horizontal rule renderer

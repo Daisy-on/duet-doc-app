@@ -137,7 +137,7 @@ export default function AIChatListPanel() {
             {/* Header */}
             <div className="p-5 pb-3 flex justify-between items-center shrink-0">
               <div className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5">
-                <Sparkles size={16} className="text-accent" />
+                <Sparkles size={16} className="text-active-fg" />
                 <span>Duet 助手</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -175,7 +175,7 @@ export default function AIChatListPanel() {
                       }}
                       className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all relative ${
                         isActive
-                          ? 'text-accent font-semibold bg-bg-main shadow-sm border-l-2 border-accent rounded-l-none pl-[14px]'
+                          ? 'text-active-fg font-semibold bg-bg-main shadow-sm border-l-2 border-active-fg rounded-l-none pl-[14px]'
                           : 'text-text-secondary'
                       }`}
                     >
@@ -183,7 +183,7 @@ export default function AIChatListPanel() {
                         <MessageSquare
                           size={14}
                           className={
-                            isActive ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'
+                            isActive ? 'text-active-fg shrink-0' : 'text-text-secondary shrink-0'
                           }
                         />
 
@@ -206,7 +206,7 @@ export default function AIChatListPanel() {
 
                         {session.isPinned && !isRenaming && (
                           <span title="已置顶" className="flex items-center shrink-0">
-                            <Pin size={12} className="text-accent opacity-80" />
+                            <Pin size={12} className="text-active-fg opacity-80" />
                           </span>
                         )}
                       </div>
@@ -240,7 +240,7 @@ export default function AIChatListPanel() {
                               onClick={(e) => handleTogglePin(session.id, session.isPinned, e)}
                               className="w-full text-left px-3 py-1.5 hover:bg-hover-bg flex items-center gap-2 transition-colors cursor-pointer"
                             >
-                              <Pin size={13} className={session.isPinned ? 'text-accent' : ''} />
+                              <Pin size={13} className={session.isPinned ? 'text-active-fg' : ''} />
                               <span>{session.isPinned ? '取消置顶' : '置顶'}</span>
                             </button>
                             <button

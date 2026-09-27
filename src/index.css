@@ -11,6 +11,9 @@
   --sys-text-secondary: #6b7280;
   --sys-text-ghost: #9ca3af;
   --sys-accent: #6366f1;
+  --sys-active-fg: #2563eb;
+  --sys-active-bg: #eff6ff;
+  --sys-active-border: #bfdbfe;
   --sys-hover-bg: #f3f4f6;
   --sys-border-color: #e5e7eb;
   --sys-success-color: #10b981;
@@ -25,6 +28,9 @@
   --sys-text-secondary: #9ca3af;
   --sys-text-ghost: #6b7280;
   --sys-accent: #818cf8;
+  --sys-active-fg: #93c5fd;
+  --sys-active-bg: #172554;
+  --sys-active-border: #1e40af;
   --sys-hover-bg: #1f293d;
   --sys-border-color: #374151;
   --sys-success-color: #34d399;
@@ -39,6 +45,9 @@
   --color-text-secondary: var(--sys-text-secondary);
   --color-text-ghost: var(--sys-text-ghost);
   --color-accent: var(--sys-accent);
+  --color-active-fg: var(--sys-active-fg);
+  --color-active-bg: var(--sys-active-bg);
+  --color-active-border: var(--sys-active-border);
   --color-hover-bg: var(--sys-hover-bg);
   --color-border-color: var(--sys-border-color);
   --color-success-color: var(--sys-success-color);
