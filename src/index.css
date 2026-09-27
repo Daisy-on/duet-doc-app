@@ -190,6 +190,48 @@ body {
   animation: toastFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* 气泡内联编辑向下自然展开动画 */
+@keyframes bubbleExpandDown {
+  0% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+    margin-top: 0;
+  }
+  100% {
+    opacity: 1;
+    max-height: 40px;
+    transform: translateY(0);
+    margin-top: 0.625rem;
+  }
+}
+
+/* 气泡内联编辑向上自然收起动画 */
+@keyframes bubbleCollapseUp {
+  0% {
+    opacity: 1;
+    max-height: 40px;
+    transform: translateY(0);
+    margin-top: 0.625rem;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+    margin-top: 0;
+  }
+}
+
+.animate-bubble-expand-down {
+  animation: bubbleExpandDown 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+.animate-bubble-collapse-up {
+  animation: bubbleCollapseUp 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  overflow: hidden;
+}
+
 /* --- TipTap 节点还原样式 (对抗 Tailwind Preflight) --- */
 
 /* 列表 */

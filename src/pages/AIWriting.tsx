@@ -118,6 +118,8 @@ export default function AIWriting() {
   const [referencedDocs, setReferencedDocs] = useState<ReferencedDoc[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [isCancelingEdit, setIsCancelingEdit] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
 
@@ -137,7 +139,9 @@ export default function AIWriting() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
   const editingSendRef = useRef(false);
+  const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMsgCountRef = useRef(0);
   const lastSessionIdRef = useRef<string | null>(null);
 
@@ -178,6 +182,13 @@ export default function AIWriting() {
     };
   }, []);
 
+  // Cleanup cancel timer on unmount
+  useEffect(() => {
+    return () => {
+      if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
+    };
+  }, []);
+
   // Toast auto-clear
   useEffect(() => {
     if (toastText) {
@@ -191,15 +202,19 @@ export default function AIWriting() {
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setLiveThinkingSeconds(0);
+    setIsCancelingEdit(false);
     if (editingMessageId) {
       setEditingMessageId(null);
-      setInputText('');
-      setReferencedDocs([]);
+      setEditingContent('');
     }
   }
 
   useEffect(() => {
     setActiveSessionId(sessionId || null);
+    if (cancelTimerRef.current) {
+      clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
+    }
   }, [sessionId, setActiveSessionId]);
 
   // Scroll to bottom on new messages, session change, or generating
@@ -225,6 +240,24 @@ export default function AIWriting() {
     const newHeight = Math.min(Math.max(textarea.scrollHeight, 52), 220);
     textarea.style.height = `${newHeight}px`;
   }, [inputText]);
+
+  // Auto-resize inline editing textarea scrollbar threshold (max ~8-10 lines ~240px)
+  useEffect(() => {
+    const textarea = editingTextareaRef.current;
+    if (!textarea || !editingMessageId) return;
+    const maxHeight = 240;
+    const isOverflowing = textarea.scrollHeight > maxHeight;
+    textarea.style.overflowY = isOverflowing ? 'auto' : 'hidden';
+  }, [editingMessageId, editingContent]);
+
+  // Focus and move cursor to end when starting inline edit
+  useEffect(() => {
+    if (!editingMessageId) return;
+    const textarea = editingTextareaRef.current;
+    if (!textarea) return;
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  }, [editingMessageId]);
 
   useEffect(() => {
     if (!isGenerating) return;
@@ -288,29 +321,6 @@ export default function AIWriting() {
       return;
     }
 
-    if (editingMessageId) {
-      if (!inputText.trim() || editingSendRef.current) return;
-      editingSendRef.current = true;
-      try {
-        const sent = await resendEditedMessage(editingMessageId, inputText, [...referencedDocs]);
-        if (!sent) {
-          setToastText('原消息已不存在，请重新发送');
-          return;
-        }
-        setEditingMessageId(null);
-        setInputText('');
-        setReferencedDocs([]);
-        setAttachedFiles([]);
-        setLiveThinkingSeconds(0);
-      } catch (error) {
-        console.error('Failed to resend edited message:', error);
-        setToastText('修改消息失败，请重试');
-      } finally {
-        editingSendRef.current = false;
-      }
-      return;
-    }
-
     if (!inputText.trim() && referencedDocs.length === 0) return;
 
     let targetSessionId = currentSessionId;
@@ -346,26 +356,68 @@ export default function AIWriting() {
     textareaRef.current?.focus();
   };
 
-  const handleEditQuestion = (message: ChatMessage) => {
-    if (editingMessageId === message.id) {
-      textareaRef.current?.focus();
-      return;
+  const handleStartEdit = (message: ChatMessage) => {
+    if (isGenerating) return;
+    if (cancelTimerRef.current) {
+      clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
     }
-    if (inputText.trim() || referencedDocs.length > 0 || attachedFiles.length > 0) {
-      setToastText('请先处理输入框中未发送的内容');
-      return;
-    }
-    if (isGenerating) stopGeneration();
+    setIsCancelingEdit(false);
     setEditingMessageId(message.id);
-    setInputText(message.content);
-    setReferencedDocs(message.referencedDocs ?? []);
-    textareaRef.current?.focus();
+    setEditingContent(message.content);
+  };
+
+  const handleCancelEdit = (originalContent?: string) => {
+    if (isCancelingEdit) return;
+    setIsCancelingEdit(true);
+    cancelTimerRef.current = setTimeout(() => {
+      if (originalContent !== undefined) {
+        setEditingContent(originalContent);
+      }
+      setEditingMessageId(null);
+      setEditingContent('');
+      setIsCancelingEdit(false);
+      cancelTimerRef.current = null;
+    }, 150);
+  };
+
+  const handleSaveAndResend = async (msg: ChatMessage) => {
+    const trimmed = editingContent.trim();
+    if (!trimmed || isGenerating || editingSendRef.current) return;
+    editingSendRef.current = true;
+    try {
+      const sent = await resendEditedMessage(msg.id, trimmed, msg.referencedDocs || []);
+      if (!sent) {
+        setToastText('原消息已不存在，请重新发送');
+        return;
+      }
+      setEditingMessageId(null);
+      setEditingContent('');
+      setLiveThinkingSeconds(0);
+    } catch (error) {
+      console.error('Failed to resend edited message:', error);
+      setToastText('修改消息失败，请重试');
+    } finally {
+      editingSendRef.current = false;
+    }
+  };
+
+  const handleEditingKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, msg: ChatMessage) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handleSaveAndResend(msg);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelEdit(msg.content);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -457,9 +509,11 @@ export default function AIWriting() {
     setInputText(prompt.title + '：' + prompt.desc);
   };
 
-  // 寻找最后一条 Assistant 消息的 ID
+  // 寻找最后一条 Assistant 消息与最后一条 User 消息的 ID
   const assistantMsgs = sessionMessages.filter((m) => m.role === 'assistant');
   const lastAssistantMsgId = assistantMsgs[assistantMsgs.length - 1]?.id;
+  const userMsgs = sessionMessages.filter((m) => m.role === 'user');
+  const lastUserMsgId = userMsgs[userMsgs.length - 1]?.id;
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -567,6 +621,8 @@ export default function AIWriting() {
               <div className="max-w-4xl mx-auto flex flex-col space-y-8">
                 {sessionMessages.map((msg) => {
                   const isUser = msg.role === 'user';
+                  const isLastUser = isUser && msg.id === lastUserMsgId;
+                  const isEditing = isUser && editingMessageId === msg.id;
                   const isExpanded = expandedThinking[msg.id] !== false;
                   const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
                   const knowledgeSources = msg.knowledgeSources
@@ -586,159 +642,238 @@ export default function AIWriting() {
                       <div
                         className={`relative ${
                           isUser
-                            ? 'max-w-[85%] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
+                            ? 'max-w-[85%] min-w-[140px] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
                             : 'w-full min-w-0 py-1 text-text-primary'
                         }`}
                       >
-                        {/* 引用文档标签 */}
-                        {isUser && msg.referencedDocs && msg.referencedDocs.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
-                            {msg.referencedDocs.map((doc, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
-                              >
-                                <FileText size={10} />
-                                {doc.title}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {isEditing ? (
+                          <div className="flex flex-col">
+                            {/* 引用文档标签 */}
+                            {msg.referencedDocs && msg.referencedDocs.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
+                                {msg.referencedDocs.map((doc, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
+                                  >
+                                    <FileText size={10} />
+                                    {doc.title}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
 
-                        {/* 深度思考过程 (ChatGPT 风格: "思考了 12s ›") */}
-                        {!isUser && msg.thinkingContent && (
-                          <div className="mb-4">
-                            <button
-                              type="button"
-                              onClick={() => toggleThinkingNode(msg.id)}
-                              className="flex items-center gap-1.5 py-1 text-[13px] text-text-secondary transition-colors hover:text-text-primary cursor-pointer font-sans select-none"
-                            >
-                              <span className="font-medium">
-                                {getThinkingLabel(msg, liveThinkingSeconds)}
-                              </span>
-                              <ChevronRight
-                                size={14}
-                                className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-text-primary' : 'text-text-secondary'}`}
+                            {/* 内联多行输入框 (CSS Grid 隐形层自适应原气泡宽度与高度，排版字体与正文严格 1:1) */}
+                            <div className="grid max-h-[240px] overflow-hidden">
+                              <div
+                                aria-hidden="true"
+                                className="invisible col-start-1 row-start-1 text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap break-words pointer-events-none select-none min-h-[24px] max-h-[240px] overflow-hidden m-0 p-0 box-border font-[inherit]"
+                              >
+                                {editingContent || ' '}
+                                {editingContent.endsWith('\n') ? ' ' : ''}
+                              </div>
+                              <textarea
+                                ref={editingTextareaRef}
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                onKeyDown={(e) => handleEditingKeyDown(e, msg)}
+                                placeholder="输入修改后的消息..."
+                                className="col-start-1 row-start-1 w-full min-w-0 min-h-[24px] resize-none bg-transparent outline-none text-[15px] text-text-primary placeholder:text-text-ghost leading-relaxed whitespace-pre-wrap break-words border-none p-0 m-0 box-border overflow-y-hidden font-[inherit]"
+                                rows={1}
                               />
-                            </button>
-                            {isExpanded && (
-                              <div className="pl-3 my-1.5 border-l-2 border-border-color/80 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed space-y-1">
-                                {msg.thinkingContent}
-                                {msg.status === 'streaming' && !msg.content && (
-                                  <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
+                            </div>
+
+                            {/* 编辑模式底部操作按钮 (自然向下展开 / 向上收起动画) */}
+                            <div
+                              className={`mt-2.5 flex items-center justify-end gap-2 select-none ${
+                                isCancelingEdit
+                                  ? 'animate-bubble-collapse-up'
+                                  : 'animate-bubble-expand-down'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleCancelEdit(msg.content)}
+                                className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 rounded-lg transition-colors cursor-pointer"
+                              >
+                                取消
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveAndResend(msg)}
+                                disabled={!editingContent.trim() || isGenerating}
+                                className="px-3.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5"
+                                title={
+                                  !editingContent.trim()
+                                    ? '内容不能为空'
+                                    : isGenerating
+                                      ? '生成中不可提交'
+                                      : '发送 (Enter)'
+                                }
+                              >
+                                {isGenerating && <Loader2 size={13} className="animate-spin" />}
+                                <span>发送</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* 引用文档标签 */}
+                            {isUser && msg.referencedDocs && msg.referencedDocs.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
+                                {msg.referencedDocs.map((doc, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
+                                  >
+                                    <FileText size={10} />
+                                    {doc.title}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* 深度思考过程 (ChatGPT 风格: "思考了 12s ›") */}
+                            {!isUser && msg.thinkingContent && (
+                              <div className="mb-4">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleThinkingNode(msg.id)}
+                                  className="flex items-center gap-1.5 py-1 text-[13px] text-text-secondary transition-colors hover:text-text-primary cursor-pointer font-sans select-none"
+                                >
+                                  <span className="font-medium">
+                                    {getThinkingLabel(msg, liveThinkingSeconds)}
+                                  </span>
+                                  <ChevronRight
+                                    size={14}
+                                    className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-text-primary' : 'text-text-secondary'}`}
+                                  />
+                                </button>
+                                {isExpanded && (
+                                  <div className="pl-3 my-1.5 border-l-2 border-border-color/80 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed space-y-1">
+                                    {msg.thinkingContent}
+                                    {msg.status === 'streaming' && !msg.content && (
+                                      <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             )}
-                          </div>
-                        )}
 
-                        {/* 消息正文 */}
-                        <div className="space-y-1.5">
-                          {isUser ? (
-                            <p className="text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap">
-                              {msg.content}
-                            </p>
-                          ) : (
-                            <div className="relative">
-                              <div
-                                className="markdown-body assistant-answer text-[15px] text-text-primary leading-relaxed"
-                                dangerouslySetInnerHTML={{
-                                  __html: renderMarkdownToHtml(msg.content),
-                                }}
-                              />
-                              {msg.status === 'streaming' && msg.content && (
-                                <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {!isUser && knowledgeSources.length > 0 && (
-                          <div className="mt-5 border-t border-border-color/70 pt-3">
-                            <div className="flex items-center gap-1.5 text-[13px] text-text-secondary">
-                              <Sparkles size={13} className="text-indigo-500" />
-                              <span className="font-medium">已检索知识库</span>
-                            </div>
-                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-text-secondary">
-                              {(showAllSources
-                                ? knowledgeSources
-                                : knowledgeSources.slice(0, 3)
-                              ).map((source) => (
-                                <button
-                                  type="button"
-                                  key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}`}
-                                  onClick={() => openKnowledgeSource(source)}
-                                  className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
-                                  title={source.headingPath.join(' > ') || source.title}
-                                >
-                                  {source.sourceType === 'image' ? (
-                                    <ImageIcon size={13} className="shrink-0 text-sky-500" />
-                                  ) : source.sourceType === 'memo' ? (
-                                    <StickyNote size={13} className="shrink-0 text-emerald-500" />
-                                  ) : (
-                                    <FileText size={13} className="shrink-0 text-indigo-500" />
+                            {/* 消息正文 */}
+                            <div className="space-y-1.5">
+                              {isUser ? (
+                                <p className="text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap break-words font-[inherit]">
+                                  {msg.content}
+                                </p>
+                              ) : (
+                                <div className="relative">
+                                  <div
+                                    className="markdown-body assistant-answer text-[15px] text-text-primary leading-relaxed"
+                                    dangerouslySetInnerHTML={{
+                                      __html: renderMarkdownToHtml(msg.content),
+                                    }}
+                                  />
+                                  {msg.status === 'streaming' && msg.content && (
+                                    <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
                                   )}
-                                  <span className="max-w-[190px] truncate">
-                                    {source.sourceType === 'image'
-                                      ? `${source.title} · 图片`
-                                      : `${source.title} · ${source.headingPath.at(-1) || `片段 ${source.chunkIndex + 1}`}`}
-                                  </span>
-                                </button>
-                              ))}
-                              {knowledgeSources.length > 3 && (
-                                <button
-                                  type="button"
-                                  aria-expanded={showAllSources}
-                                  onClick={() =>
-                                    setExpandedSources((current) => ({
-                                      ...current,
-                                      [msg.id]: !showAllSources,
-                                    }))
-                                  }
-                                  className="shrink-0 text-text-secondary hover:text-accent hover:underline cursor-pointer"
-                                >
-                                  {showAllSources ? '收起' : `+${knowledgeSources.length - 3} 展开`}
-                                </button>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        )}
 
-                        {!isUser && msg.aiMetadata?.retrievalNotice && (
-                          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                            {msg.aiMetadata.retrievalNotice}
-                          </p>
-                        )}
-                        {!isUser && msg.aiMetadata?.localReindexAvailable && (
-                          <button
-                            type="button"
-                            onClick={() => navigate('/dev/local-retrieval')}
-                            className="mt-2 text-xs text-accent hover:underline"
-                          >
-                            更新本地索引
-                          </button>
-                        )}
+                            {!isUser && knowledgeSources.length > 0 && (
+                              <div className="mt-5 border-t border-border-color/70 pt-3">
+                                <div className="flex items-center gap-1.5 text-[13px] text-text-secondary">
+                                  <Sparkles size={13} className="text-indigo-500" />
+                                  <span className="font-medium">已检索知识库</span>
+                                </div>
+                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-text-secondary">
+                                  {(showAllSources
+                                    ? knowledgeSources
+                                    : knowledgeSources.slice(0, 3)
+                                  ).map((source) => (
+                                    <button
+                                      type="button"
+                                      key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}`}
+                                      onClick={() => openKnowledgeSource(source)}
+                                      className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
+                                      title={source.headingPath.join(' > ') || source.title}
+                                    >
+                                      {source.sourceType === 'image' ? (
+                                        <ImageIcon size={13} className="shrink-0 text-sky-500" />
+                                      ) : source.sourceType === 'memo' ? (
+                                        <StickyNote
+                                          size={13}
+                                          className="shrink-0 text-emerald-500"
+                                        />
+                                      ) : (
+                                        <FileText size={13} className="shrink-0 text-indigo-500" />
+                                      )}
+                                      <span className="max-w-[190px] truncate">
+                                        {source.sourceType === 'image'
+                                          ? `${source.title} · 图片`
+                                          : `${source.title} · ${source.headingPath.at(-1) || `片段 ${source.chunkIndex + 1}`}`}
+                                      </span>
+                                    </button>
+                                  ))}
+                                  {knowledgeSources.length > 3 && (
+                                    <button
+                                      type="button"
+                                      aria-expanded={showAllSources}
+                                      onClick={() =>
+                                        setExpandedSources((current) => ({
+                                          ...current,
+                                          [msg.id]: !showAllSources,
+                                        }))
+                                      }
+                                      className="shrink-0 text-text-secondary hover:text-accent hover:underline cursor-pointer"
+                                    >
+                                      {showAllSources
+                                        ? '收起'
+                                        : `+${knowledgeSources.length - 3} 展开`}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
 
-                        {/* 提示中断或失败状态 */}
-                        {!isUser && msg.status === 'stopped' && (
-                          <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
-                            已手动停止生成
-                          </div>
-                        )}
-                        {!isUser && msg.status === 'error' && (
-                          <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
-                            {msg.aiMetadata?.errorMessage ?? '知识检索或回答未完成'}
-                          </div>
-                        )}
-                        {!isUser && msg.status === 'error' && isLastAssistant && (
-                          <button
-                            type="button"
-                            onClick={() => handleRetryQuestion(msg.id)}
-                            disabled={isGenerating}
-                            className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
-                          >
-                            重新提问
-                          </button>
+                            {!isUser && msg.aiMetadata?.retrievalNotice && (
+                              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                                {msg.aiMetadata.retrievalNotice}
+                              </p>
+                            )}
+                            {!isUser && msg.aiMetadata?.localReindexAvailable && (
+                              <button
+                                type="button"
+                                onClick={() => navigate('/dev/local-retrieval')}
+                                className="mt-2 text-xs text-accent hover:underline"
+                              >
+                                更新本地索引
+                              </button>
+                            )}
+
+                            {/* 提示中断或失败状态 */}
+                            {!isUser && msg.status === 'stopped' && (
+                              <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
+                                已手动停止生成
+                              </div>
+                            )}
+                            {!isUser && msg.status === 'error' && (
+                              <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
+                                {msg.aiMetadata?.errorMessage ?? '知识检索或回答未完成'}
+                              </div>
+                            )}
+                            {!isUser && msg.status === 'error' && isLastAssistant && (
+                              <button
+                                type="button"
+                                onClick={() => handleRetryQuestion(msg.id)}
+                                disabled={isGenerating}
+                                className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
+                              >
+                                重新提问
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -810,31 +945,44 @@ export default function AIWriting() {
                       )}
 
                       {isUser && (
-                        <div className="mt-1 flex items-center justify-end gap-1 text-[13px] text-text-secondary">
+                        <div
+                          className={`mt-1 flex h-6 items-center justify-end gap-1 text-[13px] text-text-secondary select-none transition-opacity duration-150 ${
+                            isEditing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                          }`}
+                        >
                           <span className="mr-1">{timestamp}</span>
                           <span className="mx-1 h-3 w-px bg-border-color" />
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(msg.id, msg.content)}
-                            className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
-                            title="复制消息"
-                            aria-label="复制消息"
-                          >
-                            {copiedMsgId === msg.id ? (
-                              <Check size={15} className="text-emerald-500" />
-                            ) : (
-                              <Copy size={15} />
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(msg.id, msg.content)}
+                              className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                              title="复制消息"
+                              aria-label="复制消息"
+                            >
+                              {copiedMsgId === msg.id ? (
+                                <Check size={15} className="text-emerald-500" />
+                              ) : (
+                                <Copy size={15} />
+                              )}
+                            </button>
+                            {isLastUser && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(msg)}
+                                disabled={isGenerating}
+                                className={`rounded p-1 transition-colors ${
+                                  isGenerating
+                                    ? 'opacity-40 cursor-not-allowed text-text-ghost'
+                                    : 'hover:bg-hover-bg hover:text-text-primary cursor-pointer'
+                                }`}
+                                title={isGenerating ? '生成中不可修改' : '修改消息'}
+                                aria-label="修改消息"
+                              >
+                                <Pencil size={15} />
+                              </button>
                             )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditQuestion(msg)}
-                            className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
-                            title="修改消息"
-                            aria-label="修改消息"
-                          >
-                            <Pencil size={15} />
-                          </button>
+                          </div>
                         </div>
                       )}
                       {!isUser && (msg.status === 'streaming' || !msg.content) && (
@@ -860,25 +1008,6 @@ export default function AIWriting() {
           {/* Bottom Input Area (Sticky at bottom of scroll container) */}
           <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
             <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
-              {editingMessageId && (
-                <div className="flex items-center justify-between gap-2 border-l-2 border-accent pl-2 text-[13px] text-text-secondary">
-                  <span>修改消息 · 发送后将替换此轮及后续对话</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingMessageId(null);
-                      setInputText('');
-                      setReferencedDocs([]);
-                      setAttachedFiles([]);
-                    }}
-                    className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
-                    title="取消修改"
-                    aria-label="取消修改"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
               {/* Attachment badges above input */}
               {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
                 <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
