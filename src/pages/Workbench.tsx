@@ -2,8 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, FolderPlus, Copy, Sparkles, FileLineChart } from 'lucide-react';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
+import { useAuthStore } from '../store/authStore';
+import { useAIWritingStore } from '../store/aiWritingStore';
 import CreateKnowledgeBaseModal from '../components/modals/CreateKnowledgeBaseModal';
 import CreateDocModal from '../components/modals/CreateDocModal';
+
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return '上午好';
+  if (hour >= 12 && hour < 18) return '下午好';
+  return '晚上好';
+}
 
 // Helper to format date relative to today/yesterday or absolute
 function formatRelativeTime(timestamp: number): string {
@@ -32,6 +41,10 @@ function formatRelativeTime(timestamp: number): string {
 export default function Workbench() {
   const navigate = useNavigate();
   const { documents, knowledgeBases } = useKnowledgeBaseStore();
+  const currentUser = useAuthStore((state) => state.user);
+  const lastVisitedSessionId = useAIWritingStore((state) => state.lastVisitedSessionId);
+
+  const displayName = currentUser?.display_name?.trim() || currentUser?.id || '用户';
 
   const [isKBModalOpen, setIsKBModalOpen] = useState(false);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
@@ -41,19 +54,23 @@ export default function Workbench() {
 
   return (
     <main className="flex-1 p-10 overflow-y-auto bg-bg-main relative">
-      <h1 className="text-[28px] font-bold text-text-primary mb-8">开始</h1>
+      <h1 className="text-[28px] font-bold text-text-primary mb-8 tracking-tight">
+        {getTimeGreeting()}，{displayName}~
+      </h1>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-4 gap-4 mb-10 select-none">
         {/* New Document Card */}
         <div
           onClick={() => setIsDocModalOpen(true)}
-          className="bg-bg-main border border-border-color p-5 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
+          className="bg-bg-main border border-border-color p-4 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/40 transition-colors">
-            <FileText size={18} />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/40 transition-colors shrink-0">
+              <FileText size={17} />
+            </div>
+            <div className="text-[14.5px] font-semibold text-text-primary">新建文档</div>
           </div>
-          <div className="text-[15px] font-semibold text-text-primary mt-1">新建文档</div>
           <div className="text-xs text-text-secondary leading-snug">
             在已有知识库中快速添加新文档
           </div>
@@ -62,49 +79,52 @@ export default function Workbench() {
         {/* New Knowledge Base Card */}
         <div
           onClick={() => setIsKBModalOpen(true)}
-          className="bg-bg-main border border-border-color p-5 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
+          className="bg-bg-main border border-border-color p-4 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
-          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
-            <FolderPlus size={18} />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors shrink-0">
+              <FolderPlus size={17} />
+            </div>
+            <div className="text-[14.5px] font-semibold text-text-primary">新建知识库</div>
           </div>
-          <div className="text-[15px] font-semibold text-text-primary mt-1">新建知识库</div>
-          <div className="text-xs text-text-secondary leading-snug">创建基础文件夹 (RAG 准备)</div>
+          <div className="text-xs text-text-secondary leading-snug">创建知识空间进行分类归纳</div>
+        </div>
+
+        {/* AI Writer Card (Active / maps to Duet 助手) */}
+        <div
+          onClick={() =>
+            navigate(lastVisitedSessionId ? `/ai-writing/${lastVisitedSessionId}` : '/ai-writing')
+          }
+          className="bg-bg-main border border-border-color p-4 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:bg-purple-100 dark:group-hover:bg-purple-900/40 transition-colors shrink-0">
+              <Sparkles size={17} />
+            </div>
+            <div className="text-[14.5px] font-semibold text-text-primary">AI 帮你写</div>
+          </div>
+          <div className="text-xs text-text-secondary leading-snug">
+            与智能助手对话，协助构思与写作
+          </div>
         </div>
 
         {/* Templates Card (Static placeholder / soon tooltip) */}
         <div
-          className="bg-bg-main border border-border-color p-5 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
+          className="bg-bg-main border border-border-color p-4 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
           title="模板中心即将上线"
         >
-          <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-            <Copy size={18} />
-          </div>
-          <div className="text-[15px] font-semibold text-text-primary mt-1 flex items-center gap-1.5">
-            <span>模板中心</span>
-            <span className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60 px-1 py-0.5 rounded font-bold">
-              即将上线
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Copy size={17} />
+            </div>
+            <div className="text-[14.5px] font-semibold text-text-primary flex items-center gap-1.5">
+              <span>模板中心</span>
+              <span className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60 px-1 py-0.5 rounded font-bold">
+                即将上线
+              </span>
+            </div>
           </div>
           <div className="text-xs text-text-secondary leading-snug">使用预设基础模板快速起草</div>
-        </div>
-
-        {/* AI Writer Card (Static placeholder / soon tooltip) */}
-        <div
-          className="bg-bg-main border border-border-color p-5 rounded-xl opacity-60 flex flex-col gap-2 relative group cursor-not-allowed select-none"
-          title="AI 自动生成文档即将上线"
-        >
-          <div className="w-8 h-8 rounded-lg bg-hover-bg text-text-secondary flex items-center justify-center">
-            <Sparkles size={18} />
-          </div>
-          <div className="text-[15px] font-semibold text-text-primary mt-1 flex items-center gap-1.5">
-            <span>AI 帮你写</span>
-            <span className="text-[9px] bg-hover-bg text-text-secondary border border-border-color px-1 py-0.5 rounded font-bold">
-              即将上线
-            </span>
-          </div>
-          <div className="text-xs text-text-secondary leading-snug">
-            输入提示词，由 AI 自动生成文档
-          </div>
         </div>
       </div>
 
@@ -166,7 +186,9 @@ export default function Workbench() {
                         <span className="truncate max-w-md">{doc.title}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-2 text-sm text-text-secondary">{kbName} / 管理员</td>
+                    <td className="py-3.5 px-2 text-sm text-text-secondary">
+                      {kbName} / {displayName}
+                    </td>
                     <td className="py-3.5 px-2 text-sm text-text-secondary">
                       {formatRelativeTime(doc.updatedAt)}
                     </td>
