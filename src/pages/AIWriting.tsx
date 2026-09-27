@@ -534,39 +534,46 @@ export default function AIWriting() {
             </button>
             <div className="flex items-center gap-3 ml-1 min-w-0">
               <h2 className="text-[15px] font-bold text-text-primary truncate">Duet 助手</h2>
-              <span className="text-[10px] font-semibold bg-active-bg text-active-fg px-2 py-0.5 rounded-full border border-active-border shrink-0">
-                {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
-              </span>
+              <div
+                className="relative inline-flex items-center cursor-pointer select-none"
+                title={
+                  backendStatus === 'connected'
+                    ? '云端推理引擎已就绪 · DeepSeek V4'
+                    : backendStatus === 'disconnected'
+                      ? '云端服务已断开，请检查网络连接'
+                      : '检测云端连接中...'
+                }
+              >
+                <span className="text-[10px] font-semibold bg-active-bg text-active-fg px-2.5 py-0.5 rounded-full border border-active-border shrink-0 transition-colors">
+                  {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
+                </span>
+                {/* 状态指示小点：咬合在徽章右上角 */}
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 items-center justify-center">
+                  {backendStatus === 'connected' ? (
+                    <>
+                      <span
+                        className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"
+                        style={{ animationDuration: '3s' }}
+                      />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-2 ring-bg-main" />
+                    </>
+                  ) : backendStatus === 'disconnected' ? (
+                    <>
+                      <span
+                        className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60"
+                        style={{ animationDuration: '2s' }}
+                      />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-2 ring-bg-main" />
+                    </>
+                  ) : (
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-400 ring-2 ring-bg-main" />
+                  )}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <CloudRagGate onMessage={setToastText} />
-            <div className="flex items-center gap-2 text-xs text-text-secondary bg-bg-panel border border-border-color px-2.5 py-1.5 rounded-lg shadow-sm">
-              <span className="relative flex h-2 w-2">
-                {backendStatus === 'connected' && (
-                  <span
-                    className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
-                    style={{ animationDuration: '2.5s' }}
-                  />
-                )}
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${
-                    backendStatus === 'connected'
-                      ? 'bg-emerald-500'
-                      : backendStatus === 'disconnected'
-                        ? 'bg-red-500'
-                        : 'bg-gray-400'
-                  }`}
-                />
-              </span>
-              <span className="font-medium">
-                {backendStatus === 'connected'
-                  ? '已连接云端'
-                  : backendStatus === 'disconnected'
-                    ? '离线模式'
-                    : '检测连接中...'}
-              </span>
-            </div>
           </div>
         </header>
 
