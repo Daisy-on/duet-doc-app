@@ -22,6 +22,7 @@ import { extractPlainTextFromTiptap } from '../utils/tiptapUtils';
 import { searchAssistantKnowledge, type AssistantHit } from '../rag/assistantRetriever';
 import { generalAnswerFallback } from '../ai/generalAnswerFallback';
 import { useAuthStore } from '../store/authStore';
+import { editableMessageTail, persistEditedMessage } from '../ai/editableMessageTail';
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARS = 30000;
@@ -243,6 +244,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
       userContent: string,
       referencedDocs: ReferencedDoc[] = [],
       overrideSessionId?: string,
+      preparedUserMsg?: ChatMessage,
     ) => {
       const targetSessionId = overrideSessionId || sessionId;
       if (!targetSessionId || !userContent.trim() || isGenerating) return;
@@ -274,7 +276,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
 
       try {
         // 1. 创建 User 消息并保存
-        const userMsg: ChatMessage = {
+        const userMsg: ChatMessage = preparedUserMsg ?? {
           id: `msg-${nanoid(12)}`,
           sessionId: targetSessionId,
           role: 'user',
@@ -282,7 +284,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
           referencedDocs,
           createdAt: Date.now(),
         };
-        await addMessage(userMsg);
+        if (!preparedUserMsg) await addMessage(userMsg);
 
         if (run.stopRequested || run.controller.signal.aborted) {
           await finalizeStream(run, 'stopped');
@@ -649,18 +651,27 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
 
       const sessionMsgs = useAIWritingStore
         .getState()
-        .messages.filter((message) => message.sessionId === sessionId)
-        .sort((a, b) => a.createdAt - b.createdAt);
-      const targetIdx = sessionMsgs.findIndex(
-        (message) => message.id === userMessageId && message.role === 'user',
-      );
-      if (targetIdx === -1) return false;
+        .messages.filter((message) => message.sessionId === sessionId);
+      const oldTail = editableMessageTail(sessionMsgs, userMessageId);
+      if (!oldTail) return false;
 
-      await removeMessages(sessionMsgs.slice(targetIdx).map((message) => message.id));
-      void sendChatMessage(content, referencedDocs);
+      const newUserMsg: ChatMessage = {
+        id: `msg-${nanoid(12)}`,
+        sessionId,
+        role: 'user',
+        content: content.trim(),
+        referencedDocs,
+        createdAt: Date.now(),
+      };
+      await persistEditedMessage(newUserMsg, oldTail, {
+        addMessage,
+        removeMessages,
+        removeMessage,
+      });
+      void sendChatMessage(newUserMsg.content, referencedDocs, sessionId, newUserMsg);
       return true;
     },
-    [sessionId, isGenerating, removeMessages, sendChatMessage],
+    [sessionId, isGenerating, addMessage, removeMessage, removeMessages, sendChatMessage],
   );
 
   useEffect(() => {
