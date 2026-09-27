@@ -47,7 +47,7 @@ function FolderCard({
       onMouseLeave={() => setHovered(false)}
       className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all select-none ${
         isSelected
-          ? 'border-accent/40 bg-indigo-50/80 dark:bg-indigo-950/60 shadow-xs'
+          ? 'border-active-border bg-active-bg shadow-xs'
           : 'border-transparent hover:border-border-color hover:bg-hover-bg'
       }`}
     >
@@ -60,7 +60,7 @@ function FolderCard({
         />
         <span
           className={`text-xs font-medium truncate ${
-            isSelected ? 'text-accent' : 'text-text-primary'
+            isSelected ? 'text-active-fg' : 'text-text-primary'
           }`}
         >
           {name}
@@ -88,9 +88,7 @@ function FolderCard({
       ) : (
         <span
           className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-semibold ${
-            isSelected
-              ? 'bg-indigo-100/80 dark:bg-indigo-900/60 text-accent'
-              : 'bg-hover-bg text-text-secondary'
+            isSelected ? 'bg-active-border/40 text-active-fg' : 'bg-hover-bg text-text-secondary'
           }`}
         >
           {count}

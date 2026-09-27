@@ -68,7 +68,7 @@ function DocTreeItem({
       onClick={handleDocClick}
       className={`text-[13px] py-1.5 px-1.5 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
         isDocActive
-          ? 'text-accent font-semibold bg-bg-main shadow-sm border-l-2 border-accent rounded-l-none'
+          ? 'text-active-fg font-semibold bg-active-bg shadow-sm border-l-2 border-active-border rounded-l-none'
           : 'text-text-secondary'
       } ${activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''}`}
       style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
@@ -76,7 +76,7 @@ function DocTreeItem({
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         <FileText
           size={14}
-          className={`shrink-0 ${isDocActive ? 'text-accent' : 'text-text-secondary'}`}
+          className={`shrink-0 ${isDocActive ? 'text-active-fg' : 'text-text-secondary'}`}
         />
         {isRenamingDoc ? (
           <input

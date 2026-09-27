@@ -208,7 +208,7 @@ export default function MemoCatalogPanel() {
                       }}
                       className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
                         isActive
-                          ? 'text-accent font-semibold bg-bg-main shadow-sm border-l-2 border-accent rounded-l-none pl-[10px]'
+                          ? 'text-active-fg font-semibold bg-active-bg shadow-sm border-l-2 border-active-border rounded-l-none pl-[10px]'
                           : 'text-text-secondary'
                       } ${activeMenuId === memo.id ? 'bg-hover-bg' : ''}`}
                     >
@@ -216,7 +216,7 @@ export default function MemoCatalogPanel() {
                         <FileText
                           size={14}
                           className={
-                            isActive ? 'text-accent shrink-0' : 'text-text-secondary shrink-0'
+                            isActive ? 'text-active-fg shrink-0' : 'text-text-secondary shrink-0'
                           }
                         />
                         {isRenaming ? (
