@@ -53,7 +53,7 @@ export default function OutlinePanel() {
                   type="button"
                   className={[
                     'w-full cursor-pointer truncate text-left leading-snug py-1 px-1.5 rounded transition-colors',
-                    'hover:text-accent hover:bg-hover-bg focus-visible:outline-2 focus-visible:outline-accent',
+                    'hover:text-active-fg focus-visible:outline-2 focus-visible:outline-active-fg',
                     indentClass[item.level] ?? 'pl-6',
                     textClass[item.level] ?? 'text-[11px] text-text-secondary',
                   ].join(' ')}

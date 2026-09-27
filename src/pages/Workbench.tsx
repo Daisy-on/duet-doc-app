@@ -53,7 +53,7 @@ export default function Workbench() {
   const recentDocs = [...documents].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <main className="flex-1 p-10 overflow-y-auto bg-bg-main relative">
+    <main className="flex-1 p-16 overflow-y-auto bg-bg-main relative">
       <h1 className="text-[28px] font-bold text-text-primary mb-8 tracking-tight">
         {getTimeGreeting()}，{displayName}~
       </h1>
