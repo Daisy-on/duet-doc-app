@@ -2,6 +2,11 @@ import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from '@tiptap/re
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import { useThemeStore } from '../../store/themeStore';
+import {
+  formatLanguageName,
+  displayToLanguageValue,
+  SORTED_CODE_LANGUAGES,
+} from '../../utils/codeLanguageUtils';
 
 export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -18,68 +23,6 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
   const theme = node.attrs.theme || 'auto';
   const effectiveTheme = theme === 'auto' ? resolvedGlobalTheme : theme;
   const isDark = effectiveTheme === 'dark';
-
-  const allLanguages = [
-    'plaintext',
-    'javascript',
-    'typescript',
-    'html',
-    'css',
-    'python',
-    'java',
-    'go',
-    'rust',
-    'c',
-    'cpp',
-    'csharp',
-    'sql',
-    'ruby',
-    'php',
-    'swift',
-    'kotlin',
-    'markdown',
-    'yaml',
-    'json',
-    'xml',
-    'tsx',
-    'vue',
-    'bash',
-    'shell',
-    'dockerfile',
-    'makefile',
-    'r',
-    'dart',
-  ];
-
-  // Sort and Capitalize
-  const sortedLanguages = [...allLanguages].sort().map((lang) => {
-    if (lang === 'cpp') return 'C++';
-    if (lang === 'csharp') return 'C#';
-    if (lang === 'html') return 'HTML';
-    if (lang === 'css') return 'CSS';
-    if (lang === 'json') return 'JSON';
-    if (lang === 'xml') return 'XML';
-    if (lang === 'yaml') return 'YAML';
-    if (lang === 'sql') return 'SQL';
-    if (lang === 'php') return 'PHP';
-    if (lang === 'tsx') return 'TSX';
-    return lang.charAt(0).toUpperCase() + lang.slice(1);
-  });
-
-  // Map capitalized back to original for updateAttributes
-  const displayToValue = (display: string) => {
-    if (display === 'C++') return 'cpp';
-    if (display === 'C#') return 'csharp';
-    if (display === 'HTML') return 'html';
-    if (display === 'CSS') return 'css';
-    if (display === 'JSON') return 'json';
-    if (display === 'XML') return 'xml';
-    if (display === 'YAML') return 'yaml';
-    if (display === 'SQL') return 'sql';
-    if (display === 'PHP') return 'php';
-    if (display === 'TSX') return 'tsx';
-    return display.toLowerCase();
-  };
 
   const themes = [
     { value: 'auto', label: '跟随全局' },
@@ -108,8 +51,7 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const currentLangDisplay =
-    sortedLanguages.find((l) => displayToValue(l) === language) || 'Plaintext';
+  const currentLangDisplay = formatLanguageName(language);
 
   return (
     <NodeViewWrapper
@@ -190,8 +132,8 @@ export default function CodeBlockNodeView({ node, updateAttributes }: NodeViewPr
                       : 'bg-white border-gray-200 text-gray-700'
                   }`}
                 >
-                  {sortedLanguages.map((lang) => {
-                    const value = displayToValue(lang);
+                  {SORTED_CODE_LANGUAGES.map((lang) => {
+                    const value = displayToLanguageValue(lang);
                     const isActive = language === value;
                     return (
                       <button

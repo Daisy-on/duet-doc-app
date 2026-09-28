@@ -46,6 +46,8 @@ interface CitationToken {
   indices: number[];
 }
 
+import { formatLanguageName } from './codeLanguageUtils';
+
 const customMarked = new Marked();
 
 customMarked.use({
@@ -92,19 +94,19 @@ customMarked.use({
         highlightedHtml = escapeHtml(text);
       }
 
-      const displayLang = lang || 'code';
+      const displayLang = formatLanguageName(lang);
       const encodedCode = escapeHtml(text);
-      return `<div class="my-3 rounded-xl overflow-hidden border border-border-color bg-hover-bg/30 shadow-xs group/code relative">
-    <div class="flex justify-between items-center px-4 py-1.5 bg-hover-bg/80 text-xs font-sans font-medium text-text-secondary border-b border-border-color select-none">
-      <span class="tracking-wide">${displayLang}</span>
-      <button type="button" class="copy-code-btn flex items-center gap-1.5 text-xs font-sans text-text-secondary hover:text-text-primary transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-hover-bg" data-code="${encodedCode}">
+      return `<div class="my-4 rounded-xl overflow-hidden border border-border-color/80 bg-bg-panel/40 shadow-2xs group/code relative">
+    <div class="flex justify-between items-center px-4 py-1.5 bg-hover-bg/70 text-xs font-sans text-text-secondary border-b border-border-color/80 select-none">
+      <span class="text-[12px] font-normal text-text-secondary select-none tracking-normal">${displayLang}</span>
+      <button type="button" class="copy-code-btn flex items-center gap-1.5 text-xs font-sans text-text-secondary hover:text-text-primary transition-all cursor-pointer py-0.5 px-2 rounded-md hover:bg-hover-bg active:scale-95" data-code="${encodedCode}">
         <svg class="copy-icon w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
         </svg>
-        <span class="copy-label pointer-events-none">复制代码</span>
+        <span class="copy-label pointer-events-none font-normal">复制代码</span>
       </button>
     </div>
-    <pre class="p-4 text-xs md:text-[13px] font-mono text-text-primary overflow-x-auto leading-relaxed"><code>${highlightedHtml}</code></pre>
+    <pre class="p-4 text-[13px] font-mono text-text-primary overflow-x-auto leading-[1.68] scrollbar-thin"><code>${highlightedHtml}</code></pre>
   </div>`;
     },
 
@@ -115,11 +117,11 @@ customMarked.use({
     },
 
     codespan({ text }: { text: string }) {
-      return `<code class="bg-gray-100/70 dark:bg-gray-800/70 text-gray-900 dark:text-gray-200 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-xs select-text">${text}</code>`;
+      return `<code class="bg-hover-bg/80 text-text-primary px-1.5 py-[1.5px] rounded-md border border-border-color/60 font-mono text-[13px] font-medium select-text mx-0.5 align-baseline">${text}</code>`;
     },
 
     hr() {
-      return `<hr class="my-4 border-t border-border-color" />`;
+      return `<hr class="my-5 border-t border-border-color" />`;
     },
   },
 });

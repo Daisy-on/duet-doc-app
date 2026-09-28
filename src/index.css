@@ -494,111 +494,159 @@ body.is-selecting-codeblock .code-block * {
   margin-top: 0;
 }
 
+.assistant-answer > :last-child {
+  margin-bottom: 0;
+}
+
 .markdown-body h1 {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
-  margin-top: 1.25rem;
+  line-height: 1.35;
+  margin-top: 1.75rem;
   margin-bottom: 0.75rem;
   color: var(--color-text-primary);
+  letter-spacing: -0.015em;
 }
 
 .markdown-body h2 {
-  font-size: 1.125rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  margin-top: 1.25rem;
+  line-height: 1.4;
+  margin-top: 1.5rem;
   margin-bottom: 0.625rem;
   color: var(--color-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .markdown-body h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-top: 1rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.45;
+  margin-top: 1.25rem;
   margin-bottom: 0.5rem;
   color: var(--color-text-primary);
 }
 
-.markdown-body h4,
-.markdown-body h5,
-.markdown-body h6 {
-  font-size: 0.875rem;
-  font-weight: 700;
-  margin-top: 0.75rem;
+.markdown-body h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 1rem;
   margin-bottom: 0.375rem;
   color: var(--color-text-primary);
 }
 
-.markdown-body p {
+.markdown-body h5,
+.markdown-body h6 {
   font-size: 0.875rem;
-  line-height: 1.625;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 0.875rem;
+  margin-bottom: 0.25rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.markdown-body p {
+  font-size: 15px;
+  line-height: 1.7;
+  margin-top: 0.625rem;
+  margin-bottom: 0.625rem;
+  color: var(--color-text-primary);
+}
+
+.markdown-body strong,
+.markdown-body b {
+  font-weight: 600;
   color: var(--color-text-primary);
 }
 
 .markdown-body ul {
   list-style-type: disc;
-  padding-left: 1.25rem;
+  padding-left: 1.375rem;
   margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  margin-bottom: 0.625rem;
+  font-size: 15px;
 }
 
 .markdown-body ol {
   list-style-type: decimal;
-  padding-left: 1.25rem;
+  padding-left: 1.375rem;
   margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  margin-bottom: 0.625rem;
+  font-size: 15px;
 }
 
 .markdown-body li {
+  margin-top: 0.375rem;
+  margin-bottom: 0.375rem;
+  line-height: 1.7;
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
+
+.markdown-body li > p {
   margin-top: 0.25rem;
   margin-bottom: 0.25rem;
-  line-height: 1.625;
 }
 
 .markdown-body blockquote {
   border: 1px solid var(--color-border-color);
   background-color: var(--color-hover-bg);
-  padding: 0.625rem 1rem;
-  margin-top: 0.625rem;
-  margin-bottom: 0.625rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  padding: 0.875rem 1.125rem;
+  margin-top: 0.875rem;
+  margin-bottom: 0.875rem;
+  border-radius: 0.75rem;
+  font-size: 14.5px;
+  line-height: 1.68;
   color: var(--color-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.markdown-body.assistant-answer p,
-.markdown-body.assistant-answer ul,
-.markdown-body.assistant-answer ol,
-.markdown-body.assistant-answer blockquote {
-  font-size: 15px;
+.markdown-body blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body blockquote p {
+  font-size: 14.5px;
+  line-height: 1.68;
 }
 
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 0.75rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.8125rem;
+  margin-top: 0.875rem;
+  margin-bottom: 0.875rem;
+  font-size: 0.875rem;
   border: 1px solid var(--color-border-color);
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   overflow: hidden;
 }
 
 .markdown-body th {
   background-color: var(--color-bg-panel);
-  font-weight: 700;
+  font-weight: 600;
   text-align: left;
-  padding: 0.5rem 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--color-border-color);
+  color: var(--color-text-primary);
+}
+
+.markdown-body td {
+  padding: 0.5rem 0.875rem;
   border: 1px solid var(--color-border-color);
   color: var(--color-text-secondary);
 }
 
-.markdown-body td {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border-color);
+.markdown-body hr {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--color-border-color);
 }
 
 /* --- 全局现代极简滚动条 (DeepSeek 风格: 极细、无箭头、圆角滑块) --- */
