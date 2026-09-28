@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Send,
@@ -20,6 +20,10 @@ import {
   Check,
   Cloud,
   Image as ImageIcon,
+  BookMarked,
+  ArrowUpRight,
+  ExternalLink,
+  ChevronDown,
 } from 'lucide-react';
 import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
@@ -43,6 +47,13 @@ import { buildApiUrl } from '../utils/apiUtils';
 import CloudRagGate from '../components/CloudRagGate';
 import { inspectModelInstallation } from '../models/modelCache';
 
+interface ActiveCitation {
+  source: KnowledgeSource;
+  index: number;
+  anchorRect: DOMRect;
+  msgId: string;
+}
+
 function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
   if (msg.status === 'streaming' && !msg.content) {
     return `思考中 ${liveSeconds || 1}s...`;
@@ -56,17 +67,6 @@ function getThinkingLabel(msg: ChatMessage, liveSeconds: number): string {
     return `思考了 ${approxSec}s`;
   }
   return '思考完成';
-}
-
-function uniqueKnowledgeSources(sources: KnowledgeSource[]): KnowledgeSource[] {
-  return Array.from(
-    new Map(
-      sources.map((source) => [
-        `${source.sourceType}:${source.sourceId}:${source.chunkIndex}`,
-        source,
-      ]),
-    ).values(),
-  );
 }
 
 export default function AIWriting() {
@@ -145,6 +145,12 @@ export default function AIWriting() {
   const lastMsgCountRef = useRef(0);
   const lastSessionIdRef = useRef<string | null>(null);
 
+  // Citation interaction states
+  const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
+  const [flashingCardKey, setFlashingCardKey] = useState<string | null>(null);
+  const popoverHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMouseInPopoverRef = useRef(false);
+
   // Real-time timer for live streaming thinking seconds
   const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
 
@@ -182,10 +188,11 @@ export default function AIWriting() {
     };
   }, []);
 
-  // Cleanup cancel timer on unmount
+  // Cleanup cancel timer and popover hover timer on unmount
   useEffect(() => {
     return () => {
       if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
+      if (popoverHoverTimerRef.current) clearTimeout(popoverHoverTimerRef.current);
     };
   }, []);
 
@@ -207,6 +214,7 @@ export default function AIWriting() {
       setEditingMessageId(null);
       setEditingContent('');
     }
+    setActiveCitation(null);
   }
 
   useEffect(() => {
@@ -470,6 +478,100 @@ export default function AIWriting() {
     });
   };
 
+  const handleContainerMouseOver = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const badge = target?.closest('.citation-ref-badge') as HTMLElement | null;
+      if (!badge) return;
+
+      const msgContainer = badge.closest('[data-message-id]');
+      const msgId = msgContainer?.getAttribute('data-message-id');
+      const indexStr = badge.getAttribute('data-citation-index');
+      if (!msgId || !indexStr) return;
+
+      const index = parseInt(indexStr, 10);
+      const msg = sessionMessages.find((m) => m.id === msgId);
+      const source = msg?.knowledgeSources?.[index - 1];
+      if (source) {
+        if (popoverHoverTimerRef.current) {
+          clearTimeout(popoverHoverTimerRef.current);
+          popoverHoverTimerRef.current = null;
+        }
+        setActiveCitation({
+          source,
+          index,
+          anchorRect: badge.getBoundingClientRect(),
+          msgId,
+        });
+      }
+    },
+    [sessionMessages],
+  );
+
+  const handleContainerMouseOut = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    const badge = target?.closest('.citation-ref-badge');
+    if (!badge) return;
+
+    if (popoverHoverTimerRef.current) {
+      clearTimeout(popoverHoverTimerRef.current);
+    }
+    popoverHoverTimerRef.current = setTimeout(() => {
+      if (!isMouseInPopoverRef.current) {
+        setActiveCitation(null);
+      }
+    }, 180);
+  }, []);
+
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    const badge = target?.closest('.citation-ref-badge') as HTMLElement | null;
+    if (!badge) return;
+
+    e.preventDefault();
+    const msgContainer = badge.closest('[data-message-id]');
+    const msgId = msgContainer?.getAttribute('data-message-id');
+    const indexStr = badge.getAttribute('data-citation-index');
+    if (!msgId || !indexStr) return;
+
+    const index = parseInt(indexStr, 10);
+    setExpandedSources((current) => ({ ...current, [msgId]: true }));
+    const cardId = `evidence-card-${msgId}-${index}`;
+
+    setTimeout(() => {
+      const cardEl = document.getElementById(cardId);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setFlashingCardKey(`${msgId}-${index}`);
+        setTimeout(() => {
+          setFlashingCardKey(null);
+        }, 1600);
+      }
+    }, 50);
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (activeCitation) {
+      setActiveCitation(null);
+    }
+  }, [activeCitation]);
+
+  const handleCardMouseEnter = useCallback((msgId: string, index: number) => {
+    const msgEl = document.querySelector(`[data-message-id="${msgId}"]`);
+    if (msgEl) {
+      const badges = msgEl.querySelectorAll(`.citation-ref-badge[data-citation-index="${index}"]`);
+      badges.forEach((b) => b.classList.add('is-highlighted'));
+    }
+  }, []);
+
+  const handleCardMouseLeave = useCallback((msgId: string, index: number) => {
+    const msgEl = document.querySelector(`[data-message-id="${msgId}"]`);
+    if (msgEl) {
+      const badges = msgEl.querySelectorAll(`.citation-ref-badge[data-citation-index="${index}"]`);
+      badges.forEach((b) => b.classList.remove('is-highlighted'));
+    }
+  }, []);
+
   // 一键保存到小记
   const handleSaveToMemo = async (content: string) => {
     const rawTitle =
@@ -588,6 +690,10 @@ export default function AIWriting() {
         {/* Main Scrollable Viewport (holds both messages AND sticky bottom input like DeepSeek) */}
         <div
           ref={scrollRef}
+          onScroll={handleScroll}
+          onMouseOver={handleContainerMouseOver}
+          onMouseOut={handleContainerMouseOut}
+          onClick={handleContainerClick}
           className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col"
           style={{ scrollbarGutter: 'stable' }}
         >
@@ -632,9 +738,7 @@ export default function AIWriting() {
                   const isEditing = isUser && editingMessageId === msg.id;
                   const isExpanded = expandedThinking[msg.id] !== false;
                   const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
-                  const knowledgeSources = msg.knowledgeSources
-                    ? uniqueKnowledgeSources(msg.knowledgeSources)
-                    : [];
+                  const knowledgeSources = msg.knowledgeSources || [];
                   const showAllSources = expandedSources[msg.id] === true;
                   const timestamp = new Date(msg.createdAt).toLocaleTimeString([], {
                     hour: '2-digit',
@@ -644,6 +748,7 @@ export default function AIWriting() {
                   return (
                     <div
                       key={msg.id}
+                      data-message-id={msg.id}
                       className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                     >
                       <div
@@ -789,41 +894,17 @@ export default function AIWriting() {
                             </div>
 
                             {!isUser && knowledgeSources.length > 0 && (
-                              <div className="mt-5 border-t border-border-color/70 pt-3">
-                                <div className="flex items-center gap-1.5 text-[13px] text-text-secondary">
-                                  <Sparkles size={13} className="text-indigo-500" />
-                                  <span className="font-medium">已检索知识库</span>
-                                </div>
-                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-text-secondary">
-                                  {(showAllSources
-                                    ? knowledgeSources
-                                    : knowledgeSources.slice(0, 3)
-                                  ).map((source) => (
-                                    <button
-                                      type="button"
-                                      key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}`}
-                                      onClick={() => openKnowledgeSource(source)}
-                                      className="inline-flex items-center gap-1 min-w-0 hover:text-accent hover:underline"
-                                      title={source.headingPath.join(' > ') || source.title}
-                                    >
-                                      {source.sourceType === 'image' ? (
-                                        <ImageIcon size={13} className="shrink-0 text-sky-500" />
-                                      ) : source.sourceType === 'memo' ? (
-                                        <StickyNote
-                                          size={13}
-                                          className="shrink-0 text-emerald-500"
-                                        />
-                                      ) : (
-                                        <FileText size={13} className="shrink-0 text-indigo-500" />
-                                      )}
-                                      <span className="max-w-[190px] truncate">
-                                        {source.sourceType === 'image'
-                                          ? `${source.title} · 图片`
-                                          : `${source.title} · ${source.headingPath.at(-1) || `片段 ${source.chunkIndex + 1}`}`}
-                                      </span>
-                                    </button>
-                                  ))}
-                                  {knowledgeSources.length > 3 && (
+                              <div className="mt-5 border-t border-border-color/70 pt-3.5">
+                                {/* Header */}
+                                <div className="flex items-center justify-between text-xs text-text-secondary mb-2 select-none">
+                                  <div className="flex items-center gap-1.5 font-medium">
+                                    <BookMarked size={14} className="text-indigo-500 shrink-0" />
+                                    <span>参考来源</span>
+                                    <span className="text-[11px] text-text-ghost">
+                                      · 共 {knowledgeSources.length} 处片段
+                                    </span>
+                                  </div>
+                                  {knowledgeSources.length > 2 && (
                                     <button
                                       type="button"
                                       aria-expanded={showAllSources}
@@ -833,13 +914,97 @@ export default function AIWriting() {
                                           [msg.id]: !showAllSources,
                                         }))
                                       }
-                                      className="shrink-0 text-text-secondary hover:text-accent hover:underline cursor-pointer"
+                                      className="inline-flex items-center gap-1 text-[11px] text-text-secondary hover:text-accent font-medium transition-colors cursor-pointer"
                                     >
-                                      {showAllSources
-                                        ? '收起'
-                                        : `+${knowledgeSources.length - 3} 展开`}
+                                      <span>
+                                        {showAllSources
+                                          ? '收起'
+                                          : `展开全部 (${knowledgeSources.length})`}
+                                      </span>
+                                      <ChevronDown
+                                        size={13}
+                                        className={`transition-transform duration-200 ${showAllSources ? 'rotate-180' : ''}`}
+                                      />
                                     </button>
                                   )}
+                                </div>
+
+                                {/* Cards Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {(showAllSources
+                                    ? knowledgeSources
+                                    : knowledgeSources.slice(0, 2)
+                                  ).map((source, idx) => {
+                                    const citationIndex = idx + 1;
+                                    const cardId = `evidence-card-${msg.id}-${citationIndex}`;
+                                    const isFlashing =
+                                      flashingCardKey === `${msg.id}-${citationIndex}`;
+
+                                    return (
+                                      <div
+                                        key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}:${idx}`}
+                                        id={cardId}
+                                        onMouseEnter={() =>
+                                          handleCardMouseEnter(msg.id, citationIndex)
+                                        }
+                                        onMouseLeave={() =>
+                                          handleCardMouseLeave(msg.id, citationIndex)
+                                        }
+                                        onClick={() => openKnowledgeSource(source)}
+                                        className={`group/card relative rounded-xl border border-border-color/70 bg-bg-panel/40 hover:bg-hover-bg/70 hover:border-indigo-300 dark:hover:border-indigo-700/60 p-2.5 transition-all cursor-pointer select-none flex flex-col justify-between ${
+                                          isFlashing ? 'evidence-card-flashing' : ''
+                                        }`}
+                                      >
+                                        <div>
+                                          {/* Card Top: [1] badge + icon + Title + Arrow */}
+                                          <div className="flex items-center justify-between gap-1.5 mb-1">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                              <span className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 shrink-0">
+                                                {citationIndex}
+                                              </span>
+                                              {source.sourceType === 'image' ? (
+                                                <ImageIcon
+                                                  size={13}
+                                                  className="shrink-0 text-sky-500"
+                                                />
+                                              ) : source.sourceType === 'memo' ? (
+                                                <StickyNote
+                                                  size={13}
+                                                  className="shrink-0 text-emerald-500"
+                                                />
+                                              ) : (
+                                                <FileText
+                                                  size={13}
+                                                  className="shrink-0 text-indigo-500"
+                                                />
+                                              )}
+                                              <span className="text-xs font-medium text-text-primary group-hover/card:text-accent truncate">
+                                                {source.title}
+                                              </span>
+                                            </div>
+                                            <ArrowUpRight
+                                              size={13}
+                                              className="shrink-0 text-text-ghost group-hover/card:text-accent transition-colors opacity-70 group-hover/card:opacity-100"
+                                            />
+                                          </div>
+
+                                          {/* Heading Path */}
+                                          {source.headingPath?.length > 0 && (
+                                            <div className="text-[10px] text-text-ghost truncate font-mono pl-[23px] mb-1">
+                                              {source.headingPath.join(' › ')}
+                                            </div>
+                                          )}
+
+                                          {/* Excerpt quote snippet */}
+                                          {source.excerpt && (
+                                            <p className="text-[11px] text-text-secondary leading-snug line-clamp-2 pl-[23px] font-sans">
+                                              {source.excerpt}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -1145,6 +1310,104 @@ export default function AIWriting() {
           </div>
         </div>
       </main>
+
+      {/* Citation Preview Popover */}
+      {activeCitation &&
+        (() => {
+          const popoverWidth = 360;
+          const margin = 12;
+          const anchor = activeCitation.anchorRect;
+          const showAbove = anchor.top > 240;
+          const top = showAbove ? undefined : anchor.bottom + 8;
+          const bottom = showAbove ? window.innerHeight - anchor.top + 8 : undefined;
+          const desiredLeft = anchor.left + anchor.width / 2 - popoverWidth / 2;
+          const left = Math.max(
+            margin,
+            Math.min(window.innerWidth - popoverWidth - margin, desiredLeft),
+          );
+
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                left: `${left}px`,
+                ...(top !== undefined ? { top: `${top}px` } : {}),
+                ...(bottom !== undefined ? { bottom: `${bottom}px` } : {}),
+                width: `${popoverWidth}px`,
+              }}
+              className="z-50 rounded-xl border border-border-color bg-bg-panel/95 backdrop-blur-md p-3.5 shadow-2xl animate-citation-popover select-none"
+              onMouseEnter={() => {
+                isMouseInPopoverRef.current = true;
+                if (popoverHoverTimerRef.current) {
+                  clearTimeout(popoverHoverTimerRef.current);
+                  popoverHoverTimerRef.current = null;
+                }
+              }}
+              onMouseLeave={() => {
+                isMouseInPopoverRef.current = false;
+                popoverHoverTimerRef.current = setTimeout(() => {
+                  setActiveCitation(null);
+                }, 150);
+              }}
+            >
+              {/* Header: [1] pill + icon + title + type */}
+              <div className="flex items-center justify-between gap-2 border-b border-border-color/60 pb-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 shrink-0">
+                    {activeCitation.index}
+                  </span>
+                  {activeCitation.source.sourceType === 'image' ? (
+                    <ImageIcon size={14} className="shrink-0 text-sky-500" />
+                  ) : activeCitation.source.sourceType === 'memo' ? (
+                    <StickyNote size={14} className="shrink-0 text-emerald-500" />
+                  ) : (
+                    <FileText size={14} className="shrink-0 text-indigo-500" />
+                  )}
+                  <span className="text-xs font-semibold text-text-primary truncate">
+                    {activeCitation.source.title}
+                  </span>
+                </div>
+                <span className="text-[11px] text-text-ghost shrink-0">
+                  {activeCitation.source.sourceType === 'image'
+                    ? '图片'
+                    : activeCitation.source.sourceType === 'memo'
+                      ? '小记'
+                      : `片段 ${activeCitation.source.chunkIndex + 1}`}
+                </span>
+              </div>
+
+              {/* Heading breadcrumb */}
+              {activeCitation.source.headingPath?.length > 0 && (
+                <div className="mt-1.5 text-[11px] text-text-secondary flex items-center gap-1 truncate font-mono">
+                  <span className="text-text-ghost">章节:</span>
+                  <span className="truncate">{activeCitation.source.headingPath.join(' › ')}</span>
+                </div>
+              )}
+
+              {/* Excerpt quote */}
+              {activeCitation.source.excerpt && (
+                <div className="mt-2 text-xs text-text-secondary leading-relaxed bg-hover-bg/70 rounded-lg p-2.5 border-l-2 border-indigo-500/80 dark:border-indigo-400 line-clamp-4 font-sans break-words select-text">
+                  {activeCitation.source.excerpt}
+                </div>
+              )}
+
+              {/* Footer action button */}
+              <div className="mt-2.5 pt-2 border-t border-border-color/60 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openKnowledgeSource(activeCitation.source);
+                    setActiveCitation(null);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md transition-colors cursor-pointer"
+                >
+                  <span>在知识库中打开</span>
+                  <ExternalLink size={12} />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* Floating attachment dropdown menu */}
       <AIAttachMenu

@@ -1,4 +1,4 @@
-import { marked } from 'marked';
+import { Marked, type Tokens } from 'marked';
 import { common, createLowlight } from 'lowlight';
 import { normalizeUrl } from './urlUtils';
 
@@ -40,27 +40,61 @@ function hastToHtml(node: HastNode): string {
   return '';
 }
 
-const renderer = new marked.Renderer();
+interface CitationToken {
+  type: 'citation';
+  raw: string;
+  indices: number[];
+}
 
-// Custom code block renderer with lowlight syntax highlighting
-renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
-  const validLang = lang && lowlight.registered(lang) ? lang : null;
-  let highlightedHtml: string;
+const customMarked = new Marked();
 
-  if (validLang) {
-    try {
-      const tree = lowlight.highlight(validLang, text);
-      highlightedHtml = hastToHtml(tree as unknown as HastNode);
-    } catch {
-      highlightedHtml = escapeHtml(text);
-    }
-  } else {
-    highlightedHtml = escapeHtml(text);
-  }
+customMarked.use({
+  extensions: [
+    {
+      name: 'citation',
+      level: 'inline',
+      start(src: string) {
+        return src.match(/\[S\d+/)?.index;
+      },
+      tokenizer(src: string): CitationToken | undefined {
+        const match = /^\[S(\d+)((?:,\s*S?\d+)*)\]/.exec(src);
+        if (match) {
+          const raw = match[0];
+          const indices = Array.from(raw.matchAll(/\d+/g)).map((x) => parseInt(x[0], 10));
+          return { type: 'citation', raw, indices };
+        }
+        return undefined;
+      },
+      renderer(token: Tokens.Generic) {
+        const indices = (token.indices as number[]) || [];
+        return indices
+          .map(
+            (idx) =>
+              `<button type="button" class="citation-ref-badge" data-citation-index="${idx}" aria-label="来源 [${idx}]">${idx}</button>`,
+          )
+          .join('');
+      },
+    },
+  ],
+  renderer: {
+    code({ text, lang }: { text: string; lang?: string }) {
+      const validLang = lang && lowlight.registered(lang) ? lang : null;
+      let highlightedHtml: string;
 
-  const displayLang = lang || 'code';
-  const encodedCode = escapeHtml(text);
-  return `<div class="my-3 rounded-xl overflow-hidden border border-border-color bg-hover-bg/30 shadow-xs group/code relative">
+      if (validLang) {
+        try {
+          const tree = lowlight.highlight(validLang, text);
+          highlightedHtml = hastToHtml(tree as unknown as HastNode);
+        } catch {
+          highlightedHtml = escapeHtml(text);
+        }
+      } else {
+        highlightedHtml = escapeHtml(text);
+      }
+
+      const displayLang = lang || 'code';
+      const encodedCode = escapeHtml(text);
+      return `<div class="my-3 rounded-xl overflow-hidden border border-border-color bg-hover-bg/30 shadow-xs group/code relative">
     <div class="flex justify-between items-center px-4 py-1.5 bg-hover-bg/80 text-xs font-sans font-medium text-text-secondary border-b border-border-color select-none">
       <span class="tracking-wide">${displayLang}</span>
       <button type="button" class="copy-code-btn flex items-center gap-1.5 text-xs font-sans text-text-secondary hover:text-text-primary transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-hover-bg" data-code="${encodedCode}">
@@ -72,37 +106,28 @@ renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
     </div>
     <pre class="p-4 text-xs md:text-[13px] font-mono text-text-primary overflow-x-auto leading-relaxed"><code>${highlightedHtml}</code></pre>
   </div>`;
-};
+    },
 
-// Custom link renderer with URL normalization and target="_blank"
-renderer.link = function ({
-  href,
-  title,
-  text,
-}: {
-  href: string;
-  title?: string | null;
-  text: string;
-}) {
-  const normalizedHref = normalizeUrl(href);
-  const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
-  return `<a href="${normalizedHref}" target="_blank" rel="noopener noreferrer"${titleAttr} class="text-accent underline hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer">${text}</a>`;
-};
+    link({ href, title, text }: { href: string; title?: string | null; text: string }) {
+      const normalizedHref = normalizeUrl(href);
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+      return `<a href="${normalizedHref}" target="_blank" rel="noopener noreferrer"${titleAttr} class="text-accent underline hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer">${text}</a>`;
+    },
 
-// Custom inline code span renderer
-renderer.codespan = function ({ text }: { text: string }) {
-  return `<code class="bg-gray-100/70 dark:bg-gray-800/70 text-gray-900 dark:text-gray-200 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-xs select-text">${text}</code>`;
-};
+    codespan({ text }: { text: string }) {
+      return `<code class="bg-gray-100/70 dark:bg-gray-800/70 text-gray-900 dark:text-gray-200 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-xs select-text">${text}</code>`;
+    },
 
-// Custom horizontal rule renderer
-renderer.hr = function () {
-  return `<hr class="my-4 border-t border-border-color" />`;
-};
+    hr() {
+      return `<hr class="my-4 border-t border-border-color" />`;
+    },
+  },
+});
 
 export function renderMarkdownToHtml(markdownText: string): string {
   if (!markdownText) return '';
   try {
-    const html = marked.parse(markdownText, { renderer, async: false }) as string;
+    const html = customMarked.parse(markdownText, { async: false }) as string;
     return html;
   } catch (err) {
     console.error('[renderMarkdownToHtml] Failed:', err);

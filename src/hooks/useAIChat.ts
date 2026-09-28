@@ -354,17 +354,29 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
 
         // 4. 处理知识库引用上下文
         const contexts: AIContext[] = [];
+        const manualSources: KnowledgeSource[] = [];
         if (referencedDocs.length > 0) {
           for (const docRef of referencedDocs) {
             try {
               const fullDoc = await db.documents.get(docRef.id);
               if (fullDoc) {
+                const plainContent = extractPlainTextFromTiptap(fullDoc.content);
                 contexts.push({
                   sourceId: fullDoc.id,
                   title: fullDoc.title,
-                  content: extractPlainTextFromTiptap(fullDoc.content),
+                  content: plainContent,
                   sourceType: 'document',
                   origin: 'manual',
+                });
+                manualSources.push({
+                  sourceType: 'document',
+                  sourceId: fullDoc.id,
+                  documentId: fullDoc.id,
+                  kbId: fullDoc.kbId,
+                  title: fullDoc.title,
+                  chunkIndex: 0,
+                  headingPath: [],
+                  excerpt: plainContent.slice(0, 300),
                 });
               }
             } catch {
@@ -372,6 +384,7 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
             }
           }
         }
+        run.knowledgeSources = manualSources;
 
         if (run.stopRequested || run.controller.signal.aborted) {
           await finalizeStream(run, 'stopped');
@@ -544,10 +557,13 @@ export function useAIChat(sessionId: string | null, allowCloudQuery = false) {
           }
           const evidence = retrieval.hits.slice(0, Math.max(0, 20 - contexts.length));
           const retrievedContexts = evidence.map(toRetrievedContext);
-          run.knowledgeSources = evidence.map((hit) => ({
-            ...hit.source,
-            excerpt: hit.source.sourceType === 'image' ? undefined : hit.content,
-          }));
+          run.knowledgeSources = [
+            ...manualSources,
+            ...evidence.map((hit) => ({
+              ...hit.source,
+              excerpt: hit.source.sourceType === 'image' ? undefined : hit.content,
+            })),
+          ];
 
           if (run.stopRequested || run.controller.signal.aborted) {
             await finalizeStream(run, 'stopped');
