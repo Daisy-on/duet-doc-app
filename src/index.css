@@ -654,53 +654,62 @@ body.is-selecting-codeblock .code-block * {
   top: -0.28em;
   border-radius: 9999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   font-family: inherit;
   cursor: pointer;
   user-select: none;
-  background-color: #eef2ff;
-  color: #4f46e5;
-  border: 1px solid rgba(199, 210, 254, 0.9);
+  background-color: var(--color-hover-bg);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-color);
+  opacity: 0.92;
   transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .citation-ref-badge:hover {
-  background-color: #e0e7ff;
-  color: #4338ca;
-  border-color: #a5b4fc;
-  transform: translateY(-1px) scale(1.08);
-  box-shadow: 0 2px 5px rgba(99, 102, 241, 0.22);
+  background-color: var(--color-active-bg, #e2e8f0);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-color);
+  opacity: 1;
+  transform: translateY(-0.5px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .citation-ref-badge:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-border-color);
 }
 
 [data-theme='dark'] .citation-ref-badge {
-  background-color: rgba(49, 46, 129, 0.45);
-  color: #a5b4fc;
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  background-color: rgba(255, 255, 255, 0.07);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 [data-theme='dark'] .citation-ref-badge:hover {
-  background-color: rgba(67, 56, 202, 0.6);
-  color: #e0e7ff;
-  border-color: rgba(129, 140, 248, 0.6);
-  transform: translateY(-1px) scale(1.08);
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+  background-color: rgba(255, 255, 255, 0.13);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
-/* 联动高亮状态 (当鼠标悬停于底部对应证据卡片时，正文中所有对应引用角标激活) */
+/* 联动高亮状态 (当鼠标悬停于对应证据卡片时，正文中所有对应引用角标激活) */
 .citation-ref-badge.is-highlighted {
-  background-color: var(--color-accent) !important;
+  background-color: #475569 !important;
   color: #ffffff !important;
-  border-color: var(--color-accent) !important;
-  transform: translateY(-1.5px) scale(1.12);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.45);
+  border-color: #334155 !important;
+  opacity: 1 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='dark'] .citation-ref-badge.is-highlighted {
+  background-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 /* 点击角标后，平滑定位到的底部卡片高亮脉冲动画 */

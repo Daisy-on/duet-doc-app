@@ -19,9 +19,7 @@ import {
   Pencil,
   Check,
   Cloud,
-  Image as ImageIcon,
   BookOpen,
-  ExternalLink,
 } from 'lucide-react';
 import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
@@ -34,6 +32,7 @@ const Lottie = (
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
 import AISourcesDrawer from '../components/AISourcesDrawer';
+import AISourceCard from '../components/AISourceCard';
 import KBTreePickerModal from '../components/modals/KBTreePickerModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import type { ChatMessage, KnowledgeSource, ReferencedDoc } from '../store/aiWritingStore';
@@ -149,8 +148,20 @@ export default function AIWriting() {
 
   // Citation interaction states
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
+  const badgeHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popoverHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseInPopoverRef = useRef(false);
+
+  const clearCitationTimers = useCallback(() => {
+    if (badgeHoverTimerRef.current) {
+      clearTimeout(badgeHoverTimerRef.current);
+      badgeHoverTimerRef.current = null;
+    }
+    if (popoverHoverTimerRef.current) {
+      clearTimeout(popoverHoverTimerRef.current);
+      popoverHoverTimerRef.current = null;
+    }
+  }, []);
 
   // Right Sources Drawer state directly derived from Zustand store
   const isSourcesDrawerOpen = Boolean(
@@ -219,13 +230,13 @@ export default function AIWriting() {
     };
   }, []);
 
-  // Cleanup cancel timer and popover hover timer on unmount
+  // Cleanup cancel timer and citation hover timers on unmount
   useEffect(() => {
     return () => {
       if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
-      if (popoverHoverTimerRef.current) clearTimeout(popoverHoverTimerRef.current);
+      clearCitationTimers();
     };
-  }, []);
+  }, [clearCitationTimers]);
 
   // Toast auto-clear
   useEffect(() => {
@@ -235,7 +246,7 @@ export default function AIWriting() {
     }
   }, [toastText]);
 
-  // Sync activeSessionId with URL route param & reset live thinking seconds on session switch
+  // Sync activeSessionId with URL route param & reset state on session switch
   const [prevSessionId, setPrevSessionId] = useState(sessionId);
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
@@ -250,11 +261,12 @@ export default function AIWriting() {
 
   useEffect(() => {
     setActiveSessionId(sessionId || null);
+    clearCitationTimers();
     if (cancelTimerRef.current) {
       clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = null;
     }
-  }, [sessionId, setActiveSessionId]);
+  }, [sessionId, setActiveSessionId, clearCitationTimers]);
 
   // Scroll to bottom on new messages, session change, or generating
   useEffect(() => {
@@ -482,36 +494,45 @@ export default function AIWriting() {
     setTimeout(() => setCopiedMsgId(null), 2000);
   };
 
-  const openKnowledgeSource = (source: KnowledgeSource) => {
-    const curId = currentSessionId || activeSessionId;
-    if (curId) {
-      setActiveSessionId(curId);
-    }
-    const documentId = source.documentId ?? source.sourceId;
-    if (source.sourceType === 'memo') {
-      navigate(`/memo/${documentId}`, {
-        state: {
-          citation: { documentId, excerpt: source.excerpt, headingPath: source.headingPath },
-        },
+  const openKnowledgeSource = useCallback(
+    (source: KnowledgeSource) => {
+      const curId = currentSessionId || activeSessionId;
+      if (curId) {
+        setActiveSessionId(curId);
+      }
+      const documentId = source.documentId ?? source.sourceId;
+      if (source.sourceType === 'memo') {
+        navigate(`/memo/${documentId}`, {
+          state: {
+            citation: { documentId, excerpt: source.excerpt, headingPath: source.headingPath },
+          },
+        });
+        return;
+      }
+      const kbId =
+        source.kbId ??
+        useKnowledgeBaseStore.getState().documents.find((document) => document.id === documentId)
+          ?.kbId;
+      if (!kbId) {
+        setToastText('来源文档已不可用');
+        return;
+      }
+      const imageQuery = source.assetId ? `?assetId=${encodeURIComponent(source.assetId)}` : '';
+      navigate(`/kb/${kbId}/doc/${documentId}${imageQuery}`, {
+        state:
+          source.sourceType === 'image'
+            ? undefined
+            : {
+                citation: {
+                  documentId,
+                  excerpt: source.excerpt,
+                  headingPath: source.headingPath,
+                },
+              },
       });
-      return;
-    }
-    const kbId =
-      source.kbId ??
-      useKnowledgeBaseStore.getState().documents.find((document) => document.id === documentId)
-        ?.kbId;
-    if (!kbId) {
-      setToastText('来源文档已不可用');
-      return;
-    }
-    const imageQuery = source.assetId ? `?assetId=${encodeURIComponent(source.assetId)}` : '';
-    navigate(`/kb/${kbId}/doc/${documentId}${imageQuery}`, {
-      state:
-        source.sourceType === 'image'
-          ? undefined
-          : { citation: { documentId, excerpt: source.excerpt, headingPath: source.headingPath } },
-    });
-  };
+    },
+    [currentSessionId, activeSessionId, setActiveSessionId, navigate],
+  );
 
   const handleContainerMouseOver = useCallback(
     (e: React.MouseEvent) => {
@@ -527,20 +548,32 @@ export default function AIWriting() {
       const index = parseInt(indexStr, 10);
       const msg = sessionMessages.find((m) => m.id === msgId);
       const source = msg?.knowledgeSources?.[index - 1];
-      if (source) {
+      if (!source) return;
+
+      // If already active for this badge, clear hide timer and keep showing
+      if (activeCitation?.msgId === msgId && activeCitation?.index === index) {
         if (popoverHoverTimerRef.current) {
           clearTimeout(popoverHoverTimerRef.current);
           popoverHoverTimerRef.current = null;
         }
+        return;
+      }
+
+      // Clear any pending timers
+      clearCitationTimers();
+
+      // Show after 0.5s sustained hover
+      badgeHoverTimerRef.current = setTimeout(() => {
         setActiveCitation({
           source,
           index,
           anchorRect: badge.getBoundingClientRect(),
           msgId,
         });
-      }
+        badgeHoverTimerRef.current = null;
+      }, 500);
     },
-    [sessionMessages],
+    [sessionMessages, activeCitation, clearCitationTimers],
   );
 
   const handleContainerMouseOut = useCallback((e: React.MouseEvent) => {
@@ -548,6 +581,13 @@ export default function AIWriting() {
     const badge = target?.closest('.citation-ref-badge');
     if (!badge) return;
 
+    // 1. If mouse leaves badge before 0.5s, immediately cancel popup
+    if (badgeHoverTimerRef.current) {
+      clearTimeout(badgeHoverTimerRef.current);
+      badgeHoverTimerRef.current = null;
+    }
+
+    // 2. If popup is currently open, dismiss quickly unless moving into popover
     if (popoverHoverTimerRef.current) {
       clearTimeout(popoverHoverTimerRef.current);
     }
@@ -555,7 +595,8 @@ export default function AIWriting() {
       if (!isMouseInPopoverRef.current) {
         setActiveCitation(null);
       }
-    }, 180);
+      popoverHoverTimerRef.current = null;
+    }, 80);
   }, []);
 
   const handleContainerClick = useCallback(
@@ -571,23 +612,25 @@ export default function AIWriting() {
       if (!msgId || !indexStr) return;
 
       const index = parseInt(indexStr, 10);
+      const msg = sessionMessages.find((m) => m.id === msgId);
+      const source = msg?.knowledgeSources?.[index - 1];
+
+      clearCitationTimers();
       setActiveCitation(null);
-      const curId = currentSessionId || activeSessionId;
-      setSourcesDrawer({
-        isOpen: true,
-        sessionId: curId,
-        messageId: msgId,
-        highlightIndex: index,
-      });
+
+      if (source) {
+        openKnowledgeSource(source);
+      }
     },
-    [currentSessionId, activeSessionId, setSourcesDrawer],
+    [sessionMessages, clearCitationTimers, openKnowledgeSource],
   );
 
   const handleScroll = useCallback(() => {
+    clearCitationTimers();
     if (activeCitation) {
       setActiveCitation(null);
     }
-  }, [activeCitation]);
+  }, [activeCitation, clearCitationTimers]);
 
   const handleCardMouseEnter = useCallback((msgId: string, index: number) => {
     const msgEl = document.querySelector(`[data-message-id="${msgId}"]`);
@@ -611,6 +654,42 @@ export default function AIWriting() {
       }
     }
   }, []);
+
+  const handlePopoverMouseEnter = useCallback(() => {
+    isMouseInPopoverRef.current = true;
+    if (popoverHoverTimerRef.current) {
+      clearTimeout(popoverHoverTimerRef.current);
+      popoverHoverTimerRef.current = null;
+    }
+  }, []);
+
+  const handlePopoverMouseLeave = useCallback(() => {
+    isMouseInPopoverRef.current = false;
+    clearCitationTimers();
+    setActiveCitation(null);
+  }, [clearCitationTimers]);
+
+  const handleOpenSourceFromPopover = useCallback(
+    (source: KnowledgeSource) => {
+      clearCitationTimers();
+      setActiveCitation(null);
+      openKnowledgeSource(source);
+    },
+    [clearCitationTimers, openKnowledgeSource],
+  );
+
+  const popoverPosition = useMemo(() => {
+    if (!activeCitation) return null;
+    const popoverWidth = 360;
+    const margin = 12;
+    const anchor = activeCitation.anchorRect;
+    const showAbove = anchor.top > 240;
+    const top = showAbove ? undefined : anchor.bottom + 6;
+    const bottom = showAbove ? window.innerHeight - anchor.top + 6 : undefined;
+    const desiredLeft = anchor.left + anchor.width / 2 - popoverWidth / 2;
+    const left = Math.max(margin, Math.min(window.innerWidth - popoverWidth - margin, desiredLeft));
+    return { left, top, bottom, showAbove, width: popoverWidth };
+  }, [activeCitation]);
 
   // 一键保存到小记
   const handleSaveToMemo = async (content: string) => {
@@ -1278,105 +1357,33 @@ export default function AIWriting() {
       </main>
 
       {/* Citation Preview Popover */}
-      {activeCitation &&
-        (() => {
-          const popoverWidth = 360;
-          const margin = 12;
-          const anchor = activeCitation.anchorRect;
-          const showAbove = anchor.top > 240;
-          const top = showAbove ? undefined : anchor.bottom + 8;
-          const bottom = showAbove ? window.innerHeight - anchor.top + 8 : undefined;
-          const desiredLeft = anchor.left + anchor.width / 2 - popoverWidth / 2;
-          const left = Math.max(
-            margin,
-            Math.min(window.innerWidth - popoverWidth - margin, desiredLeft),
-          );
-
-          return (
-            <div
-              style={{
-                position: 'fixed',
-                left: `${left}px`,
-                ...(top !== undefined ? { top: `${top}px` } : {}),
-                ...(bottom !== undefined ? { bottom: `${bottom}px` } : {}),
-                width: `${popoverWidth}px`,
-              }}
-              className="z-50 rounded-xl border border-border-color bg-bg-panel/95 backdrop-blur-md p-3.5 shadow-2xl animate-citation-popover select-none"
-              onMouseEnter={() => {
-                isMouseInPopoverRef.current = true;
-                if (popoverHoverTimerRef.current) {
-                  clearTimeout(popoverHoverTimerRef.current);
-                  popoverHoverTimerRef.current = null;
-                }
-              }}
-              onMouseLeave={() => {
-                isMouseInPopoverRef.current = false;
-                popoverHoverTimerRef.current = setTimeout(() => {
-                  setActiveCitation(null);
-                }, 150);
-              }}
-            >
-              {/* Header: [1] pill + icon + title + type */}
-              <div className="flex items-center justify-between gap-2 border-b border-border-color/60 pb-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 shrink-0">
-                    {activeCitation.index}
-                  </span>
-                  {activeCitation.source.sourceType === 'image' ? (
-                    <ImageIcon size={14} className="shrink-0 text-blue-500 dark:text-blue-400" />
-                  ) : activeCitation.source.sourceType === 'memo' ? (
-                    <StickyNote
-                      size={14}
-                      className="shrink-0 text-emerald-500 dark:text-emerald-400"
-                    />
-                  ) : (
-                    <FileText size={14} className="shrink-0 text-amber-500 dark:text-amber-400" />
-                  )}
-                  <span className="text-xs font-semibold text-text-primary truncate">
-                    {activeCitation.source.title}
-                  </span>
-                </div>
-                <span className="text-[11px] text-text-ghost shrink-0">
-                  {activeCitation.source.sourceType === 'image'
-                    ? '图片'
-                    : activeCitation.source.sourceType === 'memo'
-                      ? '小记'
-                      : `片段 ${activeCitation.source.chunkIndex + 1}`}
-                </span>
-              </div>
-
-              {/* Heading breadcrumb */}
-              {activeCitation.source.headingPath?.length > 0 && (
-                <div className="mt-1.5 text-[11px] text-text-secondary flex items-center gap-1 truncate font-mono">
-                  <span className="text-text-ghost">章节:</span>
-                  <span className="truncate">{activeCitation.source.headingPath.join(' › ')}</span>
-                </div>
-              )}
-
-              {/* Excerpt quote */}
-              {activeCitation.source.excerpt && (
-                <div className="mt-2 text-xs text-text-secondary leading-relaxed bg-hover-bg/70 rounded-lg p-2.5 border-l-2 border-indigo-500/80 dark:border-indigo-400 line-clamp-4 font-sans break-words select-text">
-                  {activeCitation.source.excerpt}
-                </div>
-              )}
-
-              {/* Footer action button */}
-              <div className="mt-2.5 pt-2 border-t border-border-color/60 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    openKnowledgeSource(activeCitation.source);
-                    setActiveCitation(null);
-                  }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md transition-colors cursor-pointer"
-                >
-                  <span>在知识库中打开</span>
-                  <ExternalLink size={12} />
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+      {activeCitation && popoverPosition && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${popoverPosition.left}px`,
+            ...(popoverPosition.top !== undefined ? { top: `${popoverPosition.top}px` } : {}),
+            ...(popoverPosition.bottom !== undefined
+              ? { bottom: `${popoverPosition.bottom}px` }
+              : {}),
+            width: `${popoverPosition.width}px`,
+          }}
+          className={`z-50 rounded-xl border border-border-color bg-bg-main shadow-xl animate-citation-popover select-none ${
+            popoverPosition.showAbove
+              ? 'after:absolute after:-bottom-2 after:left-0 after:w-full after:h-2 after:content-[""]'
+              : 'before:absolute before:-top-2 before:left-0 before:w-full before:h-2 before:content-[""]'
+          }`}
+          onMouseEnter={handlePopoverMouseEnter}
+          onMouseLeave={handlePopoverMouseLeave}
+        >
+          <AISourceCard
+            source={activeCitation.source}
+            originalIndex={activeCitation.index}
+            onOpenSource={handleOpenSourceFromPopover}
+            className="hover:shadow-none"
+          />
+        </div>
+      )}
 
       {/* Floating attachment dropdown menu */}
       <AIAttachMenu
