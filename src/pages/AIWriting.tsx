@@ -10,7 +10,8 @@ import {
   FileText,
   FileUp,
   Sparkles,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Square,
   RotateCcw,
   Copy,
@@ -749,11 +750,44 @@ export default function AIWriting() {
           <header className="h-[60px] flex justify-between items-center px-6 shrink-0 bg-bg-main select-none">
             <div className="flex items-center gap-3 min-w-0">
               <button
+                type="button"
                 onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
-                className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="relative h-[30px] w-[30px] rounded-lg border border-border-color/60 bg-bg-main hover:bg-hover-bg hover:border-border-color text-text-secondary hover:text-text-primary shadow-xs flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 group overflow-hidden"
                 title={isCatalogCollapsed ? '展开会话栏' : '折叠会话栏'}
+                aria-label={isCatalogCollapsed ? '展开会话栏' : '折叠会话栏'}
               >
-                <PanelLeft size={16} />
+                {/* 1. 折叠状态下的星星图标 (未悬浮时常态展示，悬浮时平滑淡出微旋) */}
+                <span
+                  className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-out ${
+                    isCatalogCollapsed
+                      ? 'opacity-100 scale-100 rotate-0 group-hover:opacity-0 group-hover:scale-75 group-hover:-rotate-45 group-hover:pointer-events-none'
+                      : 'opacity-0 scale-75 -rotate-45 pointer-events-none'
+                  }`}
+                >
+                  <Sparkles size={16} className="text-active-fg" />
+                </span>
+
+                {/* 2. 折叠状态下的展开图标 (悬浮时平滑淡入微旋，悬浮期间保持) */}
+                <span
+                  className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-out ${
+                    isCatalogCollapsed
+                      ? 'opacity-0 scale-75 rotate-45 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:rotate-0 group-hover:pointer-events-auto'
+                      : 'opacity-0 scale-75 rotate-45 pointer-events-none'
+                  }`}
+                >
+                  <PanelLeftOpen size={16} />
+                </span>
+
+                {/* 3. 展开状态下的折叠图标 (展开时显示，点击折叠时平滑淡出) */}
+                <span
+                  className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-out ${
+                    !isCatalogCollapsed
+                      ? 'opacity-100 scale-100 rotate-0'
+                      : 'opacity-0 scale-75 rotate-45 pointer-events-none'
+                  }`}
+                >
+                  <PanelLeftClose size={16} />
+                </span>
               </button>
               <div
                 className="relative inline-flex items-center cursor-pointer select-none"
@@ -796,6 +830,9 @@ export default function AIWriting() {
               <CloudRagGate onMessage={setToastText} />
             </div>
           </header>
+
+          {/* Top Progressive Blur & Gradient Transition (between Header and Document Stream) */}
+          <div className="absolute top-[60px] left-0 right-0 h-8 z-20 chat-scroll-fade-top" />
 
           {/* Global Notification Toast */}
           {toastText && (
@@ -1207,7 +1244,9 @@ export default function AIWriting() {
             </div>
 
             {/* Bottom Input Area (Sticky at bottom of scroll container) */}
-            <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
+            <div className="sticky bottom-0 pb-4 pt-0 bg-bg-main/80 backdrop-blur-md -mx-4 md:-mx-6 px-4 md:px-6 z-20 shrink-0">
+              {/* Bottom Progressive Blur & Gradient Transition (between Document Stream and Input Area) */}
+              <div className="absolute -top-8 left-0 right-0 h-8 chat-scroll-fade-bottom" />
               <div className="max-w-3xl mx-auto flex flex-col gap-2 relative">
                 {/* Attachment badges above input */}
                 {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
