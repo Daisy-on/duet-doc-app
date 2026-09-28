@@ -51,8 +51,6 @@ export default function AISourcesDrawer({
   const memoSources = indexedSources.filter((item) => item.source.sourceType === 'memo');
   const imageSources = indexedSources.filter((item) => item.source.sourceType === 'image');
 
-  if (!isOpen) return null;
-
   const renderGroup = (title: string, icon: React.ReactNode, items: SourceWithOriginalIndex[]) => {
     if (items.length === 0) return null;
 
@@ -83,9 +81,11 @@ export default function AISourcesDrawer({
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile / Tablet Backdrop */}
       <div
-        className="fixed inset-0 bg-black/20 backdrop-blur-xs z-30 md:hidden"
+        className={`fixed inset-0 bg-black/20 backdrop-blur-xs z-30 lg:hidden transition-opacity duration-200 ease-out ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -93,61 +93,68 @@ export default function AISourcesDrawer({
       {/* Drawer Panel */}
       <aside
         ref={containerRef}
-        className="fixed md:relative top-0 right-0 bottom-0 w-full sm:w-[370px] shrink-0 border-l border-border-color bg-bg-main flex flex-col h-full z-40 md:z-20 transition-all duration-200 shadow-xl md:shadow-none animate-in slide-in-from-right"
+        style={{ width: isOpen ? undefined : 0 }}
+        className={`fixed lg:relative top-0 right-0 bottom-0 shrink-0 bg-bg-main flex flex-col h-full z-40 lg:z-20 transition-all duration-200 ease-out overflow-hidden ${
+          isOpen
+            ? 'w-full sm:w-[350px] xl:w-[370px] max-w-[85vw] border-l border-border-color shadow-xl lg:shadow-none translate-x-0 opacity-100'
+            : 'w-0 border-l-0 shadow-none translate-x-full lg:translate-x-0 opacity-0 pointer-events-none'
+        }`}
       >
-        {/* Header (aligned with main top header at 60px, no border-b, same bg-bg-main) */}
-        <div className="h-[60px] px-4 flex items-center justify-between shrink-0 select-none bg-bg-main">
-          <div className="flex items-center gap-2">
-            <BookOpen size={16} className="text-emerald-500 dark:text-emerald-400" />
-            <span className="text-sm font-bold text-text-primary">参考来源</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-hover-bg text-text-secondary font-semibold border border-border-color/60">
-              {sources.length}
-            </span>
+        <div className="w-full sm:w-[350px] xl:w-[370px] max-w-[85vw] h-full flex flex-col">
+          {/* Header (aligned with main top header at 60px, no border-b, same bg-bg-main) */}
+          <div className="h-[60px] px-4 flex items-center justify-between shrink-0 select-none bg-bg-main">
+            <div className="flex items-center gap-2">
+              <BookOpen size={16} className="text-emerald-500 dark:text-emerald-400" />
+              <span className="text-sm font-bold text-text-primary">参考来源</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-hover-bg text-text-secondary font-semibold border border-border-color/60">
+                {sources.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <div
+                className="text-text-ghost hover:text-text-secondary p-1 rounded-md transition-colors cursor-pointer"
+                title="此处展示当前回答引用的知识库证据切片"
+              >
+                <HelpCircle size={15} />
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover-bg transition-colors cursor-pointer"
+                title="关闭来源面板"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <div
-              className="text-text-ghost hover:text-text-secondary p-1 rounded-md transition-colors cursor-pointer"
-              title="此处展示当前回答引用的知识库证据切片"
-            >
-              <HelpCircle size={15} />
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover-bg transition-colors cursor-pointer"
-              title="关闭来源面板"
-            >
-              <X size={16} />
-            </button>
+          {/* Sources Content List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {sources.length === 0 ? (
+              <div className="text-center py-12 text-text-ghost text-xs">
+                当前回答暂无引用的知识库内容
+              </div>
+            ) : (
+              <>
+                {renderGroup(
+                  '知识库文档',
+                  <FileText size={13} className="text-amber-500 dark:text-amber-400" />,
+                  docSources,
+                )}
+                {renderGroup(
+                  '轻量小记',
+                  <StickyNote size={13} className="text-emerald-500 dark:text-emerald-400" />,
+                  memoSources,
+                )}
+                {renderGroup(
+                  '图片素材',
+                  <ImageIcon size={13} className="text-blue-500 dark:text-blue-400" />,
+                  imageSources,
+                )}
+              </>
+            )}
           </div>
-        </div>
-
-        {/* Sources Content List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {sources.length === 0 ? (
-            <div className="text-center py-12 text-text-ghost text-xs">
-              当前回答暂无引用的知识库内容
-            </div>
-          ) : (
-            <>
-              {renderGroup(
-                '知识库文档',
-                <FileText size={13} className="text-amber-500 dark:text-amber-400" />,
-                docSources,
-              )}
-              {renderGroup(
-                '轻量小记',
-                <StickyNote size={13} className="text-emerald-500 dark:text-emerald-400" />,
-                memoSources,
-              )}
-              {renderGroup(
-                '图片素材',
-                <ImageIcon size={13} className="text-blue-500 dark:text-blue-400" />,
-                imageSources,
-              )}
-            </>
-          )}
         </div>
       </aside>
     </>

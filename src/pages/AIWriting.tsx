@@ -765,11 +765,11 @@ export default function AIWriting() {
                       : '检测云端连接中...'
                 }
               >
-                <span className="text-[10px] font-semibold bg-active-bg text-active-fg px-2.5 py-0.5 rounded-full border border-active-border shrink-0 transition-colors">
+                <span className="h-[30px] inline-flex items-center text-xs font-semibold bg-active-bg text-active-fg px-3 rounded-2xl border border-active-border shrink-0 transition-colors shadow-xs">
                   {isThinkingEnabled ? 'DeepSeek V4-Pro' : 'DeepSeek V4'}
                 </span>
                 {/* 状态指示小点：咬合在徽章右上角 */}
-                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5 items-center justify-center">
                   {backendStatus === 'connected' ? (
                     <>
                       <span
@@ -818,7 +818,7 @@ export default function AIWriting() {
             {/* Messages Stream */}
             <div className="flex-1 py-6">
               {sessionMessages.length === 0 ? (
-                <div className="max-w-4xl mx-auto pt-8 flex flex-col items-center">
+                <div className="max-w-3xl mx-auto pt-8 flex flex-col items-center">
                   <div className="w-28 h-28 mb-3 flex items-center justify-center select-none">
                     <Lottie animationData={moonAnimation} loop={true} className="w-full h-full" />
                   </div>
@@ -849,7 +849,7 @@ export default function AIWriting() {
                   </div>
                 </div>
               ) : (
-                <div className="max-w-4xl mx-auto flex flex-col space-y-8">
+                <div className="max-w-3xl mx-auto flex flex-col space-y-8">
                   {sessionMessages.map((msg) => {
                     const isUser = msg.role === 'user';
                     const isLastUser = isUser && msg.id === lastUserMsgId;
@@ -871,7 +871,7 @@ export default function AIWriting() {
                         <div
                           className={`relative ${
                             isUser
-                              ? 'max-w-[85%] min-w-[140px] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
+                              ? 'max-w-[75%] min-w-[140px] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
                               : 'w-full min-w-0 py-1 text-text-primary'
                           }`}
                         >
@@ -982,7 +982,7 @@ export default function AIWriting() {
                                     <div className="pl-3 my-1.5 border-l-2 border-border-color/80 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed space-y-1">
                                       {msg.thinkingContent}
                                       {msg.status === 'streaming' && !msg.content && (
-                                        <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
+                                        <span className="inline-block w-1.5 h-3 bg-text-primary ml-1 animate-pulse" />
                                       )}
                                     </div>
                                   )}
@@ -1004,7 +1004,7 @@ export default function AIWriting() {
                                       }}
                                     />
                                     {msg.status === 'streaming' && msg.content && (
-                                      <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
+                                      <span className="inline-block w-1.5 h-3.5 bg-text-primary ml-0.5 animate-pulse align-middle" />
                                     )}
                                   </div>
                                 )}
@@ -1063,7 +1063,7 @@ export default function AIWriting() {
                               className={`p-1 rounded-lg transition-colors ${
                                 isGenerating || !isLastAssistant || msg.status === 'error'
                                   ? 'text-text-ghost cursor-not-allowed'
-                                  : 'text-text-secondary hover:text-indigo-600 hover:bg-hover-bg cursor-pointer'
+                                  : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg cursor-pointer'
                               }`}
                               title={
                                 msg.status === 'error'
@@ -1079,7 +1079,7 @@ export default function AIWriting() {
                             {/* 复制 */}
                             <button
                               onClick={() => handleCopyText(msg.id, msg.content)}
-                              className="p-1 text-text-secondary hover:text-indigo-600 hover:bg-hover-bg rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                              className="p-1 text-text-secondary hover:text-text-primary hover:bg-hover-bg rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                               title="复制回答"
                             >
                               {copiedMsgId === msg.id ? (
@@ -1094,7 +1094,8 @@ export default function AIWriting() {
                             {/* 生成文档 */}
                             <button
                               onClick={() => handleOpenDocChooser(msg.content)}
-                              className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
+                              className="flex h-6 items-center gap-1 rounded px-1.5 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                              title="生成为知识库文档"
                             >
                               <FilePlus size={14} />
                               <span>生成文档</span>
@@ -1103,7 +1104,8 @@ export default function AIWriting() {
                             {/* 保存到小记 */}
                             <button
                               onClick={() => handleSaveToMemo(msg.content)}
-                              className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
+                              className="flex h-6 items-center gap-1 rounded px-1.5 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                              title="保存到轻量小记"
                             >
                               <StickyNote size={14} />
                               <span>保存到小记</span>
@@ -1116,7 +1118,7 @@ export default function AIWriting() {
                                 onClick={() => handleToggleSourcesDrawer(msg.id)}
                                 className={`flex h-6 items-center gap-1 rounded px-1.5 text-[12px] font-medium transition-all cursor-pointer ${
                                   activeSourcesMsgId === msg.id && isSourcesDrawerOpen
-                                    ? 'bg-indigo-50 dark:bg-indigo-950/80 text-accent font-semibold border border-indigo-200 dark:border-indigo-800'
+                                    ? 'bg-active-bg text-active-fg font-semibold border border-active-border'
                                     : 'text-text-secondary hover:bg-hover-bg hover:text-text-primary'
                                 }`}
                                 title="查看本回答引用的知识库来源"
@@ -1126,7 +1128,7 @@ export default function AIWriting() {
                                 <span
                                   className={`text-[10px] font-semibold px-1 rounded-full ${
                                     activeSourcesMsgId === msg.id && isSourcesDrawerOpen
-                                      ? 'bg-indigo-200/60 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300'
+                                      ? 'bg-active-border/60 text-active-fg'
                                       : 'bg-hover-bg text-text-secondary'
                                   }`}
                                 >
@@ -1206,7 +1208,7 @@ export default function AIWriting() {
 
             {/* Bottom Input Area (Sticky at bottom of scroll container) */}
             <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
-              <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
+              <div className="max-w-3xl mx-auto flex flex-col gap-2 relative">
                 {/* Attachment badges above input */}
                 {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
                   <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
