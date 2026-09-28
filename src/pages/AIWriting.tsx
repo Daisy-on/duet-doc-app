@@ -20,10 +20,8 @@ import {
   Check,
   Cloud,
   Image as ImageIcon,
-  BookMarked,
-  ArrowUpRight,
+  BookOpen,
   ExternalLink,
-  ChevronDown,
 } from 'lucide-react';
 import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
@@ -35,6 +33,7 @@ const Lottie = (
 ) as React.ComponentType<LottieComponentProps>;
 import AIChatListPanel from '../components/AIChatListPanel';
 import AIAttachMenu from '../components/menus/AIAttachMenu';
+import AISourcesDrawer from '../components/AISourcesDrawer';
 import KBTreePickerModal from '../components/modals/KBTreePickerModal';
 import { useAIWritingStore } from '../store/aiWritingStore';
 import type { ChatMessage, KnowledgeSource, ReferencedDoc } from '../store/aiWritingStore';
@@ -121,7 +120,6 @@ export default function AIWriting() {
   const [editingContent, setEditingContent] = useState('');
   const [isCancelingEdit, setIsCancelingEdit] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
-  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
 
   // Copied toast state per message
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -147,9 +145,29 @@ export default function AIWriting() {
 
   // Citation interaction states
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
-  const [flashingCardKey, setFlashingCardKey] = useState<string | null>(null);
   const popoverHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseInPopoverRef = useRef(false);
+
+  // Right Sources Drawer state
+  const [isSourcesDrawerOpen, setIsSourcesDrawerOpen] = useState(false);
+  const [activeSourcesMsgId, setActiveSourcesMsgId] = useState<string | null>(null);
+  const [drawerHighlightIndex, setDrawerHighlightIndex] = useState<number | null>(null);
+
+  const activeDrawerSources = useMemo(() => {
+    if (!activeSourcesMsgId) return [];
+    const targetMsg = sessionMessages.find((m) => m.id === activeSourcesMsgId);
+    return targetMsg?.knowledgeSources || [];
+  }, [activeSourcesMsgId, sessionMessages]);
+
+  const handleToggleSourcesDrawer = (msgId: string) => {
+    if (activeSourcesMsgId === msgId && isSourcesDrawerOpen) {
+      setIsSourcesDrawerOpen(false);
+    } else {
+      setActiveSourcesMsgId(msgId);
+      setDrawerHighlightIndex(null);
+      setIsSourcesDrawerOpen(true);
+    }
+  };
 
   // Real-time timer for live streaming thinking seconds
   const [liveThinkingSeconds, setLiveThinkingSeconds] = useState(0);
@@ -215,6 +233,8 @@ export default function AIWriting() {
       setEditingContent('');
     }
     setActiveCitation(null);
+    setIsSourcesDrawerOpen(false);
+    setActiveSourcesMsgId(null);
   }
 
   useEffect(() => {
@@ -535,19 +555,10 @@ export default function AIWriting() {
     if (!msgId || !indexStr) return;
 
     const index = parseInt(indexStr, 10);
-    setExpandedSources((current) => ({ ...current, [msgId]: true }));
-    const cardId = `evidence-card-${msgId}-${index}`;
-
-    setTimeout(() => {
-      const cardEl = document.getElementById(cardId);
-      if (cardEl) {
-        cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setFlashingCardKey(`${msgId}-${index}`);
-        setTimeout(() => {
-          setFlashingCardKey(null);
-        }, 1600);
-      }
-    }, 50);
+    setActiveCitation(null);
+    setActiveSourcesMsgId(msgId);
+    setDrawerHighlightIndex(index);
+    setIsSourcesDrawerOpen(true);
   }, []);
 
   const handleScroll = useCallback(() => {
@@ -567,8 +578,15 @@ export default function AIWriting() {
   const handleCardMouseLeave = useCallback((msgId: string, index: number) => {
     const msgEl = document.querySelector(`[data-message-id="${msgId}"]`);
     if (msgEl) {
-      const badges = msgEl.querySelectorAll(`.citation-ref-badge[data-citation-index="${index}"]`);
-      badges.forEach((b) => b.classList.remove('is-highlighted'));
+      if (index === 0) {
+        const badges = msgEl.querySelectorAll('.citation-ref-badge');
+        badges.forEach((b) => b.classList.remove('is-highlighted'));
+      } else {
+        const badges = msgEl.querySelectorAll(
+          `.citation-ref-badge[data-citation-index="${index}"]`,
+        );
+        badges.forEach((b) => b.classList.remove('is-highlighted'));
+      }
     }
   }, []);
 
@@ -687,450 +705,284 @@ export default function AIWriting() {
           </div>
         )}
 
-        {/* Main Scrollable Viewport (holds both messages AND sticky bottom input like DeepSeek) */}
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          onMouseOver={handleContainerMouseOver}
-          onMouseOut={handleContainerMouseOut}
-          onClick={handleContainerClick}
-          className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col"
-          style={{ scrollbarGutter: 'stable' }}
-        >
-          {/* Messages Stream */}
-          <div className="flex-1 py-6">
-            {sessionMessages.length === 0 ? (
-              <div className="max-w-4xl mx-auto pt-8 flex flex-col items-center">
-                <div className="w-28 h-28 mb-3 flex items-center justify-center select-none">
-                  <Lottie animationData={moonAnimation} loop={true} className="w-full h-full" />
-                </div>
-                <h1 className="text-xl font-bold text-text-primary mb-2">Hi，今天想写点什么？</h1>
-                <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
-                  引用知识库文档，或直接提问。
-                </p>
+        {/* Main Content Workspace (Chat Area + Sources Drawer) */}
+        <div className="flex-1 flex min-h-0 overflow-hidden relative">
+          {/* Main Scrollable Viewport (holds both messages AND sticky bottom input like DeepSeek) */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            onMouseOver={handleContainerMouseOver}
+            onMouseOut={handleContainerMouseOut}
+            onClick={handleContainerClick}
+            className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col transition-all duration-300"
+            style={{ scrollbarGutter: 'stable' }}
+          >
+            {/* Messages Stream */}
+            <div className="flex-1 py-6">
+              {sessionMessages.length === 0 ? (
+                <div className="max-w-4xl mx-auto pt-8 flex flex-col items-center">
+                  <div className="w-28 h-28 mb-3 flex items-center justify-center select-none">
+                    <Lottie animationData={moonAnimation} loop={true} className="w-full h-full" />
+                  </div>
+                  <h1 className="text-xl font-bold text-text-primary mb-2">Hi，今天想写点什么？</h1>
+                  <p className="text-xs text-text-secondary mb-8 text-center max-w-md">
+                    引用知识库文档，或直接提问。
+                  </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
-                  {starterPrompts.map((p, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => selectPrompt(p)}
-                      className="p-3.5 bg-bg-panel border border-border-color hover:border-indigo-200 dark:hover:border-indigo-800 rounded-xl text-left hover:shadow-md transition-all group cursor-pointer"
-                    >
-                      <div className="text-xs font-bold text-text-primary group-hover:text-accent mb-1 flex items-center justify-between">
-                        {p.title}
-                        <Sparkles
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </div>
-                      <div className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
-                        {p.desc}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="max-w-4xl mx-auto flex flex-col space-y-8">
-                {sessionMessages.map((msg) => {
-                  const isUser = msg.role === 'user';
-                  const isLastUser = isUser && msg.id === lastUserMsgId;
-                  const isEditing = isUser && editingMessageId === msg.id;
-                  const isExpanded = expandedThinking[msg.id] !== false;
-                  const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
-                  const knowledgeSources = msg.knowledgeSources || [];
-                  const showAllSources = expandedSources[msg.id] === true;
-                  const timestamp = new Date(msg.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-
-                  return (
-                    <div
-                      key={msg.id}
-                      data-message-id={msg.id}
-                      className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
-                    >
-                      <div
-                        className={`relative ${
-                          isUser
-                            ? 'max-w-[85%] min-w-[140px] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
-                            : 'w-full min-w-0 py-1 text-text-primary'
-                        }`}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
+                    {starterPrompts.map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => selectPrompt(p)}
+                        className="p-3.5 bg-bg-panel border border-border-color hover:border-indigo-200 dark:hover:border-indigo-800 rounded-xl text-left hover:shadow-md transition-all group cursor-pointer"
                       >
-                        {isEditing ? (
-                          <div className="flex flex-col">
-                            {/* 引用文档标签 */}
-                            {msg.referencedDocs && msg.referencedDocs.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
-                                {msg.referencedDocs.map((doc, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
-                                  >
-                                    <FileText size={10} />
-                                    {doc.title}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                        <div className="text-xs font-bold text-text-primary group-hover:text-accent mb-1 flex items-center justify-between">
+                          {p.title}
+                          <Sparkles
+                            size={12}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          />
+                        </div>
+                        <div className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
+                          {p.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="max-w-4xl mx-auto flex flex-col space-y-8">
+                  {sessionMessages.map((msg) => {
+                    const isUser = msg.role === 'user';
+                    const isLastUser = isUser && msg.id === lastUserMsgId;
+                    const isEditing = isUser && editingMessageId === msg.id;
+                    const isExpanded = expandedThinking[msg.id] !== false;
+                    const isLastAssistant = !isUser && msg.id === lastAssistantMsgId;
+                    const knowledgeSources = msg.knowledgeSources || [];
+                    const timestamp = new Date(msg.createdAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
 
-                            {/* 内联多行输入框 (CSS Grid 隐形层自适应原气泡宽度与高度，排版字体与正文严格 1:1) */}
-                            <div className="grid max-h-[240px] overflow-hidden">
+                    return (
+                      <div
+                        key={msg.id}
+                        data-message-id={msg.id}
+                        className={`group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                      >
+                        <div
+                          className={`relative ${
+                            isUser
+                              ? 'max-w-[85%] min-w-[140px] self-end rounded-2xl bg-indigo-50 px-4 py-3 text-text-primary dark:bg-indigo-950/60'
+                              : 'w-full min-w-0 py-1 text-text-primary'
+                          }`}
+                        >
+                          {isEditing ? (
+                            <div className="flex flex-col">
+                              {/* 引用文档标签 */}
+                              {msg.referencedDocs && msg.referencedDocs.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
+                                  {msg.referencedDocs.map((doc, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
+                                    >
+                                      <FileText size={10} />
+                                      {doc.title}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* 内联多行输入框 (CSS Grid 隐形层自适应原气泡宽度与高度，排版字体与正文严格 1:1) */}
+                              <div className="grid max-h-[240px] overflow-hidden">
+                                <div
+                                  aria-hidden="true"
+                                  className="invisible col-start-1 row-start-1 text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap break-words pointer-events-none select-none min-h-[24px] max-h-[240px] overflow-hidden m-0 p-0 box-border font-[inherit]"
+                                >
+                                  {editingContent || ' '}
+                                  {editingContent.endsWith('\n') ? ' ' : ''}
+                                </div>
+                                <textarea
+                                  ref={editingTextareaRef}
+                                  value={editingContent}
+                                  onChange={(e) => setEditingContent(e.target.value)}
+                                  onKeyDown={(e) => handleEditingKeyDown(e, msg)}
+                                  placeholder="输入修改后的消息..."
+                                  className="col-start-1 row-start-1 w-full min-w-0 min-h-[24px] resize-none bg-transparent outline-none text-[15px] text-text-primary placeholder:text-text-ghost leading-relaxed whitespace-pre-wrap break-words border-none p-0 m-0 box-border overflow-y-hidden font-[inherit]"
+                                  rows={1}
+                                />
+                              </div>
+
+                              {/* 编辑模式底部操作按钮 (自然向下展开 / 向上收起动画) */}
                               <div
-                                aria-hidden="true"
-                                className="invisible col-start-1 row-start-1 text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap break-words pointer-events-none select-none min-h-[24px] max-h-[240px] overflow-hidden m-0 p-0 box-border font-[inherit]"
+                                className={`mt-2.5 flex items-center justify-end gap-2 select-none ${
+                                  isCancelingEdit
+                                    ? 'animate-bubble-collapse-up'
+                                    : 'animate-bubble-expand-down'
+                                }`}
                               >
-                                {editingContent || ' '}
-                                {editingContent.endsWith('\n') ? ' ' : ''}
-                              </div>
-                              <textarea
-                                ref={editingTextareaRef}
-                                value={editingContent}
-                                onChange={(e) => setEditingContent(e.target.value)}
-                                onKeyDown={(e) => handleEditingKeyDown(e, msg)}
-                                placeholder="输入修改后的消息..."
-                                className="col-start-1 row-start-1 w-full min-w-0 min-h-[24px] resize-none bg-transparent outline-none text-[15px] text-text-primary placeholder:text-text-ghost leading-relaxed whitespace-pre-wrap break-words border-none p-0 m-0 box-border overflow-y-hidden font-[inherit]"
-                                rows={1}
-                              />
-                            </div>
-
-                            {/* 编辑模式底部操作按钮 (自然向下展开 / 向上收起动画) */}
-                            <div
-                              className={`mt-2.5 flex items-center justify-end gap-2 select-none ${
-                                isCancelingEdit
-                                  ? 'animate-bubble-collapse-up'
-                                  : 'animate-bubble-expand-down'
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleCancelEdit(msg.content)}
-                                className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 rounded-lg transition-colors cursor-pointer"
-                              >
-                                取消
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleSaveAndResend(msg)}
-                                disabled={!editingContent.trim() || isGenerating}
-                                className="px-3.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5"
-                                title={
-                                  !editingContent.trim()
-                                    ? '内容不能为空'
-                                    : isGenerating
-                                      ? '生成中不可提交'
-                                      : '发送 (Enter)'
-                                }
-                              >
-                                {isGenerating && <Loader2 size={13} className="animate-spin" />}
-                                <span>发送</span>
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            {/* 引用文档标签 */}
-                            {isUser && msg.referencedDocs && msg.referencedDocs.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
-                                {msg.referencedDocs.map((doc, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
-                                  >
-                                    <FileText size={10} />
-                                    {doc.title}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* 深度思考过程 (ChatGPT 风格: "思考了 12s ›") */}
-                            {!isUser && msg.thinkingContent && (
-                              <div className="mb-4">
                                 <button
                                   type="button"
-                                  onClick={() => toggleThinkingNode(msg.id)}
-                                  className="flex items-center gap-1.5 py-1 text-[13px] text-text-secondary transition-colors hover:text-text-primary cursor-pointer font-sans select-none"
+                                  onClick={() => handleCancelEdit(msg.content)}
+                                  className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 rounded-lg transition-colors cursor-pointer"
                                 >
-                                  <span className="font-medium">
-                                    {getThinkingLabel(msg, liveThinkingSeconds)}
-                                  </span>
-                                  <ChevronRight
-                                    size={14}
-                                    className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-text-primary' : 'text-text-secondary'}`}
-                                  />
+                                  取消
                                 </button>
-                                {isExpanded && (
-                                  <div className="pl-3 my-1.5 border-l-2 border-border-color/80 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed space-y-1">
-                                    {msg.thinkingContent}
-                                    {msg.status === 'streaming' && !msg.content && (
-                                      <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSaveAndResend(msg)}
+                                  disabled={!editingContent.trim() || isGenerating}
+                                  className="px-3.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5"
+                                  title={
+                                    !editingContent.trim()
+                                      ? '内容不能为空'
+                                      : isGenerating
+                                        ? '生成中不可提交'
+                                        : '发送 (Enter)'
+                                  }
+                                >
+                                  {isGenerating && <Loader2 size={13} className="animate-spin" />}
+                                  <span>发送</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {/* 引用文档标签 */}
+                              {isUser && msg.referencedDocs && msg.referencedDocs.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2 border-b border-indigo-100 dark:border-indigo-900 pb-2">
+                                  {msg.referencedDocs.map((doc, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 bg-bg-main border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-semibold"
+                                    >
+                                      <FileText size={10} />
+                                      {doc.title}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* 深度思考过程 (ChatGPT 风格: "思考了 12s ›") */}
+                              {!isUser && msg.thinkingContent && (
+                                <div className="mb-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleThinkingNode(msg.id)}
+                                    className="flex items-center gap-1.5 py-1 text-[13px] text-text-secondary transition-colors hover:text-text-primary cursor-pointer font-sans select-none"
+                                  >
+                                    <span className="font-medium">
+                                      {getThinkingLabel(msg, liveThinkingSeconds)}
+                                    </span>
+                                    <ChevronRight
+                                      size={14}
+                                      className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-text-primary' : 'text-text-secondary'}`}
+                                    />
+                                  </button>
+                                  {isExpanded && (
+                                    <div className="pl-3 my-1.5 border-l-2 border-border-color/80 text-xs md:text-[13px] font-sans text-text-secondary/90 whitespace-pre-wrap leading-relaxed space-y-1">
+                                      {msg.thinkingContent}
+                                      {msg.status === 'streaming' && !msg.content && (
+                                        <span className="inline-block w-1.5 h-3 bg-indigo-500 ml-1 animate-pulse" />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* 消息正文 */}
+                              <div className="space-y-1.5">
+                                {isUser ? (
+                                  <p className="text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap break-words font-[inherit]">
+                                    {msg.content}
+                                  </p>
+                                ) : (
+                                  <div className="relative">
+                                    <div
+                                      className="markdown-body assistant-answer text-[15px] text-text-primary leading-relaxed"
+                                      dangerouslySetInnerHTML={{
+                                        __html: renderMarkdownToHtml(msg.content),
+                                      }}
+                                    />
+                                    {msg.status === 'streaming' && msg.content && (
+                                      <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
                                     )}
                                   </div>
                                 )}
                               </div>
-                            )}
 
-                            {/* 消息正文 */}
-                            <div className="space-y-1.5">
-                              {isUser ? (
-                                <p className="text-[15px] text-text-primary leading-relaxed whitespace-pre-wrap break-words font-[inherit]">
-                                  {msg.content}
+                              {!isUser && msg.aiMetadata?.retrievalNotice && (
+                                <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                                  {msg.aiMetadata.retrievalNotice}
                                 </p>
-                              ) : (
-                                <div className="relative">
-                                  <div
-                                    className="markdown-body assistant-answer text-[15px] text-text-primary leading-relaxed"
-                                    dangerouslySetInnerHTML={{
-                                      __html: renderMarkdownToHtml(msg.content),
-                                    }}
-                                  />
-                                  {msg.status === 'streaming' && msg.content && (
-                                    <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
-                                  )}
+                              )}
+                              {!isUser && msg.aiMetadata?.localReindexAvailable && (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate('/dev/local-retrieval')}
+                                  className="mt-2 text-xs text-accent hover:underline"
+                                >
+                                  更新本地索引
+                                </button>
+                              )}
+
+                              {/* 提示中断或失败状态 */}
+                              {!isUser && msg.status === 'stopped' && (
+                                <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
+                                  已手动停止生成
                                 </div>
                               )}
-                            </div>
-
-                            {!isUser && knowledgeSources.length > 0 && (
-                              <div className="mt-5 border-t border-border-color/70 pt-3.5">
-                                {/* Header */}
-                                <div className="flex items-center justify-between text-xs text-text-secondary mb-2 select-none">
-                                  <div className="flex items-center gap-1.5 font-medium">
-                                    <BookMarked size={14} className="text-indigo-500 shrink-0" />
-                                    <span>参考来源</span>
-                                    <span className="text-[11px] text-text-ghost">
-                                      · 共 {knowledgeSources.length} 处片段
-                                    </span>
-                                  </div>
-                                  {knowledgeSources.length > 2 && (
-                                    <button
-                                      type="button"
-                                      aria-expanded={showAllSources}
-                                      onClick={() =>
-                                        setExpandedSources((current) => ({
-                                          ...current,
-                                          [msg.id]: !showAllSources,
-                                        }))
-                                      }
-                                      className="inline-flex items-center gap-1 text-[11px] text-text-secondary hover:text-accent font-medium transition-colors cursor-pointer"
-                                    >
-                                      <span>
-                                        {showAllSources
-                                          ? '收起'
-                                          : `展开全部 (${knowledgeSources.length})`}
-                                      </span>
-                                      <ChevronDown
-                                        size={13}
-                                        className={`transition-transform duration-200 ${showAllSources ? 'rotate-180' : ''}`}
-                                      />
-                                    </button>
-                                  )}
+                              {!isUser && msg.status === 'error' && (
+                                <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
+                                  {msg.aiMetadata?.errorMessage ?? '知识检索或回答未完成'}
                                 </div>
-
-                                {/* Cards Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  {(showAllSources
-                                    ? knowledgeSources
-                                    : knowledgeSources.slice(0, 2)
-                                  ).map((source, idx) => {
-                                    const citationIndex = idx + 1;
-                                    const cardId = `evidence-card-${msg.id}-${citationIndex}`;
-                                    const isFlashing =
-                                      flashingCardKey === `${msg.id}-${citationIndex}`;
-
-                                    return (
-                                      <div
-                                        key={`${source.sourceType}:${source.sourceId}:${source.chunkIndex}:${idx}`}
-                                        id={cardId}
-                                        onMouseEnter={() =>
-                                          handleCardMouseEnter(msg.id, citationIndex)
-                                        }
-                                        onMouseLeave={() =>
-                                          handleCardMouseLeave(msg.id, citationIndex)
-                                        }
-                                        onClick={() => openKnowledgeSource(source)}
-                                        className={`group/card relative rounded-xl border border-border-color/70 bg-bg-panel/40 hover:bg-hover-bg/70 hover:border-indigo-300 dark:hover:border-indigo-700/60 p-2.5 transition-all cursor-pointer select-none flex flex-col justify-between ${
-                                          isFlashing ? 'evidence-card-flashing' : ''
-                                        }`}
-                                      >
-                                        <div>
-                                          {/* Card Top: [1] badge + icon + Title + Arrow */}
-                                          <div className="flex items-center justify-between gap-1.5 mb-1">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                              <span className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 shrink-0">
-                                                {citationIndex}
-                                              </span>
-                                              {source.sourceType === 'image' ? (
-                                                <ImageIcon
-                                                  size={13}
-                                                  className="shrink-0 text-sky-500"
-                                                />
-                                              ) : source.sourceType === 'memo' ? (
-                                                <StickyNote
-                                                  size={13}
-                                                  className="shrink-0 text-emerald-500"
-                                                />
-                                              ) : (
-                                                <FileText
-                                                  size={13}
-                                                  className="shrink-0 text-indigo-500"
-                                                />
-                                              )}
-                                              <span className="text-xs font-medium text-text-primary group-hover/card:text-accent truncate">
-                                                {source.title}
-                                              </span>
-                                            </div>
-                                            <ArrowUpRight
-                                              size={13}
-                                              className="shrink-0 text-text-ghost group-hover/card:text-accent transition-colors opacity-70 group-hover/card:opacity-100"
-                                            />
-                                          </div>
-
-                                          {/* Heading Path */}
-                                          {source.headingPath?.length > 0 && (
-                                            <div className="text-[10px] text-text-ghost truncate font-mono pl-[23px] mb-1">
-                                              {source.headingPath.join(' › ')}
-                                            </div>
-                                          )}
-
-                                          {/* Excerpt quote snippet */}
-                                          {source.excerpt && (
-                                            <p className="text-[11px] text-text-secondary leading-snug line-clamp-2 pl-[23px] font-sans">
-                                              {source.excerpt}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
-                            {!isUser && msg.aiMetadata?.retrievalNotice && (
-                              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                                {msg.aiMetadata.retrievalNotice}
-                              </p>
-                            )}
-                            {!isUser && msg.aiMetadata?.localReindexAvailable && (
-                              <button
-                                type="button"
-                                onClick={() => navigate('/dev/local-retrieval')}
-                                className="mt-2 text-xs text-accent hover:underline"
-                              >
-                                更新本地索引
-                              </button>
-                            )}
-
-                            {/* 提示中断或失败状态 */}
-                            {!isUser && msg.status === 'stopped' && (
-                              <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
-                                已手动停止生成
-                              </div>
-                            )}
-                            {!isUser && msg.status === 'error' && (
-                              <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
-                                {msg.aiMetadata?.errorMessage ?? '知识检索或回答未完成'}
-                              </div>
-                            )}
-                            {!isUser && msg.status === 'error' && isLastAssistant && (
-                              <button
-                                type="button"
-                                onClick={() => handleRetryQuestion(msg.id)}
-                                disabled={isGenerating}
-                                className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
-                              >
-                                重新提问
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-
-                      {/* AI 消息底部操作工具栏 (仅非 streaming 状态展示) */}
-                      {!isUser && msg.status !== 'streaming' && msg.content && (
-                        <div className="mt-2 flex items-center gap-1.5 text-text-secondary/80 transition-colors hover:text-text-secondary">
-                          {/* 重新生成 (仅最新一条 AI 回答可用) */}
-                          <button
-                            onClick={() => {
-                              setLiveThinkingSeconds(0);
-                              regenerateResponse(msg.id);
-                            }}
-                            disabled={isGenerating || !isLastAssistant || msg.status === 'error'}
-                            className={`p-1 rounded-lg transition-colors ${
-                              isGenerating || !isLastAssistant || msg.status === 'error'
-                                ? 'text-text-ghost cursor-not-allowed'
-                                : 'text-text-secondary hover:text-indigo-600 hover:bg-hover-bg cursor-pointer'
-                            }`}
-                            title={
-                              msg.status === 'error'
-                                ? '失败后请使用重新提问'
-                                : isLastAssistant
-                                  ? '重新生成回答'
-                                  : '仅最新一条回答可重新生成'
-                            }
-                          >
-                            <RotateCcw size={15} />
-                          </button>
-
-                          {/* 复制 */}
-                          <button
-                            onClick={() => handleCopyText(msg.id, msg.content)}
-                            className="p-1 text-text-secondary hover:text-indigo-600 hover:bg-hover-bg rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                            title="复制回答"
-                          >
-                            {copiedMsgId === msg.id ? (
-                              <Check size={15} className="text-emerald-500" />
-                            ) : (
-                              <Copy size={15} />
-                            )}
-                          </button>
-
-                          <div className="w-px h-3 bg-border-color mx-0.5" />
-
-                          {/* 生成文档 */}
-                          <button
-                            onClick={() => handleOpenDocChooser(msg.content)}
-                            className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
-                          >
-                            <FilePlus size={14} />
-                            <span>生成文档</span>
-                          </button>
-
-                          {/* 保存到小记 */}
-                          <button
-                            onClick={() => handleSaveToMemo(msg.content)}
-                            className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
-                          >
-                            <StickyNote size={14} />
-                            <span>保存到小记</span>
-                          </button>
-
-                          <div className="w-px h-3 bg-border-color mx-0.5" />
-
-                          <span className="ml-auto shrink-0 text-[13px] text-text-secondary">
-                            {timestamp}
-                          </span>
+                              )}
+                              {!isUser && msg.status === 'error' && isLastAssistant && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRetryQuestion(msg.id)}
+                                  disabled={isGenerating}
+                                  className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
+                                >
+                                  重新提问
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
-                      )}
 
-                      {isUser && (
-                        <div
-                          className={`mt-1 flex h-6 items-center justify-end gap-1 text-[13px] text-text-secondary select-none transition-opacity duration-150 ${
-                            isEditing ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                          }`}
-                        >
-                          <span className="mr-1">{timestamp}</span>
-                          <span className="mx-1 h-3 w-px bg-border-color" />
-                          <div className="flex items-center gap-1">
+                        {/* AI 消息底部操作工具栏 (仅非 streaming 状态展示) */}
+                        {!isUser && msg.status !== 'streaming' && msg.content && (
+                          <div className="mt-2 flex items-center gap-1.5 text-text-secondary/80 transition-colors hover:text-text-secondary">
+                            {/* 重新生成 (仅最新一条 AI 回答可用) */}
                             <button
-                              type="button"
+                              onClick={() => {
+                                setLiveThinkingSeconds(0);
+                                regenerateResponse(msg.id);
+                              }}
+                              disabled={isGenerating || !isLastAssistant || msg.status === 'error'}
+                              className={`p-1 rounded-lg transition-colors ${
+                                isGenerating || !isLastAssistant || msg.status === 'error'
+                                  ? 'text-text-ghost cursor-not-allowed'
+                                  : 'text-text-secondary hover:text-indigo-600 hover:bg-hover-bg cursor-pointer'
+                              }`}
+                              title={
+                                msg.status === 'error'
+                                  ? '失败后请使用重新提问'
+                                  : isLastAssistant
+                                    ? '重新生成回答'
+                                    : '仅最新一条回答可重新生成'
+                              }
+                            >
+                              <RotateCcw size={15} />
+                            </button>
+
+                            {/* 复制 */}
+                            <button
                               onClick={() => handleCopyText(msg.id, msg.content)}
-                              className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
-                              title="复制消息"
-                              aria-label="复制消息"
+                              className="p-1 text-text-secondary hover:text-indigo-600 hover:bg-hover-bg rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                              title="复制回答"
                             >
                               {copiedMsgId === msg.id ? (
                                 <Check size={15} className="text-emerald-500" />
@@ -1138,176 +990,271 @@ export default function AIWriting() {
                                 <Copy size={15} />
                               )}
                             </button>
-                            {isLastUser && (
+
+                            <div className="w-px h-3 bg-border-color mx-0.5" />
+
+                            {/* 生成文档 */}
+                            <button
+                              onClick={() => handleOpenDocChooser(msg.content)}
+                              className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
+                            >
+                              <FilePlus size={14} />
+                              <span>生成文档</span>
+                            </button>
+
+                            {/* 保存到小记 */}
+                            <button
+                              onClick={() => handleSaveToMemo(msg.content)}
+                              className="flex h-6 items-center gap-1 rounded px-1 text-[13px] text-text-secondary transition-colors hover:bg-hover-bg hover:text-accent cursor-pointer"
+                            >
+                              <StickyNote size={14} />
+                              <span>保存到小记</span>
+                            </button>
+
+                            {/* 来源 (ChatGPT 风格) */}
+                            {knowledgeSources.length > 0 && (
                               <button
                                 type="button"
-                                onClick={() => handleStartEdit(msg)}
-                                disabled={isGenerating}
-                                className={`rounded p-1 transition-colors ${
-                                  isGenerating
-                                    ? 'opacity-40 cursor-not-allowed text-text-ghost'
-                                    : 'hover:bg-hover-bg hover:text-text-primary cursor-pointer'
+                                onClick={() => handleToggleSourcesDrawer(msg.id)}
+                                className={`flex h-6 items-center gap-1 rounded px-1.5 text-[12px] font-medium transition-all cursor-pointer ${
+                                  activeSourcesMsgId === msg.id && isSourcesDrawerOpen
+                                    ? 'bg-indigo-50 dark:bg-indigo-950/80 text-accent font-semibold border border-indigo-200 dark:border-indigo-800'
+                                    : 'text-text-secondary hover:bg-hover-bg hover:text-text-primary'
                                 }`}
-                                title={isGenerating ? '生成中不可修改' : '修改消息'}
-                                aria-label="修改消息"
+                                title="查看本回答引用的知识库来源"
                               >
-                                <Pencil size={15} />
+                                <BookOpen size={13} className="shrink-0" />
+                                <span>来源</span>
+                                <span
+                                  className={`text-[10px] font-semibold px-1 rounded-full ${
+                                    activeSourcesMsgId === msg.id && isSourcesDrawerOpen
+                                      ? 'bg-indigo-200/60 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300'
+                                      : 'bg-hover-bg text-text-secondary'
+                                  }`}
+                                >
+                                  {knowledgeSources.length}
+                                </span>
                               </button>
                             )}
+
+                            <div className="w-px h-3 bg-border-color mx-0.5" />
+
+                            <span className="ml-auto shrink-0 text-[13px] text-text-secondary">
+                              {timestamp}
+                            </span>
                           </div>
-                        </div>
-                      )}
-                      {!isUser && (msg.status === 'streaming' || !msg.content) && (
-                        <div className="mt-1 text-[13px] text-text-secondary">{timestamp}</div>
-                      )}
-                    </div>
-                  );
-                })}
+                        )}
 
-                {/* 仅在初始化等待连接时展示动画 */}
-                {isGenerating &&
-                  sessionMessages.length > 0 &&
-                  sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
-                    <div className="flex items-center gap-2 py-1 text-[13px] text-text-secondary">
-                      <Loader2 size={14} className="animate-spin text-accent" />
-                      <span>正在思考并撰写内容...</span>
-                    </div>
-                  )}
-              </div>
-            )}
-          </div>
+                        {isUser && (
+                          <div
+                            className={`mt-1 flex h-6 items-center justify-end gap-1 text-[13px] text-text-secondary select-none transition-opacity duration-150 ${
+                              isEditing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                            }`}
+                          >
+                            <span className="mr-1">{timestamp}</span>
+                            <span className="mx-1 h-3 w-px bg-border-color" />
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(msg.id, msg.content)}
+                                className="rounded p-1 hover:bg-hover-bg hover:text-text-primary cursor-pointer"
+                                title="复制消息"
+                                aria-label="复制消息"
+                              >
+                                {copiedMsgId === msg.id ? (
+                                  <Check size={15} className="text-emerald-500" />
+                                ) : (
+                                  <Copy size={15} />
+                                )}
+                              </button>
+                              {isLastUser && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(msg)}
+                                  disabled={isGenerating}
+                                  className={`rounded p-1 transition-colors ${
+                                    isGenerating
+                                      ? 'opacity-40 cursor-not-allowed text-text-ghost'
+                                      : 'hover:bg-hover-bg hover:text-text-primary cursor-pointer'
+                                  }`}
+                                  title={isGenerating ? '生成中不可修改' : '修改消息'}
+                                  aria-label="修改消息"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {!isUser && (msg.status === 'streaming' || !msg.content) && (
+                          <div className="mt-1 text-[13px] text-text-secondary">{timestamp}</div>
+                        )}
+                      </div>
+                    );
+                  })}
 
-          {/* Bottom Input Area (Sticky at bottom of scroll container) */}
-          <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
-            <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
-              {/* Attachment badges above input */}
-              {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
-                  {referencedDocs.map((doc) => (
-                    <span
-                      key={doc.id}
-                      className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-accent px-2.5 py-1 rounded-lg text-xs font-semibold"
-                    >
-                      <FileText size={12} />
-                      <span className="truncate max-w-[120px]">{doc.title}</span>
-                      <button
-                        onClick={() => removeReferencedDoc(doc.id)}
-                        className="text-indigo-400 hover:text-accent p-0.5 rounded transition-colors"
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                  {attachedFiles.map((file) => (
-                    <span
-                      key={file}
-                      className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-600 px-2.5 py-1 rounded-lg text-xs font-semibold"
-                    >
-                      <FileUp size={12} />
-                      <span className="truncate max-w-[120px]">{file}</span>
-                      <button
-                        onClick={() => removeAttachedFile(file)}
-                        className="text-emerald-400 hover:text-emerald-600 p-0.5 rounded transition-colors"
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
+                  {/* 仅在初始化等待连接时展示动画 */}
+                  {isGenerating &&
+                    sessionMessages.length > 0 &&
+                    sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
+                      <div className="flex items-center gap-2 py-1 text-[13px] text-text-secondary">
+                        <Loader2 size={14} className="animate-spin text-accent" />
+                        <span>正在思考并撰写内容...</span>
+                      </div>
+                    )}
                 </div>
               )}
+            </div>
 
-              {/* Main Textarea Container (Kimi Unified Style) */}
-              <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
-                <textarea
-                  ref={textareaRef}
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    currentSessionId
-                      ? '与 Duet 助手对话，输入并发送...'
-                      : '与 Duet 助手开启新对话...'
-                  }
-                  className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
-                  style={{ minHeight: '52px' }}
-                />
+            {/* Bottom Input Area (Sticky at bottom of scroll container) */}
+            <div className="sticky bottom-0 pb-4 pt-2 bg-bg-main z-20 shrink-0">
+              <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
+                {/* Attachment badges above input */}
+                {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
+                    {referencedDocs.map((doc) => (
+                      <span
+                        key={doc.id}
+                        className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-accent px-2.5 py-1 rounded-lg text-xs font-semibold"
+                      >
+                        <FileText size={12} />
+                        <span className="truncate max-w-[120px]">{doc.title}</span>
+                        <button
+                          onClick={() => removeReferencedDoc(doc.id)}
+                          className="text-indigo-400 hover:text-accent p-0.5 rounded transition-colors"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                    {attachedFiles.map((file) => (
+                      <span
+                        key={file}
+                        className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-600 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                      >
+                        <FileUp size={12} />
+                        <span className="truncate max-w-[120px]">{file}</span>
+                        <button
+                          onClick={() => removeAttachedFile(file)}
+                          className="text-emerald-400 hover:text-emerald-600 p-0.5 rounded transition-colors"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-                {/* Input Toolbar (Unified 0px inner padding for exact symmetric margins) */}
-                <div className="p-0 bg-transparent flex justify-between items-center shrink-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2.5">
-                    <div className="relative">
+                {/* Main Textarea Container (Kimi Unified Style) */}
+                <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
+                  <textarea
+                    ref={textareaRef}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={
+                      currentSessionId
+                        ? '与 Duet 助手对话，输入并发送...'
+                        : '与 Duet 助手开启新对话...'
+                    }
+                    className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
+                    style={{ minHeight: '52px' }}
+                  />
+
+                  {/* Input Toolbar (Unified 0px inner padding for exact symmetric margins) */}
+                  <div className="p-0 bg-transparent flex justify-between items-center shrink-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2.5">
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            setAttachMenuAnchorEl(e.currentTarget);
+                            setIsAttachMenuOpen(!isAttachMenuOpen);
+                          }}
+                          className="w-8.5 h-8.5 rounded-full hover:bg-hover-bg text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
+                          title="引用知识库文档"
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+
+                      {/* Thinking toggle (Pill shape) */}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          setAttachMenuAnchorEl(e.currentTarget);
-                          setIsAttachMenuOpen(!isAttachMenuOpen);
-                        }}
-                        className="w-8.5 h-8.5 rounded-full hover:bg-hover-bg text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
-                        title="引用知识库文档"
+                        onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
+                        className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
+                          isThinkingEnabled
+                            ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-accent font-semibold'
+                            : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
+                        }`}
+                        title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
                       >
-                        <Plus size={18} />
+                        <BrainCircuit
+                          size={13}
+                          className={isThinkingEnabled ? 'animate-pulse' : ''}
+                        />
+                        <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
                       </button>
+                      {hasLocalEmbeddingModel === false && (
+                        <label
+                          className="inline-flex h-8 items-center gap-1.5 text-xs text-text-secondary"
+                          title="开启后，仅在助手需要检索时调用云端 BGE 生成查询向量；不会自动建立索引"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={allowCloudQuery}
+                            onChange={(event) => setAllowCloudQuery(event.target.checked)}
+                            disabled={isGenerating}
+                          />
+                          <Cloud size={13} />
+                          <span className="sm:hidden">云检索（付费）</span>
+                          <span className="hidden sm:inline">云端检索（按次计费）</span>
+                        </label>
+                      )}
                     </div>
 
-                    {/* Thinking toggle (Pill shape) */}
-                    <button
-                      type="button"
-                      onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
-                      className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
-                        isThinkingEnabled
-                          ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-accent font-semibold'
-                          : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
-                      }`}
-                      title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
-                    >
-                      <BrainCircuit
-                        size={13}
-                        className={isThinkingEnabled ? 'animate-pulse' : ''}
-                      />
-                      <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
-                    </button>
-                    {hasLocalEmbeddingModel === false && (
-                      <label
-                        className="inline-flex h-8 items-center gap-1.5 text-xs text-text-secondary"
-                        title="开启后，仅在助手需要检索时调用云端 BGE 生成查询向量；不会自动建立索引"
+                    {/* Send or Stop Button (Circular) */}
+                    {isGenerating ? (
+                      <button
+                        type="button"
+                        onClick={stopGeneration}
+                        className="w-8.5 h-8.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                        title="停止生成"
                       >
-                        <input
-                          type="checkbox"
-                          checked={allowCloudQuery}
-                          onChange={(event) => setAllowCloudQuery(event.target.checked)}
-                          disabled={isGenerating}
-                        />
-                        <Cloud size={13} />
-                        <span className="sm:hidden">云检索（付费）</span>
-                        <span className="hidden sm:inline">云端检索（按次计费）</span>
-                      </label>
+                        <Square size={12} className="fill-current" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSend}
+                        className="w-8.5 h-8.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                        title="发送消息"
+                      >
+                        <Send size={14} />
+                      </button>
                     )}
                   </div>
-
-                  {/* Send or Stop Button (Circular) */}
-                  {isGenerating ? (
-                    <button
-                      type="button"
-                      onClick={stopGeneration}
-                      className="w-8.5 h-8.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
-                      title="停止生成"
-                    >
-                      <Square size={12} className="fill-current" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleSend}
-                      className="w-8.5 h-8.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
-                      title="发送消息"
-                    >
-                      <Send size={14} />
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Right Sources Drawer */}
+          <AISourcesDrawer
+            isOpen={isSourcesDrawerOpen}
+            onClose={() => setIsSourcesDrawerOpen(false)}
+            sources={activeDrawerSources}
+            highlightedIndex={drawerHighlightIndex}
+            onOpenSource={openKnowledgeSource}
+            onHoverSource={(index) => {
+              if (!activeSourcesMsgId) return;
+              if (index === null) {
+                handleCardMouseLeave(activeSourcesMsgId, 0);
+              } else {
+                handleCardMouseEnter(activeSourcesMsgId, index);
+              }
+            }}
+          />
         </div>
       </main>
 
