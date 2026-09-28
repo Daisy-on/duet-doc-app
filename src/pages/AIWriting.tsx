@@ -641,19 +641,19 @@ export default function AIWriting() {
       <AIChatListPanel />
 
       {/* 2. Main Chat Panel */}
-      <main className="flex-1 flex flex-col min-w-0 bg-bg-main relative">
-        {/* Top Header */}
-        <header className="h-[60px] border-b border-border-color flex justify-between items-center px-6 shrink-0 bg-bg-main">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <button
-              onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
-              className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title={isCatalogCollapsed ? '展开会话栏' : '折叠会话栏'}
-            >
-              <PanelLeft size={16} />
-            </button>
-            <div className="flex items-center gap-3 ml-1 min-w-0">
-              <h2 className="text-[15px] font-bold text-text-primary truncate">Duet 助手</h2>
+      <main className="flex-1 flex flex-row min-w-0 bg-bg-main relative overflow-hidden">
+        {/* Chat Column */}
+        <div className="flex-1 flex flex-col min-w-0 h-full relative">
+          {/* Top Header */}
+          <header className="h-[60px] flex justify-between items-center px-6 shrink-0 bg-bg-main select-none">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => setIsCatalogCollapsed(!isCatalogCollapsed)}
+                className="text-text-secondary hover:text-text-primary hover:bg-hover-bg p-1.5 rounded-lg border border-border-color/60 bg-bg-main shadow-sm flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title={isCatalogCollapsed ? '展开会话栏' : '折叠会话栏'}
+              >
+                <PanelLeft size={16} />
+              </button>
               <div
                 className="relative inline-flex items-center cursor-pointer select-none"
                 title={
@@ -691,22 +691,19 @@ export default function AIWriting() {
                 </span>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <CloudRagGate onMessage={setToastText} />
-          </div>
-        </header>
+            <div className="flex items-center gap-2 shrink-0">
+              <CloudRagGate onMessage={setToastText} />
+            </div>
+          </header>
 
-        {/* Global Notification Toast */}
-        {toastText && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-gray-900/90 text-white text-xs px-4 py-2 rounded-xl shadow-xl border border-gray-700 backdrop-blur flex items-center gap-2 animate-dropdown-fade-in">
-            <Check size={14} className="text-emerald-400" />
-            <span>{toastText}</span>
-          </div>
-        )}
+          {/* Global Notification Toast */}
+          {toastText && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-gray-900/90 text-white text-xs px-4 py-2 rounded-xl shadow-xl border border-gray-700 backdrop-blur flex items-center gap-2 animate-dropdown-fade-in">
+              <Check size={14} className="text-emerald-400" />
+              <span>{toastText}</span>
+            </div>
+          )}
 
-        {/* Main Content Workspace (Chat Area + Sources Drawer) */}
-        <div className="flex-1 flex min-h-0 overflow-hidden relative">
           {/* Main Scrollable Viewport (holds both messages AND sticky bottom input like DeepSeek) */}
           <div
             ref={scrollRef}
@@ -1238,24 +1235,24 @@ export default function AIWriting() {
               </div>
             </div>
           </div>
-
-          {/* Right Sources Drawer */}
-          <AISourcesDrawer
-            isOpen={isSourcesDrawerOpen}
-            onClose={() => setIsSourcesDrawerOpen(false)}
-            sources={activeDrawerSources}
-            highlightedIndex={drawerHighlightIndex}
-            onOpenSource={openKnowledgeSource}
-            onHoverSource={(index) => {
-              if (!activeSourcesMsgId) return;
-              if (index === null) {
-                handleCardMouseLeave(activeSourcesMsgId, 0);
-              } else {
-                handleCardMouseEnter(activeSourcesMsgId, index);
-              }
-            }}
-          />
         </div>
+
+        {/* Right Sources Drawer */}
+        <AISourcesDrawer
+          isOpen={isSourcesDrawerOpen}
+          onClose={() => setIsSourcesDrawerOpen(false)}
+          sources={activeDrawerSources}
+          highlightedIndex={drawerHighlightIndex}
+          onOpenSource={openKnowledgeSource}
+          onHoverSource={(index) => {
+            if (!activeSourcesMsgId) return;
+            if (index === null) {
+              handleCardMouseLeave(activeSourcesMsgId, 0);
+            } else {
+              handleCardMouseEnter(activeSourcesMsgId, index);
+            }
+          }}
+        />
       </main>
 
       {/* Citation Preview Popover */}

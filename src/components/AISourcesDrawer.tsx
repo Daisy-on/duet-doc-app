@@ -1,14 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  BookOpen,
-  X,
-  FileText,
-  StickyNote,
-  Image as ImageIcon,
-  ArrowUpRight,
-  ExternalLink,
-  HelpCircle,
-} from 'lucide-react';
+import { BookOpen, X, FileText, StickyNote, Image as ImageIcon, HelpCircle } from 'lucide-react';
 import type { KnowledgeSource } from '../store/aiWritingStore';
 
 interface AISourcesDrawerProps {
@@ -72,7 +63,7 @@ export default function AISourcesDrawer({
           <span className="text-[11px] text-text-ghost font-normal">· {items.length}</span>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {items.map(({ source, originalIndex }) => {
             const isTarget = highlightedIndex === originalIndex;
 
@@ -83,56 +74,52 @@ export default function AISourcesDrawer({
                 onMouseEnter={() => onHoverSource?.(originalIndex)}
                 onMouseLeave={() => onHoverSource?.(null)}
                 onClick={() => onOpenSource(source)}
-                className={`group relative rounded-xl border p-3 transition-all cursor-pointer select-none bg-bg-main hover:bg-hover-bg/60 hover:border-indigo-300 dark:hover:border-indigo-700/60 shadow-xs hover:shadow-md ${
+                title="点击在知识库中打开对应原文"
+                className={`group relative rounded-xl border p-3.5 transition-all duration-200 cursor-pointer select-none bg-bg-main hover:bg-hover-bg/30 ${
                   isTarget
-                    ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20'
-                    : 'border-border-color/80'
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20 shadow-sm'
+                    : 'border-border-color/70 hover:border-indigo-300 dark:hover:border-indigo-700/60 shadow-none hover:shadow-md'
                 }`}
               >
-                {/* Top: [1] badge + icon + Title + Arrow */}
-                <div className="flex items-center justify-between gap-1.5 mb-1">
+                {/* Top: [1] badge + icon + Title + chunk label */}
+                <div className="flex items-center justify-between gap-2 mb-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 shrink-0">
                       {originalIndex}
                     </span>
                     {source.sourceType === 'image' ? (
-                      <ImageIcon size={13} className="shrink-0 text-sky-500" />
+                      <ImageIcon size={13.5} className="shrink-0 text-sky-500" />
                     ) : source.sourceType === 'memo' ? (
-                      <StickyNote size={13} className="shrink-0 text-emerald-500" />
+                      <StickyNote size={13.5} className="shrink-0 text-emerald-500" />
                     ) : (
-                      <FileText size={13} className="shrink-0 text-indigo-500" />
+                      <FileText size={13.5} className="shrink-0 text-indigo-500" />
                     )}
-                    <span className="text-xs font-medium text-text-primary group-hover:text-accent truncate">
+                    <span className="text-xs font-semibold text-text-primary group-hover:text-accent transition-colors truncate">
                       {source.title}
                     </span>
                   </div>
-                  <ArrowUpRight
-                    size={14}
-                    className="shrink-0 text-text-ghost group-hover:text-accent transition-colors opacity-70 group-hover:opacity-100"
-                  />
+                  <span className="text-[10px] text-text-ghost shrink-0 font-medium">
+                    {source.sourceType === 'image'
+                      ? '图片'
+                      : source.sourceType === 'memo'
+                        ? '小记'
+                        : `片段 ${source.chunkIndex + 1}`}
+                  </span>
                 </div>
 
                 {/* Heading Path breadcrumb */}
                 {source.headingPath?.length > 0 && (
-                  <div className="text-[10px] text-text-ghost truncate font-mono pl-[25px] mb-1.5">
+                  <div className="text-[11px] text-text-secondary/70 truncate font-sans mb-1.5">
                     {source.headingPath.join(' › ')}
                   </div>
                 )}
 
                 {/* Excerpt quote */}
                 {source.excerpt && (
-                  <div className="text-[11px] text-text-secondary leading-relaxed line-clamp-4 pl-[25px] font-sans break-words bg-hover-bg/50 rounded-lg p-2 border-l-2 border-indigo-400/80 dark:border-indigo-500/80 select-text">
+                  <div className="text-[12px] text-text-secondary leading-relaxed line-clamp-5 font-sans break-words select-text">
                     {source.excerpt}
                   </div>
                 )}
-
-                {/* Action footer */}
-                <div className="mt-2 pt-1.5 border-t border-border-color/40 flex items-center justify-end">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 group-hover:underline">
-                    <span>在知识库中打开</span>
-                    <ExternalLink size={11} />
-                  </span>
-                </div>
               </div>
             );
           })}
@@ -145,7 +132,7 @@ export default function AISourcesDrawer({
     <>
       {/* Mobile Backdrop */}
       <div
-        className="fixed inset-0 bg-black/20 backdrop-blur-xs z-30 lg:hidden"
+        className="fixed inset-0 bg-black/20 backdrop-blur-xs z-30 md:hidden"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -153,10 +140,10 @@ export default function AISourcesDrawer({
       {/* Drawer Panel */}
       <aside
         ref={containerRef}
-        className="absolute lg:relative top-0 right-0 bottom-0 w-[340px] sm:w-[370px] shrink-0 border-l border-border-color bg-bg-panel/95 backdrop-blur-md flex flex-col h-full z-40 lg:z-20 transition-all duration-300 shadow-xl lg:shadow-none animate-in slide-in-from-right"
+        className="fixed md:relative top-0 right-0 bottom-0 w-full sm:w-[370px] shrink-0 border-l border-border-color bg-bg-panel flex flex-col h-full z-40 md:z-20 transition-all duration-200 shadow-xl md:shadow-none animate-in slide-in-from-right"
       >
-        {/* Header */}
-        <div className="h-[52px] border-b border-border-color/80 px-4 flex items-center justify-between shrink-0 select-none bg-bg-panel">
+        {/* Header (aligned with main top header at 60px, no border-b) */}
+        <div className="h-[60px] px-4 flex items-center justify-between shrink-0 select-none bg-bg-panel">
           <div className="flex items-center gap-2">
             <BookOpen size={16} className="text-indigo-500" />
             <span className="text-sm font-bold text-text-primary">参考来源</span>
