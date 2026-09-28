@@ -33,6 +33,7 @@ export default function AIChatListPanel() {
     // 已经在草稿页面，无需导航；否则切换至空白草稿页
     if (!sessionId) return;
     setActiveSessionId(null);
+    useAIWritingStore.getState().closeSourcesDrawer();
     navigate('/ai-writing');
   };
 

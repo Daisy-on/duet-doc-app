@@ -79,7 +79,11 @@ export default function AIWriting() {
     createSession,
     isThinkingEnabled,
     setIsThinkingEnabled,
+    activeSessionId,
     setActiveSessionId,
+    sourcesDrawer,
+    setSourcesDrawer,
+    closeSourcesDrawer,
   } = useAIWritingStore();
 
   const { createDocument, createMemo, updateDocument } = useKnowledgeBaseStore();
@@ -148,24 +152,33 @@ export default function AIWriting() {
   const popoverHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseInPopoverRef = useRef(false);
 
-  // Right Sources Drawer state
-  const [isSourcesDrawerOpen, setIsSourcesDrawerOpen] = useState(false);
-  const [activeSourcesMsgId, setActiveSourcesMsgId] = useState<string | null>(null);
-  const [drawerHighlightIndex, setDrawerHighlightIndex] = useState<number | null>(null);
+  // Right Sources Drawer state directly derived from Zustand store
+  const isSourcesDrawerOpen = Boolean(
+    sourcesDrawer.isOpen &&
+    currentSessionId &&
+    sourcesDrawer.sessionId === currentSessionId &&
+    (!sourcesDrawer.messageId || sessionMessages.some((m) => m.id === sourcesDrawer.messageId)),
+  );
+  const activeSourcesMsgId = isSourcesDrawerOpen ? sourcesDrawer.messageId : null;
+  const drawerHighlightIndex = isSourcesDrawerOpen ? sourcesDrawer.highlightIndex : null;
 
-  const activeDrawerSources = useMemo(() => {
-    if (!activeSourcesMsgId) return [];
-    const targetMsg = sessionMessages.find((m) => m.id === activeSourcesMsgId);
-    return targetMsg?.knowledgeSources || [];
-  }, [activeSourcesMsgId, sessionMessages]);
+  const targetSourcesMsg = useMemo(
+    () => sessionMessages.find((m) => m.id === activeSourcesMsgId),
+    [activeSourcesMsgId, sessionMessages],
+  );
+  const activeDrawerSources = targetSourcesMsg?.knowledgeSources || [];
 
   const handleToggleSourcesDrawer = (msgId: string) => {
+    const curId = currentSessionId || activeSessionId;
     if (activeSourcesMsgId === msgId && isSourcesDrawerOpen) {
-      setIsSourcesDrawerOpen(false);
+      closeSourcesDrawer();
     } else {
-      setActiveSourcesMsgId(msgId);
-      setDrawerHighlightIndex(null);
-      setIsSourcesDrawerOpen(true);
+      setSourcesDrawer({
+        isOpen: true,
+        sessionId: curId,
+        messageId: msgId,
+        highlightIndex: null,
+      });
     }
   };
 
@@ -233,8 +246,6 @@ export default function AIWriting() {
       setEditingContent('');
     }
     setActiveCitation(null);
-    setIsSourcesDrawerOpen(false);
-    setActiveSourcesMsgId(null);
   }
 
   useEffect(() => {
@@ -472,6 +483,10 @@ export default function AIWriting() {
   };
 
   const openKnowledgeSource = (source: KnowledgeSource) => {
+    const curId = currentSessionId || activeSessionId;
+    if (curId) {
+      setActiveSessionId(curId);
+    }
     const documentId = source.documentId ?? source.sourceId;
     if (source.sourceType === 'memo') {
       navigate(`/memo/${documentId}`, {
@@ -543,23 +558,30 @@ export default function AIWriting() {
     }, 180);
   }, []);
 
-  const handleContainerClick = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement | null;
-    const badge = target?.closest('.citation-ref-badge') as HTMLElement | null;
-    if (!badge) return;
+  const handleContainerClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const badge = target?.closest('.citation-ref-badge') as HTMLElement | null;
+      if (!badge) return;
 
-    e.preventDefault();
-    const msgContainer = badge.closest('[data-message-id]');
-    const msgId = msgContainer?.getAttribute('data-message-id');
-    const indexStr = badge.getAttribute('data-citation-index');
-    if (!msgId || !indexStr) return;
+      e.preventDefault();
+      const msgContainer = badge.closest('[data-message-id]');
+      const msgId = msgContainer?.getAttribute('data-message-id');
+      const indexStr = badge.getAttribute('data-citation-index');
+      if (!msgId || !indexStr) return;
 
-    const index = parseInt(indexStr, 10);
-    setActiveCitation(null);
-    setActiveSourcesMsgId(msgId);
-    setDrawerHighlightIndex(index);
-    setIsSourcesDrawerOpen(true);
-  }, []);
+      const index = parseInt(indexStr, 10);
+      setActiveCitation(null);
+      const curId = currentSessionId || activeSessionId;
+      setSourcesDrawer({
+        isOpen: true,
+        sessionId: curId,
+        messageId: msgId,
+        highlightIndex: index,
+      });
+    },
+    [currentSessionId, activeSessionId, setSourcesDrawer],
+  );
 
   const handleScroll = useCallback(() => {
     if (activeCitation) {
@@ -1240,7 +1262,7 @@ export default function AIWriting() {
         {/* Right Sources Drawer */}
         <AISourcesDrawer
           isOpen={isSourcesDrawerOpen}
-          onClose={() => setIsSourcesDrawerOpen(false)}
+          onClose={closeSourcesDrawer}
           sources={activeDrawerSources}
           highlightedIndex={drawerHighlightIndex}
           onOpenSource={openKnowledgeSource}
@@ -1301,11 +1323,14 @@ export default function AIWriting() {
                     {activeCitation.index}
                   </span>
                   {activeCitation.source.sourceType === 'image' ? (
-                    <ImageIcon size={14} className="shrink-0 text-sky-500" />
+                    <ImageIcon size={14} className="shrink-0 text-blue-500 dark:text-blue-400" />
                   ) : activeCitation.source.sourceType === 'memo' ? (
-                    <StickyNote size={14} className="shrink-0 text-emerald-500" />
+                    <StickyNote
+                      size={14}
+                      className="shrink-0 text-emerald-500 dark:text-emerald-400"
+                    />
                   ) : (
-                    <FileText size={14} className="shrink-0 text-indigo-500" />
+                    <FileText size={14} className="shrink-0 text-amber-500 dark:text-amber-400" />
                   )}
                   <span className="text-xs font-semibold text-text-primary truncate">
                     {activeCitation.source.title}

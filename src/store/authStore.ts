@@ -13,7 +13,7 @@ import {
 import type { AuthResponse, AuthUser, LoginInput, RegisterInput } from '../auth/types';
 import { closeUserDatabase, openUserDatabase } from '../db';
 import { useSyncStore } from './syncStore';
-import { useAIWritingStore } from './aiWritingStore';
+import { useAIWritingStore, saveDrawerCacheToSession } from './aiWritingStore';
 import { useFavoritesStore } from './favoritesStore';
 import { useKnowledgeBaseStore } from './knowledgeBaseStore';
 
@@ -73,11 +73,13 @@ function resetLocalSession() {
   closeUserDatabase();
   useKnowledgeBaseStore.setState({ knowledgeBases: [], groups: [], documents: [] });
   useFavoritesStore.setState({ folders: [], items: [] });
+  saveDrawerCacheToSession(null);
   useAIWritingStore.setState({
     sessions: [],
     messages: [],
     activeSessionId: null,
     lastVisitedSessionId: null,
+    sourcesDrawer: { isOpen: false, sessionId: null, messageId: null, highlightIndex: null },
   });
 }
 

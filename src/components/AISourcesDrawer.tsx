@@ -60,7 +60,7 @@ export default function AISourcesDrawer({
         <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary select-none">
           {icon}
           <span>{title}</span>
-          <span className="text-[11px] text-text-ghost font-normal">· {items.length}</span>
+          <span className="text-[13px] text-text-ghost font-normal">· {items.length}</span>
         </div>
 
         <div className="space-y-2.5">
@@ -75,30 +75,45 @@ export default function AISourcesDrawer({
                 onMouseLeave={() => onHoverSource?.(null)}
                 onClick={() => onOpenSource(source)}
                 title="点击在知识库中打开对应原文"
-                className={`group relative rounded-xl border p-3.5 transition-all duration-200 cursor-pointer select-none bg-bg-main hover:bg-hover-bg/30 ${
+                className={`group relative rounded-xl p-3.5 transition-all duration-200 cursor-pointer select-none border ${
                   isTarget
                     ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20 shadow-sm'
-                    : 'border-border-color/70 hover:border-indigo-300 dark:hover:border-indigo-700/60 shadow-none hover:shadow-md'
+                    : 'border-transparent hover:bg-hover-bg/50 hover:shadow-md shadow-none'
                 }`}
               >
                 {/* Top: [1] badge + icon + Title + chunk label */}
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 shrink-0">
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold border shrink-0 transition-colors ${
+                        isTarget
+                          ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border-indigo-200/80 dark:border-indigo-800'
+                          : 'bg-hover-bg text-text-secondary border-border-color/60'
+                      }`}
+                    >
                       {originalIndex}
                     </span>
                     {source.sourceType === 'image' ? (
-                      <ImageIcon size={13.5} className="shrink-0 text-sky-500" />
+                      <ImageIcon
+                        size={13.5}
+                        className="shrink-0 text-blue-500 dark:text-blue-400"
+                      />
                     ) : source.sourceType === 'memo' ? (
-                      <StickyNote size={13.5} className="shrink-0 text-emerald-500" />
+                      <StickyNote
+                        size={13.5}
+                        className="shrink-0 text-emerald-500 dark:text-emerald-400"
+                      />
                     ) : (
-                      <FileText size={13.5} className="shrink-0 text-indigo-500" />
+                      <FileText
+                        size={13.5}
+                        className="shrink-0 text-amber-500 dark:text-amber-400"
+                      />
                     )}
-                    <span className="text-xs font-semibold text-text-primary group-hover:text-accent transition-colors truncate">
+                    <span className="text-xs font-semibold text-text-primary truncate">
                       {source.title}
                     </span>
                   </div>
-                  <span className="text-[10px] text-text-ghost shrink-0 font-medium">
+                  <span className="text-[12px] text-text-ghost shrink-0 font-medium">
                     {source.sourceType === 'image'
                       ? '图片'
                       : source.sourceType === 'memo'
@@ -109,7 +124,7 @@ export default function AISourcesDrawer({
 
                 {/* Heading Path breadcrumb */}
                 {source.headingPath?.length > 0 && (
-                  <div className="text-[11px] text-text-secondary/70 truncate font-sans mb-1.5">
+                  <div className="text-[13px] text-text-primary truncate font-sans mb-1.5">
                     {source.headingPath.join(' › ')}
                   </div>
                 )}
@@ -140,14 +155,14 @@ export default function AISourcesDrawer({
       {/* Drawer Panel */}
       <aside
         ref={containerRef}
-        className="fixed md:relative top-0 right-0 bottom-0 w-full sm:w-[370px] shrink-0 border-l border-border-color bg-bg-panel flex flex-col h-full z-40 md:z-20 transition-all duration-200 shadow-xl md:shadow-none animate-in slide-in-from-right"
+        className="fixed md:relative top-0 right-0 bottom-0 w-full sm:w-[370px] shrink-0 border-l border-border-color bg-bg-main flex flex-col h-full z-40 md:z-20 transition-all duration-200 shadow-xl md:shadow-none animate-in slide-in-from-right"
       >
-        {/* Header (aligned with main top header at 60px, no border-b) */}
-        <div className="h-[60px] px-4 flex items-center justify-between shrink-0 select-none bg-bg-panel">
+        {/* Header (aligned with main top header at 60px, no border-b, same bg-bg-main) */}
+        <div className="h-[60px] px-4 flex items-center justify-between shrink-0 select-none bg-bg-main">
           <div className="flex items-center gap-2">
-            <BookOpen size={16} className="text-indigo-500" />
+            <BookOpen size={16} className="text-emerald-500 dark:text-emerald-400" />
             <span className="text-sm font-bold text-text-primary">参考来源</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-400 font-semibold border border-indigo-200/60 dark:border-indigo-800">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-hover-bg text-text-secondary font-semibold border border-border-color/60">
               {sources.length}
             </span>
           </div>
@@ -180,17 +195,17 @@ export default function AISourcesDrawer({
             <>
               {renderGroup(
                 '知识库文档',
-                <FileText size={13} className="text-indigo-500" />,
+                <FileText size={13} className="text-amber-500 dark:text-amber-400" />,
                 docSources,
               )}
               {renderGroup(
                 '轻量小记',
-                <StickyNote size={13} className="text-emerald-500" />,
+                <StickyNote size={13} className="text-emerald-500 dark:text-emerald-400" />,
                 memoSources,
               )}
               {renderGroup(
                 '图片素材',
-                <ImageIcon size={13} className="text-sky-500" />,
+                <ImageIcon size={13} className="text-blue-500 dark:text-blue-400" />,
                 imageSources,
               )}
             </>

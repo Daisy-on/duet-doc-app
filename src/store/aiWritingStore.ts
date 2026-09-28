@@ -48,12 +48,67 @@ export interface ChatSession {
   isPinned?: boolean;
 }
 
+export interface SourcesDrawerState {
+  isOpen: boolean;
+  sessionId: string | null;
+  messageId: string | null;
+  highlightIndex: number | null;
+}
+
+const DRAWER_CACHE_KEY = 'duet:ai_sources_drawer_cache';
+
+export function loadDrawerCacheFromSession(): SourcesDrawerState {
+  try {
+    if (typeof sessionStorage === 'undefined') {
+      return { isOpen: false, sessionId: null, messageId: null, highlightIndex: null };
+    }
+    const raw = sessionStorage.getItem(DRAWER_CACHE_KEY);
+    if (!raw) {
+      return { isOpen: false, sessionId: null, messageId: null, highlightIndex: null };
+    }
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.sessionId === 'string' && typeof parsed.messageId === 'string') {
+      return {
+        isOpen: Boolean(parsed.isOpen),
+        sessionId: parsed.sessionId,
+        messageId: parsed.messageId,
+        highlightIndex: typeof parsed.highlightIndex === 'number' ? parsed.highlightIndex : null,
+      };
+    }
+  } catch {
+    // Ignore storage read errors
+  }
+  return { isOpen: false, sessionId: null, messageId: null, highlightIndex: null };
+}
+
+export function saveDrawerCacheToSession(drawer: SourcesDrawerState | null) {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    if (!drawer || !drawer.isOpen || !drawer.sessionId || !drawer.messageId) {
+      sessionStorage.removeItem(DRAWER_CACHE_KEY);
+    } else {
+      sessionStorage.setItem(
+        DRAWER_CACHE_KEY,
+        JSON.stringify({
+          isOpen: true,
+          sessionId: drawer.sessionId,
+          messageId: drawer.messageId,
+          highlightIndex: drawer.highlightIndex,
+        }),
+      );
+    }
+  } catch {
+    // Ignore storage write errors
+  }
+}
+
 interface AIWritingStore {
   sessions: ChatSession[];
   messages: ChatMessage[];
   activeSessionId: string | null;
   lastVisitedSessionId: string | null;
   isThinkingEnabled: boolean;
+  sourcesDrawer: SourcesDrawerState;
 
   initStore: () => Promise<void>;
   reloadFromDb: () => Promise<void>;
@@ -64,6 +119,8 @@ interface AIWritingStore {
   deleteSession: (id: string) => Promise<void>;
   setActiveSessionId: (id: string | null) => void;
   setIsThinkingEnabled: (enabled: boolean) => void;
+  setSourcesDrawer: (drawer: Partial<SourcesDrawerState>) => void;
+  closeSourcesDrawer: () => void;
 
   addMessage: (msg: ChatMessage) => Promise<void>;
   updateMessageStream: (
@@ -151,6 +208,26 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   activeSessionId: null,
   lastVisitedSessionId: null,
   isThinkingEnabled: false,
+  sourcesDrawer: loadDrawerCacheFromSession(),
+
+  setSourcesDrawer: (updates) => {
+    set((state) => {
+      const next = { ...state.sourcesDrawer, ...updates };
+      saveDrawerCacheToSession(next);
+      return { sourcesDrawer: next };
+    });
+  },
+
+  closeSourcesDrawer: () => {
+    const next: SourcesDrawerState = {
+      isOpen: false,
+      sessionId: null,
+      messageId: null,
+      highlightIndex: null,
+    };
+    saveDrawerCacheToSession(next);
+    set({ sourcesDrawer: next });
+  },
 
   initStore: async () => {
     try {
@@ -311,11 +388,19 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
         state.lastVisitedSessionId === id
           ? filteredSessions[0]?.id || null
           : state.lastVisitedSessionId;
+      const shouldClearDrawer = state.sourcesDrawer.sessionId === id;
+      const nextDrawer = shouldClearDrawer
+        ? { isOpen: false, sessionId: null, messageId: null, highlightIndex: null }
+        : state.sourcesDrawer;
+      if (shouldClearDrawer) {
+        saveDrawerCacheToSession(nextDrawer);
+      }
       return {
         sessions: filteredSessions,
         messages: state.messages.filter((m) => m.sessionId !== id),
         activeSessionId: newActiveId,
         lastVisitedSessionId: newLastVisited,
+        sourcesDrawer: nextDrawer,
       };
     });
   },
@@ -447,8 +532,20 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
       if (operations.length > 0) await enqueueMutationInTx(tx, operations);
     });
     refreshSyncCounts();
-    set((state) => ({
-      messages: state.messages.filter((m) => !idSet.has(m.id)),
-    }));
+    set((state) => {
+      const shouldClearDrawer = Boolean(
+        state.sourcesDrawer.messageId && idSet.has(state.sourcesDrawer.messageId),
+      );
+      const nextDrawer = shouldClearDrawer
+        ? { isOpen: false, sessionId: null, messageId: null, highlightIndex: null }
+        : state.sourcesDrawer;
+      if (shouldClearDrawer) {
+        saveDrawerCacheToSession(nextDrawer);
+      }
+      return {
+        messages: state.messages.filter((m) => !idSet.has(m.id)),
+        sourcesDrawer: nextDrawer,
+      };
+    });
   },
 }));
