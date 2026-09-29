@@ -183,14 +183,31 @@ export default function AIWriting() {
     sourcesDrawer.sessionId === currentSessionId &&
     (!sourcesDrawer.messageId || sessionMessages.some((m) => m.id === sourcesDrawer.messageId)),
   );
-  const activeSourcesMsgId = isSourcesDrawerOpen ? sourcesDrawer.messageId : null;
+  const activeSourcesMsgId = sourcesDrawer.messageId;
   const drawerHighlightIndex = isSourcesDrawerOpen ? sourcesDrawer.highlightIndex : null;
 
-  const targetSourcesMsg = useMemo(
-    () => sessionMessages.find((m) => m.id === activeSourcesMsgId),
-    [activeSourcesMsgId, sessionMessages],
+  // 提前预获取最新一条具有知识库引用的 Assistant 消息
+  const latestAssistantSourcesMsg = useMemo(() => {
+    for (let i = sessionMessages.length - 1; i >= 0; i--) {
+      const msg = sessionMessages[i];
+      if (msg.role === 'assistant' && (msg.knowledgeSources?.length ?? 0) > 0) {
+        return msg;
+      }
+    }
+    return undefined;
+  }, [sessionMessages]);
+
+  const targetSourcesMsg = useMemo(() => {
+    if (activeSourcesMsgId) {
+      return sessionMessages.find((m) => m.id === activeSourcesMsgId) ?? latestAssistantSourcesMsg;
+    }
+    return latestAssistantSourcesMsg;
+  }, [activeSourcesMsgId, sessionMessages, latestAssistantSourcesMsg]);
+
+  const activeDrawerSources = useMemo(
+    () => targetSourcesMsg?.knowledgeSources || [],
+    [targetSourcesMsg],
   );
-  const activeDrawerSources = targetSourcesMsg?.knowledgeSources || [];
 
   const handleToggleSourcesDrawer = useCallback(
     (msgId: string) => {
@@ -905,7 +922,7 @@ export default function AIWriting() {
             onMouseOver={handleContainerMouseOver}
             onMouseOut={handleContainerMouseOut}
             onClick={handleContainerClick}
-            className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col transition-all duration-300"
+            className="flex-1 overflow-y-auto px-4 md:px-6 flex flex-col"
             style={{ scrollbarGutter: 'stable' }}
           >
             {/* Messages Stream */}
@@ -1056,7 +1073,7 @@ export default function AIWriting() {
               )}
 
               {/* Main Textarea Container (Kimi Unified Style) */}
-              <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
+              <div className="border border-border-color focus-within:border-blue-500/80 focus-within:ring-2 focus-within:ring-blue-500/15 bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
                 <textarea
                   ref={textareaRef}
                   value={inputText}
@@ -1094,32 +1111,38 @@ export default function AIWriting() {
                       onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
                       className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
                         isThinkingEnabled
-                          ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-accent font-semibold'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-semibold'
                           : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
                       }`}
                       title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
                     >
                       <BrainCircuit
                         size={13}
-                        className={isThinkingEnabled ? 'animate-pulse' : ''}
+                        className={isThinkingEnabled ? 'animate-pulse text-blue-500' : ''}
                       />
                       <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
                     </button>
+
+                    {/* Cloud Retrieval toggle (Pill shape) */}
                     {hasLocalEmbeddingModel === false && (
-                      <label
-                        className="inline-flex h-8 items-center gap-1.5 text-xs text-text-secondary"
-                        title="开启后，仅在助手需要检索时调用云端 BGE 生成查询向量；不会自动建立索引"
+                      <button
+                        type="button"
+                        onClick={() => setAllowCloudQuery(!allowCloudQuery)}
+                        disabled={isGenerating}
+                        className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
+                          allowCloudQuery
+                            ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-semibold'
+                            : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
+                        } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={
+                          allowCloudQuery
+                            ? '云端检索已开启（本地未安装语义模型时，按次调用云端 BGE）'
+                            : '点击开启云端检索（按次计费）'
+                        }
                       >
-                        <input
-                          type="checkbox"
-                          checked={allowCloudQuery}
-                          onChange={(event) => setAllowCloudQuery(event.target.checked)}
-                          disabled={isGenerating}
-                        />
-                        <Cloud size={13} />
-                        <span className="sm:hidden">云检索（付费）</span>
-                        <span className="hidden sm:inline">云端检索（按次计费）</span>
-                      </label>
+                        <Cloud size={13} className={allowCloudQuery ? 'text-blue-500' : ''} />
+                        <span>{allowCloudQuery ? '云端检索 (已开启)' : '云端检索'}</span>
+                      </button>
                     )}
                   </div>
 

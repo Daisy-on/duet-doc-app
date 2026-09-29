@@ -17,6 +17,8 @@ interface SourceWithOriginalIndex {
   originalIndex: number;
 }
 
+const DRAWER_WIDTH = 360;
+
 export default function AISourcesDrawer({
   isOpen,
   onClose,
@@ -83,7 +85,7 @@ export default function AISourcesDrawer({
     <>
       {/* Mobile / Tablet Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/20 backdrop-blur-xs z-30 lg:hidden transition-opacity duration-200 ease-out ${
+        className={`fixed inset-0 bg-black/20 backdrop-blur-xs z-30 lg:hidden transition-opacity duration-150 ease-out ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -93,14 +95,12 @@ export default function AISourcesDrawer({
       {/* Drawer Panel */}
       <aside
         ref={containerRef}
-        style={{ width: isOpen ? undefined : 0 }}
-        className={`fixed lg:relative top-0 right-0 bottom-0 shrink-0 bg-bg-main flex flex-col h-full z-40 lg:z-20 transition-all duration-200 ease-out overflow-hidden ${
-          isOpen
-            ? 'w-full sm:w-[350px] xl:w-[370px] max-w-[85vw] border-l border-border-color shadow-xl lg:shadow-none translate-x-0 opacity-100'
-            : 'w-0 border-l-0 shadow-none translate-x-full lg:translate-x-0 opacity-0 pointer-events-none'
+        style={{ width: isOpen ? `${DRAWER_WIDTH}px` : '0px' }}
+        className={`fixed lg:relative top-0 right-0 bottom-0 shrink-0 bg-bg-main flex flex-col h-full z-40 lg:z-20 transition-all duration-150 ease-out overflow-hidden ${
+          isOpen ? 'pointer-events-auto' : 'pointer-events-none'
         }`}
       >
-        <div className="w-full sm:w-[350px] xl:w-[370px] max-w-[85vw] h-full flex flex-col">
+        <div className="w-[360px] min-w-[360px] shrink-0 h-full flex flex-col border-l border-border-color bg-bg-main">
           {/* Header (aligned with main top header at 60px, no border-b, same bg-bg-main) */}
           <div className="h-[60px] px-4 flex items-center justify-between shrink-0 select-none bg-bg-main">
             <div className="flex items-center gap-2">

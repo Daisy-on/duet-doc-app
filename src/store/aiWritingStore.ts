@@ -219,14 +219,15 @@ export const useAIWritingStore = create<AIWritingStore>((set, get) => ({
   },
 
   closeSourcesDrawer: () => {
-    const next: SourcesDrawerState = {
-      isOpen: false,
-      sessionId: null,
-      messageId: null,
-      highlightIndex: null,
-    };
-    saveDrawerCacheToSession(next);
-    set({ sourcesDrawer: next });
+    set((state) => {
+      const next: SourcesDrawerState = {
+        ...state.sourcesDrawer,
+        isOpen: false,
+        highlightIndex: null,
+      };
+      saveDrawerCacheToSession(next);
+      return { sourcesDrawer: next };
+    });
   },
 
   initStore: async () => {
