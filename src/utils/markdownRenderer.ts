@@ -157,10 +157,7 @@ streamingMarked.use(sharedMarkedConfig);
 streamingMarked.use({
   renderer: {
     code({ text, lang }: { text: string; lang?: string }) {
-      const validLang = lang && lowlight.registered(lang) ? lang : null;
-      const cached = validLang ? highlightCache.get(`${validLang}\n${text}`) : null;
-      const innerHtml = cached ?? escapeHtml(text);
-      return buildCodeBlockHtml(text, lang, innerHtml);
+      return buildCodeBlockHtml(text, lang, escapeHtml(text));
     },
   },
 });
@@ -168,6 +165,137 @@ streamingMarked.use({
 // 针对已完成历史消息的静态 HTML 缓存，避免流式打字时对所有历史消息重复跑 Marked
 const renderedHtmlCache = new Map<string, string>();
 const MAX_RENDERED_CACHE_SIZE = 100;
+
+// 针对流式期间已固化的独立 Block（段落/已闭合代码块/标题/列表等）的增量 HTML 缓存
+const blockHtmlCache = new Map<string, string>();
+const MAX_BLOCK_CACHE_SIZE = 1000;
+
+function isListLine(line: string): boolean {
+  return /^\s*([-*+]|\d+\.)\s+/.test(line);
+}
+
+function isHeadingLine(line: string): boolean {
+  return /^\s*#{1,6}\s+/.test(line);
+}
+
+function isHrLine(line: string): boolean {
+  return /^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line);
+}
+
+export interface MarkdownBlockItem {
+  text: string;
+  isCodeBlock: boolean;
+}
+
+export interface SplitBlocksResult {
+  frozenBlocks: MarkdownBlockItem[];
+  activeTail: string;
+}
+
+/**
+ * 将流式输出的 Markdown 文本智能切分为「已固化历史块」与「当前正在生成的活跃尾部」
+ */
+export function splitMarkdownBlocks(src: string): SplitBlocksResult {
+  if (!src) return { frozenBlocks: [], activeTail: '' };
+
+  const lines = src.split('\n');
+  const frozenBlocks: MarkdownBlockItem[] = [];
+  let currentLines: string[] = [];
+  let inCodeFence = false;
+  let fenceMarker = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // 检查代码块标记（以至少 3 个反引号或波浪号开始）
+    const match = trimmed.match(/^(`{3,}|~{3,})/);
+
+    if (!inCodeFence) {
+      if (match) {
+        if (currentLines.length > 0) {
+          frozenBlocks.push({ text: currentLines.join('\n'), isCodeBlock: false });
+          currentLines = [];
+        }
+        inCodeFence = true;
+        fenceMarker = match[1][0];
+        currentLines.push(line);
+      } else if (trimmed === '') {
+        if (currentLines.length > 0) {
+          // 如果当前是列表，检查空行之后是否有后续列表项或缩进（处理多行松散列表）
+          const isCurrentlyList = isListLine(currentLines[0]);
+          let isContinuedList = false;
+          if (isCurrentlyList) {
+            for (let j = i + 1; j < lines.length; j++) {
+              const peekTrimmed = lines[j].trim();
+              if (peekTrimmed !== '') {
+                if (isListLine(lines[j]) || /^\s{2,}/.test(lines[j])) {
+                  isContinuedList = true;
+                }
+                break;
+              }
+            }
+          }
+
+          if (isContinuedList) {
+            currentLines.push(line);
+          } else {
+            frozenBlocks.push({ text: currentLines.join('\n'), isCodeBlock: false });
+            currentLines = [];
+          }
+        }
+      } else if (
+        currentLines.length > 0 &&
+        (isHeadingLine(currentLines[0]) || isHrLine(currentLines[0]))
+      ) {
+        // 单行标题或分割线封顶
+        frozenBlocks.push({ text: currentLines.join('\n'), isCodeBlock: false });
+        currentLines = [line];
+      } else if (currentLines.length > 0 && (isHeadingLine(line) || isHrLine(line))) {
+        // 新行是标题或分割线，前一段落封顶
+        frozenBlocks.push({ text: currentLines.join('\n'), isCodeBlock: false });
+        currentLines = [line];
+      } else {
+        currentLines.push(line);
+      }
+    } else {
+      currentLines.push(line);
+      if (match && match[1][0] === fenceMarker && match[1].length >= 3) {
+        inCodeFence = false;
+        fenceMarker = '';
+        frozenBlocks.push({ text: currentLines.join('\n'), isCodeBlock: true });
+        currentLines = [];
+      }
+    }
+  }
+
+  const activeTail = currentLines.join('\n');
+  return { frozenBlocks, activeTail };
+}
+
+function getCachedBlockHtml(block: MarkdownBlockItem): string {
+  const cached = blockHtmlCache.get(block.text);
+  if (cached !== undefined) {
+    perfStats.blockCacheHits++;
+    return cached;
+  }
+
+  // 闭合即上色：如果是已闭合代码块，走 highlightMarked 一次性高亮并持久缓存；常规文本块走 streamingMarked
+  const parser = block.isCodeBlock ? highlightMarked : streamingMarked;
+  let html: string;
+  try {
+    html = parser.parse(block.text, { async: false }) as string;
+  } catch {
+    html = escapeHtml(block.text);
+  }
+
+  if (blockHtmlCache.size >= MAX_BLOCK_CACHE_SIZE) {
+    const firstKey = blockHtmlCache.keys().next().value;
+    if (firstKey) blockHtmlCache.delete(firstKey);
+  }
+  blockHtmlCache.set(block.text, html);
+  return html;
+}
 
 export interface RenderMarkdownOptions {
   isStreaming?: boolean;
@@ -178,6 +306,7 @@ export interface MarkdownPerfStats {
   streamingCalls: number;
   highlightCalls: number;
   cacheHits: number;
+  blockCacheHits: number;
   totalDurationMs: number;
   avgDurationMs: number;
   maxDurationMs: number;
@@ -190,6 +319,7 @@ const perfStats: MarkdownPerfStats = {
   streamingCalls: 0,
   highlightCalls: 0,
   cacheHits: 0,
+  blockCacheHits: 0,
   totalDurationMs: 0,
   avgDurationMs: 0,
   maxDurationMs: 0,
@@ -205,6 +335,7 @@ export function getMarkdownPerfStats() {
     streamingCalls: perfStats.streamingCalls,
     highlightCalls: perfStats.highlightCalls,
     cacheHits: perfStats.cacheHits,
+    blockCacheHits: perfStats.blockCacheHits,
     totalDurationMs: +perfStats.totalDurationMs.toFixed(2),
     avgDurationMs: perfStats.totalCalls
       ? +(perfStats.totalDurationMs / perfStats.totalCalls).toFixed(2)
@@ -220,11 +351,15 @@ export function resetMarkdownPerfStats() {
   perfStats.streamingCalls = 0;
   perfStats.highlightCalls = 0;
   perfStats.cacheHits = 0;
+  perfStats.blockCacheHits = 0;
   perfStats.totalDurationMs = 0;
   perfStats.avgDurationMs = 0;
   perfStats.maxDurationMs = 0;
   perfStats.durations = [];
   perfStats.longTasksCount = 0;
+  highlightCache.clear();
+  blockHtmlCache.clear();
+  renderedHtmlCache.clear();
 }
 
 if (typeof window !== 'undefined') {
@@ -235,9 +370,10 @@ if (typeof window !== 'undefined') {
       const stats = getMarkdownPerfStats();
       console.table({
         总解析调用次数: stats.totalCalls,
-        流式降级调用次数: stats.streamingCalls,
-        完整高亮调用次数: stats.highlightCalls,
-        静态缓存命中次数: stats.cacheHits,
+        流式增量调用次数: stats.streamingCalls,
+        完整终态解析次数: stats.highlightCalls,
+        消息级缓存命中: stats.cacheHits,
+        块级增量缓存命中: stats.blockCacheHits,
         '平均解析耗时 (ms)': stats.avgDurationMs,
         'P95 峰值耗时 (ms)': stats.p95DurationMs,
         '最大单次耗时 (ms)': stats.maxDurationMs,
@@ -254,35 +390,51 @@ export function renderMarkdownToHtml(
   if (!markdownText) return '';
   const isStreaming = typeof options === 'boolean' ? options : Boolean(options?.isStreaming);
 
-  // 对于已完成的历史消息，优先读取整段 HTML 缓存，实现 0ms 闪电复用
-  if (!isStreaming) {
-    const cachedHtml = renderedHtmlCache.get(markdownText);
-    if (cachedHtml !== undefined) {
-      perfStats.totalCalls++;
-      perfStats.cacheHits++;
-      return cachedHtml;
-    }
+  // 1. 如果有整条消息的终态 HTML 缓存，直接 0ms 闪电复用
+  const cachedWholeHtml = renderedHtmlCache.get(markdownText);
+  if (cachedWholeHtml !== undefined) {
+    perfStats.totalCalls++;
+    perfStats.cacheHits++;
+    return cachedWholeHtml;
   }
 
-  const parser = isStreaming ? streamingMarked : highlightMarked;
   const startTime = performance.now();
 
   try {
-    const html = parser.parse(markdownText, { async: false }) as string;
-    const duration = performance.now() - startTime;
+    // 2. 统一走块级装配管道：已闭合的块直接命中 blockHtmlCache（闭合即上色）
+    const { frozenBlocks, activeTail } = splitMarkdownBlocks(markdownText);
+    const parts: string[] = [];
 
-    perfStats.totalCalls++;
-    if (isStreaming) {
-      perfStats.streamingCalls++;
-    } else {
-      perfStats.highlightCalls++;
+    for (let i = 0; i < frozenBlocks.length; i++) {
+      parts.push(getCachedBlockHtml(frozenBlocks[i]));
+    }
+
+    if (activeTail.trim()) {
+      try {
+        // 流式中尾部走轻量纯文本；终态完成时尾部走完整高亮
+        const tailParser = isStreaming ? streamingMarked : highlightMarked;
+        parts.push(tailParser.parse(activeTail, { async: false }) as string);
+      } catch {
+        parts.push(escapeHtml(activeTail));
+      }
+    }
+
+    const html = parts.join('');
+
+    // 3. 如果非流式（终态），将拼接结果直接写入整条消息缓存，后续直接 0ms 复用
+    if (!isStreaming) {
       if (renderedHtmlCache.size >= MAX_RENDERED_CACHE_SIZE) {
         const firstKey = renderedHtmlCache.keys().next().value;
         if (firstKey) renderedHtmlCache.delete(firstKey);
       }
       renderedHtmlCache.set(markdownText, html);
+      perfStats.highlightCalls++;
+    } else {
+      perfStats.streamingCalls++;
     }
 
+    const duration = performance.now() - startTime;
+    perfStats.totalCalls++;
     perfStats.totalDurationMs += duration;
     perfStats.durations.push(duration);
     if (duration > perfStats.maxDurationMs) {
