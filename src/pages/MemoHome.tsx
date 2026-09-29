@@ -178,7 +178,7 @@ export default function MemoHome() {
         {/* Workspace Body - Focus Flow Layout */}
         <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 py-8 max-w-4xl mx-auto w-full space-y-6 my-auto">
           {/* Quick Scratchpad Input Box (Full Width Aligned) */}
-          <div className="w-full bg-bg-main border border-border-color/80 focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/10 rounded-2xl shadow-xs transition-all overflow-hidden p-3.5 flex flex-col gap-2.5">
+          <div className="w-full bg-bg-main border border-border-color/80 focus-within:border-emerald-200/50 focus-within:ring-2 focus-within:ring-emerald-200/20 focus-within:shadow-[0_0_16px_rgba(16,185,129,0.16)] dark:focus-within:border-emerald-400/50 dark:focus-within:ring-emerald-400/20 dark:focus-within:shadow-[0_0_20px_rgba(16,185,129,0.2)] rounded-2xl shadow-xs transition-all overflow-hidden p-3 flex flex-col gap-2.5">
             <textarea
               value={quickInput}
               onChange={(e) => setQuickInput(e.target.value)}
@@ -193,9 +193,9 @@ export default function MemoHome() {
                 type="button"
                 onClick={handleSaveQuickMemo}
                 disabled={!quickInput.trim() || isSaving}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-xs cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer ${
                   quickInput.trim() && !isSaving
-                    ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white hover:shadow'
+                    ? 'bg-blue-500 hover:bg-blue-400 active:bg-blue-400 text-white hover:shadow'
                     : 'bg-hover-bg text-text-ghost cursor-not-allowed border border-border-color/40 shadow-none'
                 }`}
               >
@@ -211,7 +211,7 @@ export default function MemoHome() {
               <div className="flex items-center justify-between text-sm font-semibold text-text-secondary select-none px-1">
                 <span className="flex items-center gap-1.5">
                   <Clock size={14} />
-                  <span>最近便签</span>
+                  <span>最近的小记</span>
                 </span>
               </div>
 
@@ -239,9 +239,9 @@ export default function MemoHome() {
                         </p>
                       </div>
 
-                      <div className="pt-2 mt-2 border-t border-border-color/40 flex items-center justify-between text-[10px] text-text-ghost">
+                      <div className="pt-2 flex items-center justify-between text-[10px] text-text-ghost">
                         <span>{formatMemoTime(memo.updatedAt)}</span>
-                        <span className="group-hover:text-amber-500 transition-colors">编辑 →</span>
+                        <span className="group-hover:text-amber-500 transition-colors">编辑</span>
                       </div>
                     </div>
                   );

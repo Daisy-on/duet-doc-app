@@ -88,7 +88,7 @@ function DocTreeItem({
               if (e.key === 'Enter') handleFinishRenameDoc();
               else if (e.key === 'Escape') handleCancelRenameDoc();
             }}
-            className="w-full text-xs text-text-primary bg-bg-main px-1.5 py-0.5 border border-accent rounded outline-none shadow-xs"
+            className="w-full text-xs text-text-primary bg-bg-main px-1.5 py-0.5 border border-blue-500 rounded outline-none shadow-xs"
             autoFocus
             onClick={(e) => e.stopPropagation()}
             onFocus={(e) => e.target.select()}
@@ -249,7 +249,7 @@ function GroupTreeNode({
               type="text"
               value={renamingName}
               onChange={(e) => setRenamingName(e.target.value)}
-              className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+              className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-blue-500"
               autoFocus
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.target.select()}
@@ -369,7 +369,7 @@ function GroupTreeNode({
                   if (e.key === 'Enter') handleFinishCreateGroup();
                   else if (e.key === 'Escape') setCreatingParentId(undefined);
                 }}
-                className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+                className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-blue-500"
                 autoFocus
                 onFocus={(e) => e.target.select()}
               />
@@ -731,7 +731,7 @@ export default function CatalogPanel() {
             <div className="p-5 pb-3 flex justify-between items-center shrink-0">
               <div
                 onClick={() => navigate(backPath)}
-                className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5 cursor-pointer hover:text-accent transition-colors truncate max-w-[150px]"
+                className="text-[14px] font-semibold text-text-primary flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors truncate max-w-[150px]"
                 title={docId ? `返回 ${kb.name}` : '返回主页'}
               >
                 <ChevronLeft size={16} className="shrink-0" />
@@ -755,7 +755,7 @@ export default function CatalogPanel() {
             </div>
 
             {/* Search Current KB */}
-            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-bg-main border border-border-color rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0 cursor-text hover:border-accent transition-colors">
+            <div className="mx-4 mb-3 px-2.5 py-1.5 bg-bg-main border border-border-color rounded-md text-xs text-text-secondary flex items-center gap-1.5 shadow-sm shrink-0 cursor-text hover:border-blue-400 focus-within:border-blue-500 transition-colors">
               <Search size={14} /> 搜索当前知识库...
             </div>
 
@@ -822,7 +822,7 @@ export default function CatalogPanel() {
                       if (e.key === 'Enter') handleFinishCreateGroup();
                       else if (e.key === 'Escape') setCreatingParentId(undefined);
                     }}
-                    className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-accent"
+                    className="w-full text-xs font-semibold text-text-primary bg-bg-main px-2 py-1 border border-border-color rounded outline-none focus:border-blue-500"
                     autoFocus
                     onFocus={(e) => e.target.select()}
                   />
@@ -866,7 +866,7 @@ export default function CatalogPanel() {
         {/* Drag handle resize line */}
         <div
           onMouseDown={handleMouseDown}
-          className="absolute top-0 -right-[2px] w-[4px] h-full cursor-col-resize hover:bg-accent/40 active:bg-accent/80 transition-colors z-30"
+          className="absolute top-0 -right-[2px] w-[4px] h-full cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/80 transition-colors z-30"
         />
       </aside>
 

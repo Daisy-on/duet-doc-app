@@ -59,6 +59,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
 
   // Track currently selected sub-group for this KB instance
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
+  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
+  const [hoveredBreadcrumb, setHoveredBreadcrumb] = useState<string | null>(null);
 
   // Validate currentGroupId in case the group was deleted via CatalogPanel
   const activeGroupId =
@@ -71,7 +73,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
           <h2 className="text-lg font-bold text-text-primary mb-2">知识库不存在</h2>
           <button
             onClick={() => navigate('/')}
-            className="px-4 py-2 bg-accent hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
           >
             返回开始页
           </button>
@@ -141,7 +143,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
         </header>
 
         {/* Details Banner */}
-        <div className="px-10 py-10 border-b border-border-color bg-bg-main shrink-0">
+        <div className="px-10 pt-10 pb-4 bg-bg-main shrink-0">
           <div className="max-w-4xl mx-auto flex items-start gap-6">
             <div
               className="w-16 h-16 rounded-xl flex items-center justify-center shadow-sm shrink-0 transition-transform duration-300 hover:scale-105"
@@ -186,12 +188,21 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
               <div className="flex items-center gap-1 text-[13px] font-medium text-text-secondary select-none overflow-x-auto">
                 <div
                   onClick={() => setCurrentGroupId(null)}
+                  onMouseEnter={() => setHoveredBreadcrumb('root')}
+                  onMouseLeave={() => setHoveredBreadcrumb(null)}
                   className={`flex items-center gap-1.5 transition-all px-2.5 py-1.5 rounded-lg ${
                     !activeGroupId
                       ? 'border border-border-color shadow-sm text-text-primary'
-                      : 'hover:text-accent cursor-pointer hover:bg-gray-200/50'
+                      : 'cursor-pointer'
                   }`}
-                  style={!activeGroupId ? { backgroundColor: kbTint } : undefined}
+                  style={{
+                    backgroundColor: !activeGroupId
+                      ? kbTint
+                      : hoveredBreadcrumb === 'root'
+                        ? `${kbColor}18`
+                        : undefined,
+                    color: activeGroupId && hoveredBreadcrumb === 'root' ? kbColor : undefined,
+                  }}
                 >
                   <Folder size={14} style={{ color: kbColor }} />
                   <span className={!activeGroupId ? 'font-bold' : ''}>{kb.name}</span>
@@ -199,17 +210,23 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
 
                 {ancestors.map((ancestor, index) => {
                   const isLast = index === ancestors.length - 1;
+                  const isHovered = hoveredBreadcrumb === ancestor.id;
                   return (
                     <React.Fragment key={ancestor.id}>
                       <ChevronRight size={14} className="text-gray-300 mx-0.5 shrink-0" />
                       <div
                         onClick={!isLast ? () => setCurrentGroupId(ancestor.id) : undefined}
+                        onMouseEnter={!isLast ? () => setHoveredBreadcrumb(ancestor.id) : undefined}
+                        onMouseLeave={!isLast ? () => setHoveredBreadcrumb(null) : undefined}
                         className={`flex items-center gap-1.5 transition-all px-2.5 py-1.5 rounded-lg ${
                           isLast
                             ? 'border border-border-color shadow-sm text-text-primary'
-                            : 'hover:text-accent cursor-pointer hover:bg-gray-200/50'
+                            : 'cursor-pointer'
                         }`}
-                        style={isLast ? { backgroundColor: kbTint } : undefined}
+                        style={{
+                          backgroundColor: isLast ? kbTint : isHovered ? `${kbColor}18` : undefined,
+                          color: !isLast && isHovered ? kbColor : undefined,
+                        }}
                       >
                         <span className={`truncate max-w-[150px] ${isLast ? 'font-bold' : ''}`}>
                           {ancestor.name}
@@ -219,7 +236,7 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                   );
                 })}
               </div>
-              <div className="text-[11px] font-semibold text-text-secondary/70 uppercase tracking-wider bg-bg-main border border-border-color/60 px-2 py-1 rounded-md shadow-sm shrink-0">
+              <div className="text-[12px] font-semibold text-text-secondary/70 uppercase tracking-wider bg-bg-main border border-border-color/60 px-2 py-1 rounded-md shadow-sm shrink-0">
                 当前路径
               </div>
             </div>
@@ -236,12 +253,21 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                     const directSubGroupsCount = allGroups.filter(
                       (g) => g.parentGroupId === group.id,
                     ).length;
+                    const isHovered = hoveredGroupId === group.id;
 
                     return (
                       <div
                         key={group.id}
                         onClick={() => setCurrentGroupId(group.id)}
-                        className="bg-bg-main border border-border-color rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-accent hover:-translate-y-0.5 transition-all duration-200 group flex items-start gap-3.5"
+                        onMouseEnter={() => setHoveredGroupId(group.id)}
+                        onMouseLeave={() => setHoveredGroupId(null)}
+                        className="bg-bg-main border border-border-color rounded-xl p-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 group flex items-start gap-3.5"
+                        style={{
+                          borderColor: isHovered ? `${kbColor}70` : undefined,
+                          boxShadow: isHovered
+                            ? `0 0 16px ${kbColor}28, 0 4px 14px ${kbColor}18`
+                            : undefined,
+                        }}
                       >
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"
@@ -251,8 +277,9 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div
-                            className="text-[13px] font-bold text-text-primary group-hover:text-accent transition-colors truncate mb-1"
+                            className="text-[13px] font-bold text-text-primary transition-colors truncate mb-1"
                             title={group.name}
+                            style={{ color: isHovered ? kbColor : undefined }}
                           >
                             {group.name}
                           </div>
@@ -284,9 +311,9 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                 </p>
                 <button
                   onClick={handleCreateDocument}
-                  className="px-5 py-2.5 bg-accent hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-[13px] font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <FileText size={16} />
+                  <FileText size={14} />
                   <span>新建文档</span>
                 </button>
               </div>
@@ -298,7 +325,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                   {currentGroupId && (
                     <button
                       onClick={handleCreateDocument}
-                      className="text-xs font-semibold text-accent hover:text-indigo-700 flex items-center gap-1 cursor-pointer transition-colors"
+                      className="text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors hover:opacity-80"
+                      style={{ color: kbColor }}
                     >
                       <Plus size={14} /> 在此目录下新建文档
                     </button>
@@ -332,14 +360,21 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                               <div className="w-[22px] h-[22px] bg-hover-bg rounded-md flex items-center justify-center text-text-secondary">
                                 <FileText size={13} />
                               </div>
-                              <span className="hover:text-accent transition-colors truncate max-w-sm">
+                              <span className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-sm">
                                 {doc.title}
                               </span>
                             </div>
                           </td>
                           <td className="py-4 px-6 text-[13px] text-text-secondary">
                             {group ? (
-                              <span className="bg-indigo-50/80 dark:bg-indigo-950/80 text-accent border border-indigo-100 dark:border-indigo-900 px-2 py-0.5 rounded-md font-medium">
+                              <span
+                                className="border px-2 py-0.5 rounded-md font-medium text-[12px]"
+                                style={{
+                                  backgroundColor: `${kbColor}15`,
+                                  color: kbColor,
+                                  borderColor: `${kbColor}35`,
+                                }}
+                              >
                                 {group.name.replace(/^\d+\.\s*/, '')}
                               </span>
                             ) : (
@@ -362,7 +397,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                 当前目录下暂无直属文档。你可以点击
                 <span
                   onClick={handleCreateDocument}
-                  className="text-accent font-semibold cursor-pointer hover:underline mx-1"
+                  className="font-semibold cursor-pointer hover:underline mx-1"
+                  style={{ color: kbColor }}
                 >
                   新建文档
                 </span>

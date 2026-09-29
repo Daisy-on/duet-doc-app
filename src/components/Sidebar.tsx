@@ -243,7 +243,7 @@ export default function Sidebar() {
           className="text-text-secondary hover:text-text-primary p-0.5 hover:bg-hover-bg rounded transition-colors cursor-pointer flex font-medium"
           title="新建知识库"
         >
-          <Plus size={13} />
+          <Plus size={14} />
         </button>
       </div>
 
