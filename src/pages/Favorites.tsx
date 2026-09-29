@@ -15,6 +15,7 @@ import {
 import { useFavoritesStore, FOLDER_ALL_ID } from '../store/favoritesStore';
 import { useKnowledgeBaseStore, MEMO_KB_ID } from '../store/knowledgeBaseStore';
 import FavoriteItemMenu from '../components/modals/FavoriteItemMenu';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 
 // ── FolderCard (left panel item) ─────────────────────────────────────────────
 
@@ -45,10 +46,10 @@ function FolderCard({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all select-none ${
+      className={`flex items-center justify-between px-3 h-[38px] rounded-xl border cursor-pointer select-none transition-shadow duration-150 ${
         isSelected
           ? 'border-active-border bg-active-bg shadow-xs'
-          : 'border-transparent hover:border-border-color hover:bg-hover-bg'
+          : 'border-transparent hover:shadow-sm'
       }`}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -68,32 +69,34 @@ function FolderCard({
       </div>
 
       {/* Actions (rename / delete) — only on non-system folders when hovered */}
-      {!isSystem && hovered ? (
-        <div className="flex items-center gap-1 shrink-0 ml-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={onRename}
-            title="重命名"
-            className="p-0.5 text-text-secondary hover:text-text-primary rounded transition-colors cursor-pointer"
+      <div className="h-5 flex items-center justify-end shrink-0 ml-1">
+        {!isSystem && hovered ? (
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={onRename}
+              title="重命名"
+              className="p-1 text-text-secondary hover:text-text-primary rounded transition-colors cursor-pointer"
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={onDelete}
+              title="删除收藏夹"
+              className="p-1 text-text-secondary hover:text-red-500 rounded transition-colors cursor-pointer"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ) : (
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+              isSelected ? 'bg-active-border/40 text-active-fg' : 'bg-hover-bg text-text-secondary'
+            }`}
           >
-            <Pencil size={11} />
-          </button>
-          <button
-            onClick={onDelete}
-            title="删除收藏夹"
-            className="p-0.5 text-text-secondary hover:text-red-500 rounded transition-colors cursor-pointer"
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
-      ) : (
-        <span
-          className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-semibold ${
-            isSelected ? 'bg-active-border/40 text-active-fg' : 'bg-hover-bg text-text-secondary'
-          }`}
-        >
-          {count}
-        </span>
-      )}
+            {count}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -136,6 +139,7 @@ export default function Favorites() {
   const [editingName, setEditingName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
@@ -191,9 +195,11 @@ export default function Favorites() {
 
   // ── Folder delete ──────────────────────────────────────────────────────────
 
-  const handleDeleteFolder = (id: string) => {
-    deleteFolder(id);
-    if (selectedFolderId === id) setSelectedFolderId(FOLDER_ALL_ID);
+  const handleConfirmDeleteFolder = () => {
+    if (!folderToDelete) return;
+    deleteFolder(folderToDelete.id);
+    if (selectedFolderId === folderToDelete.id) setSelectedFolderId(FOLDER_ALL_ID);
+    setFolderToDelete(null);
   };
 
   // ── New folder create ──────────────────────────────────────────────────────
@@ -211,10 +217,10 @@ export default function Favorites() {
       {/* ── Left panel — folder list ────────────────────────────────────────── */}
       <aside className="w-[240px] min-w-[240px] bg-bg-panel border-r border-border-color flex flex-col h-full">
         {/* Panel header */}
-        <div className="px-5 py-4 shrink-0 border-b border-border-color">
+        <div className="h-[60px] flex items-center px-5 shrink-0">
           <h2 className="text-[14px] font-bold text-text-primary flex items-center gap-2">
             <Star size={15} className="text-yellow-400 fill-yellow-400" />
-            我的收藏
+            我的收藏夹
           </h2>
         </div>
 
@@ -235,7 +241,7 @@ export default function Favorites() {
           {/* Section label */}
           {userFolders.length > 0 && (
             <p className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider px-2 pt-3 pb-1">
-              我的分组
+              我的收藏夹
             </p>
           )}
 
@@ -267,7 +273,7 @@ export default function Favorites() {
                     onClick={() => setEditingFolderId(null)}
                     className="text-text-secondary cursor-pointer shrink-0"
                   >
-                    <X size={12} />
+                    <X size={13} />
                   </button>
                 </div>
               );
@@ -282,7 +288,7 @@ export default function Favorites() {
                 isSelected={selectedFolderId === folder.id}
                 onClick={() => setSelectedFolderId(folder.id)}
                 onRename={() => startRename(folder.id, folder.name)}
-                onDelete={() => handleDeleteFolder(folder.id)}
+                onDelete={() => setFolderToDelete({ id: folder.id, name: folder.name })}
               />
             );
           })}
@@ -301,7 +307,7 @@ export default function Favorites() {
                     setNewFolderName('');
                   }
                 }}
-                placeholder="输入分组名称"
+                placeholder="输入收藏夹名称"
                 className="flex-1 text-xs outline-none bg-transparent text-text-primary placeholder-text-ghost"
               />
               <button onClick={handleCreateFolder} className="text-accent cursor-pointer shrink-0">
@@ -314,7 +320,7 @@ export default function Favorites() {
                 }}
                 className="text-text-secondary cursor-pointer shrink-0"
               >
-                <X size={12} />
+                <X size={13} />
               </button>
             </div>
           ) : (
@@ -332,7 +338,7 @@ export default function Favorites() {
       {/* ── Right panel — document list ────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0 bg-bg-main">
         {/* Header */}
-        <header className="h-[60px] border-b border-border-color flex items-center px-6 shrink-0 bg-bg-main gap-3">
+        <header className="h-[60px] flex items-center px-6 shrink-0 bg-bg-main gap-3">
           <Star size={16} className="text-yellow-400 fill-yellow-400 shrink-0" />
           <h1 className="text-[15px] font-bold text-text-primary truncate">
             {folders.find((f) => f.id === selectedFolderId)?.name ?? '收藏'}
@@ -347,9 +353,9 @@ export default function Favorites() {
           {selectedItems.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="max-w-4xl mx-auto px-6 py-5">
+            <div className="max-w-5xl mx-auto px-8 py-6">
               {/* Table header */}
-              <div className="grid grid-cols-[1fr_180px_130px_36px] gap-4 px-4 py-2 text-[11px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-color mb-1">
+              <div className="grid grid-cols-[1fr_220px_160px_44px] gap-4 px-5 py-3 text-sm font-semibold text-text-secondary border-b border-border-color mb-1.5">
                 <span>名称</span>
                 <span>归属知识库</span>
                 <span>收藏时间</span>
@@ -365,10 +371,10 @@ export default function Favorites() {
                   return (
                     <div
                       key={item.id}
-                      className="grid grid-cols-[1fr_180px_130px_36px] gap-4 px-4 py-3 rounded-xl text-xs text-text-ghost italic items-center"
+                      className="grid grid-cols-[1fr_220px_160px_44px] gap-4 px-5 py-3.5 rounded-xl text-sm text-text-ghost italic items-center"
                     >
-                      <span className="flex items-center gap-2">
-                        <FileText size={14} className="text-gray-300 shrink-0" />
+                      <span className="flex items-center gap-3">
+                        <FileText size={16} className="text-gray-300 shrink-0" />
                         文档已删除
                       </span>
                       <span>—</span>
@@ -380,9 +386,9 @@ export default function Favorites() {
                             removeFavorite(item.docId);
                           }}
                           title="移除收藏"
-                          className="p-1 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors cursor-pointer"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </div>
@@ -395,31 +401,31 @@ export default function Favorites() {
                   <div
                     key={item.id}
                     onClick={() => handleDocClick(item.docId)}
-                    className="w-full grid grid-cols-[1fr_180px_130px_36px] gap-4 px-4 py-3 rounded-xl hover:bg-hover-bg transition-colors group text-left cursor-pointer items-center"
+                    className="w-full grid grid-cols-[1fr_220px_160px_44px] gap-4 px-5 py-3.5 rounded-xl hover:bg-hover-bg transition-colors group text-left cursor-pointer items-center"
                   >
                     {/* Title */}
-                    <span className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex items-center gap-3 min-w-0">
                       <FileText
-                        size={14}
+                        size={16}
                         className="text-accent shrink-0 group-hover:text-indigo-600 transition-colors"
                       />
-                      <span className="text-xs font-medium text-text-primary truncate group-hover:text-accent transition-colors">
+                      <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent transition-colors">
                         {doc.title}
                       </span>
                       <ArrowUpRight
-                        size={12}
+                        size={14}
                         className="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                       />
                     </span>
 
                     {/* KB / Group breadcrumb */}
-                    <span className="text-xs text-text-secondary truncate">
+                    <span className="text-sm text-text-secondary truncate">
                       {kb?.name ?? '—'}
                       {group ? ` / ${group.name}` : ''}
                     </span>
 
                     {/* Favorited time */}
-                    <span className="text-xs text-text-secondary">
+                    <span className="text-sm text-text-secondary">
                       {formatTime(item.favoritedAt, now)}
                     </span>
 
@@ -431,13 +437,13 @@ export default function Favorites() {
                           setActiveDocId(item.docId);
                           setMenuAnchorEl(e.currentTarget);
                         }}
-                        className={`p-1 rounded-lg hover:bg-gray-200 text-text-secondary hover:text-text-primary transition-colors cursor-pointer ${
+                        className={`p-1.5 rounded-lg hover:bg-gray-200 text-text-secondary hover:text-text-primary transition-colors cursor-pointer ${
                           activeDocId === item.docId
                             ? 'opacity-100 bg-gray-200'
                             : 'opacity-0 group-hover:opacity-100'
                         }`}
                       >
-                        <MoreHorizontal size={14} />
+                        <MoreHorizontal size={16} />
                       </button>
                     </div>
                   </div>
@@ -461,6 +467,25 @@ export default function Favorites() {
           anchorEl={menuAnchorEl}
         />
       )}
+
+      {/* Folder delete confirmation modal */}
+      <ConfirmDeleteModal
+        isOpen={folderToDelete !== null}
+        onClose={() => setFolderToDelete(null)}
+        onConfirm={handleConfirmDeleteFolder}
+        title="删除收藏夹"
+        description={
+          folderToDelete ? (
+            <span>
+              确定要删除收藏夹
+              <strong className="text-text-primary mx-1">“{folderToDelete.name}”</strong>
+              吗？该操作不可撤销，收藏夹内的文档仍将保留在“全部收藏”中。
+            </span>
+          ) : (
+            ''
+          )
+        }
+      />
     </div>
   );
 }
