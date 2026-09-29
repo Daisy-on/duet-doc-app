@@ -1037,7 +1037,9 @@ export default function AIWriting() {
                                     <div
                                       className="markdown-body assistant-answer text-[15px] text-text-primary leading-relaxed"
                                       dangerouslySetInnerHTML={{
-                                        __html: renderMarkdownToHtml(msg.content),
+                                        __html: renderMarkdownToHtml(msg.content, {
+                                          isStreaming: msg.status === 'streaming',
+                                        }),
                                       }}
                                     />
                                     {msg.status === 'streaming' && msg.content && (
