@@ -14,7 +14,9 @@ import {
   Square,
   Check,
   Cloud,
+  ChevronDown,
 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import LottieComponent, { type LottieComponentProps } from 'lottie-react';
 import moonAnimation from '../assets/Moon.json';
 
@@ -124,6 +126,38 @@ export default function AIWriting() {
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMsgCountRef = useRef(0);
   const lastSessionIdRef = useRef<string | null>(null);
+  const isAutoScrollActiveRef = useRef(true);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  // TanStack Virtualizer configuration for long chat sessions
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: sessionMessages.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 140,
+    overscan: 5,
+    gap: 32,
+    paddingStart: 24,
+    paddingEnd: 32,
+    getItemKey: (index) => sessionMessages[index]?.id ?? index,
+  });
+
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      isAutoScrollActiveRef.current = true;
+      setShowScrollBottom(false);
+      if (!scrollRef.current) return;
+      if (sessionMessages.length > 0) {
+        rowVirtualizer.scrollToIndex(sessionMessages.length - 1, {
+          align: 'end',
+          behavior,
+        });
+      } else {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    },
+    [sessionMessages.length, rowVirtualizer],
+  );
 
   // Citation interaction states
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
@@ -192,6 +226,8 @@ export default function AIWriting() {
   const handleRegenerateResponse = useCallback(
     (msgId: string) => {
       setLiveThinkingSeconds(0);
+      isAutoScrollActiveRef.current = true;
+      setShowScrollBottom(false);
       regenerateResponse(msgId);
     },
     [regenerateResponse],
@@ -258,6 +294,8 @@ export default function AIWriting() {
       setEditingContent('');
     }
     setActiveCitation(null);
+    setShowScrollBottom(false);
+    isAutoScrollActiveRef.current = true;
   }
 
   useEffect(() => {
@@ -279,10 +317,18 @@ export default function AIWriting() {
     lastSessionIdRef.current = currentSessionId || null;
     lastMsgCountRef.current = sessionMessages.length;
 
-    if (isNewSession || isNewMsgAdded || isGenerating) {
+    if (isNewSession || isNewMsgAdded) {
+      isAutoScrollActiveRef.current = true;
+      setShowScrollBottom(false);
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      });
+    } else if (isGenerating && isAutoScrollActiveRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [currentSessionId, sessionMessages.length, isGenerating]);
+  }, [currentSessionId, sessionMessages, isGenerating]);
 
   // Auto-resize textarea height (min 2 lines ~52px, max 10 lines ~220px)
   useEffect(() => {
@@ -388,6 +434,8 @@ export default function AIWriting() {
     setReferencedDocs([]);
     setAttachedFiles([]);
     setLiveThinkingSeconds(0);
+    isAutoScrollActiveRef.current = true;
+    setShowScrollBottom(false);
 
     await sendChatMessage(textToSend, payloadDocs, targetSessionId);
   };
@@ -405,6 +453,8 @@ export default function AIWriting() {
     if (!question) return;
     setInputText(question.content);
     setReferencedDocs(question.referencedDocs ?? []);
+    isAutoScrollActiveRef.current = true;
+    setShowScrollBottom(false);
     textareaRef.current?.focus();
   };
 
@@ -631,7 +681,13 @@ export default function AIWriting() {
     if (activeCitation) {
       setActiveCitation(null);
     }
-  }, [activeCitation, clearCitationTimers]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isNearBottom = distanceFromBottom < 100;
+    isAutoScrollActiveRef.current = isNearBottom;
+    setShowScrollBottom(!isNearBottom && sessionMessages.length > 3);
+  }, [activeCitation, clearCitationTimers, sessionMessages.length]);
 
   const handleCardMouseEnter = useCallback((msgId: string, index: number) => {
     const msgEl = document.querySelector(`[data-message-id="${msgId}"]`);
@@ -853,7 +909,7 @@ export default function AIWriting() {
             style={{ scrollbarGutter: 'stable' }}
           >
             {/* Messages Stream */}
-            <div className="flex-1 py-6">
+            <div className="flex-1 flex flex-col min-h-0">
               {sessionMessages.length === 0 ? (
                 <div className="max-w-3xl mx-auto pt-8 flex flex-col items-center">
                   <div className="w-28 h-28 mb-3 flex items-center justify-center select-none">
@@ -886,44 +942,69 @@ export default function AIWriting() {
                   </div>
                 </div>
               ) : (
-                <div className="max-w-3xl mx-auto flex flex-col space-y-8">
-                  {sessionMessages.map((msg) => (
-                    <ChatMessageItem
-                      key={msg.id}
-                      msg={msg}
-                      isUser={msg.role === 'user'}
-                      isLastUser={msg.role === 'user' && msg.id === lastUserMsgId}
-                      isLastAssistant={msg.role !== 'user' && msg.id === lastAssistantMsgId}
-                      isEditing={msg.role === 'user' && editingMessageId === msg.id}
-                      isExpanded={expandedThinking[msg.id] !== false}
-                      isGenerating={isGenerating}
-                      isCopied={copiedMsgId === msg.id}
-                      isSourcesOpen={activeSourcesMsgId === msg.id && isSourcesDrawerOpen}
-                      liveThinkingSeconds={liveThinkingSeconds}
-                      editingContent={editingContent}
-                      isCancelingEdit={isCancelingEdit}
-                      editingTextareaRef={editingTextareaRef}
-                      onToggleThinkingNode={toggleThinkingNode}
-                      onNavigateToLocalRetrieval={handleNavigateToLocalRetrieval}
-                      onRetryQuestion={handleRetryQuestion}
-                      onRegenerateResponse={handleRegenerateResponse}
-                      onCopyText={handleCopyText}
-                      onOpenDocChooser={handleOpenDocChooser}
-                      onSaveToMemo={handleSaveToMemo}
-                      onToggleSourcesDrawer={handleToggleSourcesDrawer}
-                      onStartEdit={handleStartEdit}
-                      onCancelEdit={handleCancelEdit}
-                      onSaveAndResend={handleSaveAndResend}
-                      onEditingChange={setEditingContent}
-                      onEditingKeyDown={handleEditingKeyDown}
-                    />
-                  ))}
+                <div className="max-w-3xl mx-auto w-full relative">
+                  <div
+                    style={{
+                      height: `${rowVirtualizer.getTotalSize()}px`,
+                      width: '100%',
+                      position: 'relative',
+                    }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const msg = sessionMessages[virtualRow.index];
+                      if (!msg) return null;
+                      return (
+                        <div
+                          key={virtualRow.key}
+                          data-index={virtualRow.index}
+                          ref={rowVirtualizer.measureElement}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <ChatMessageItem
+                            key={msg.id}
+                            msg={msg}
+                            isUser={msg.role === 'user'}
+                            isLastUser={msg.role === 'user' && msg.id === lastUserMsgId}
+                            isLastAssistant={msg.role !== 'user' && msg.id === lastAssistantMsgId}
+                            isEditing={msg.role === 'user' && editingMessageId === msg.id}
+                            isExpanded={expandedThinking[msg.id] !== false}
+                            isGenerating={isGenerating}
+                            isCopied={copiedMsgId === msg.id}
+                            isSourcesOpen={activeSourcesMsgId === msg.id && isSourcesDrawerOpen}
+                            liveThinkingSeconds={liveThinkingSeconds}
+                            editingContent={editingContent}
+                            isCancelingEdit={isCancelingEdit}
+                            editingTextareaRef={editingTextareaRef}
+                            onToggleThinkingNode={toggleThinkingNode}
+                            onNavigateToLocalRetrieval={handleNavigateToLocalRetrieval}
+                            onRetryQuestion={handleRetryQuestion}
+                            onRegenerateResponse={handleRegenerateResponse}
+                            onCopyText={handleCopyText}
+                            onOpenDocChooser={handleOpenDocChooser}
+                            onSaveToMemo={handleSaveToMemo}
+                            onToggleSourcesDrawer={handleToggleSourcesDrawer}
+                            onStartEdit={handleStartEdit}
+                            onCancelEdit={handleCancelEdit}
+                            onSaveAndResend={handleSaveAndResend}
+                            onEditingChange={setEditingContent}
+                            onEditingKeyDown={handleEditingKeyDown}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
 
                   {/* 仅在初始化等待连接时展示动画 */}
                   {isGenerating &&
                     sessionMessages.length > 0 &&
                     sessionMessages[sessionMessages.length - 1]?.role === 'user' && (
-                      <div className="flex items-center gap-2 py-1 text-[13px] text-text-secondary">
+                      <div className="flex items-center gap-2 py-3 text-[13px] text-text-secondary">
                         <Loader2 size={14} className="animate-spin text-accent" />
                         <span>正在思考并撰写内容...</span>
                       </div>
@@ -931,141 +1012,157 @@ export default function AIWriting() {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Bottom Input Area (Sticky at bottom of scroll container) */}
-            <div className="sticky bottom-0 pb-4 pt-0 bg-bg-main/80 backdrop-blur-md -mx-4 md:-mx-6 px-4 md:px-6 z-20 shrink-0">
-              {/* Bottom Progressive Blur & Gradient Transition (between Document Stream and Input Area) */}
-              <div className="absolute -top-8 left-0 right-0 h-8 chat-scroll-fade-bottom" />
-              <div className="max-w-3xl mx-auto flex flex-col gap-2 relative">
-                {/* Attachment badges above input */}
-                {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
-                    {referencedDocs.map((doc) => (
-                      <span
-                        key={doc.id}
-                        className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-accent px-2.5 py-1 rounded-lg text-xs font-semibold"
+          {/* Bottom Input Area (Fixed at bottom of screen, NEVER scrolls with messages) */}
+          <div className="relative pb-4 pt-0 bg-bg-main/80 backdrop-blur-md px-4 md:px-6 z-20 shrink-0">
+            {/* Bottom Progressive Blur & Gradient Transition (between Document Stream and Input Area) */}
+            <div className="absolute -top-8 left-0 right-0 h-8 pointer-events-none chat-scroll-fade-bottom" />
+            <div className="max-w-3xl mx-auto flex flex-col gap-2 relative">
+              {/* Attachment badges above input */}
+              {(referencedDocs.length > 0 || attachedFiles.length > 0) && (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-bg-panel border border-border-color/60 rounded-xl mb-1.5 animate-dropdown-fade-in">
+                  {referencedDocs.map((doc) => (
+                    <span
+                      key={doc.id}
+                      className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-accent px-2.5 py-1 rounded-lg text-xs font-semibold"
+                    >
+                      <FileText size={12} />
+                      <span className="truncate max-w-[120px]">{doc.title}</span>
+                      <button
+                        onClick={() => removeReferencedDoc(doc.id)}
+                        className="text-indigo-400 hover:text-accent p-0.5 rounded transition-colors"
                       >
-                        <FileText size={12} />
-                        <span className="truncate max-w-[120px]">{doc.title}</span>
-                        <button
-                          onClick={() => removeReferencedDoc(doc.id)}
-                          className="text-indigo-400 hover:text-accent p-0.5 rounded transition-colors"
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                    {attachedFiles.map((file) => (
-                      <span
-                        key={file}
-                        className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-600 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  {attachedFiles.map((file) => (
+                    <span
+                      key={file}
+                      className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-600 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                    >
+                      <FileUp size={12} />
+                      <span className="truncate max-w-[120px]">{file}</span>
+                      <button
+                        onClick={() => removeAttachedFile(file)}
+                        className="text-emerald-400 hover:text-emerald-600 p-0.5 rounded transition-colors"
                       >
-                        <FileUp size={12} />
-                        <span className="truncate max-w-[120px]">{file}</span>
-                        <button
-                          onClick={() => removeAttachedFile(file)}
-                          className="text-emerald-400 hover:text-emerald-600 p-0.5 rounded transition-colors"
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
-                {/* Main Textarea Container (Kimi Unified Style) */}
-                <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={
-                      currentSessionId
-                        ? '与 Duet 助手对话，输入并发送...'
-                        : '与 Duet 助手开启新对话...'
-                    }
-                    className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
-                    style={{ minHeight: '52px' }}
-                  />
+              {/* Main Textarea Container (Kimi Unified Style) */}
+              <div className="border border-border-color focus-within:border-accent bg-bg-main rounded-2xl md:rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.035)] transition-all overflow-hidden flex flex-col p-2 gap-2">
+                <textarea
+                  ref={textareaRef}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    currentSessionId
+                      ? '与 Duet 助手对话，输入并发送...'
+                      : '与 Duet 助手开启新对话...'
+                  }
+                  className="w-full resize-none bg-transparent px-1 py-1 outline-none text-sm text-text-primary placeholder-text-secondary font-sans leading-relaxed border-none overflow-y-auto max-h-[220px]"
+                  style={{ minHeight: '52px' }}
+                />
 
-                  {/* Input Toolbar (Unified 0px inner padding for exact symmetric margins) */}
-                  <div className="p-0 bg-transparent flex justify-between items-center shrink-0">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2.5">
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            setAttachMenuAnchorEl(e.currentTarget);
-                            setIsAttachMenuOpen(!isAttachMenuOpen);
-                          }}
-                          className="w-8.5 h-8.5 rounded-full hover:bg-hover-bg text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
-                          title="引用知识库文档"
-                        >
-                          <Plus size={18} />
-                        </button>
-                      </div>
-
-                      {/* Thinking toggle (Pill shape) */}
+                {/* Input Toolbar (Unified 0px inner padding for exact symmetric margins) */}
+                <div className="p-0 bg-transparent flex justify-between items-center shrink-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2.5">
+                    <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
-                        className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
-                          isThinkingEnabled
-                            ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-accent font-semibold'
-                            : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
-                        }`}
-                        title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
+                        onClick={(e) => {
+                          setAttachMenuAnchorEl(e.currentTarget);
+                          setIsAttachMenuOpen(!isAttachMenuOpen);
+                        }}
+                        className="w-8.5 h-8.5 rounded-full hover:bg-hover-bg text-text-secondary hover:text-text-primary flex items-center justify-center transition-all cursor-pointer"
+                        title="引用知识库文档"
                       >
-                        <BrainCircuit
-                          size={13}
-                          className={isThinkingEnabled ? 'animate-pulse' : ''}
-                        />
-                        <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
+                        <Plus size={18} />
                       </button>
-                      {hasLocalEmbeddingModel === false && (
-                        <label
-                          className="inline-flex h-8 items-center gap-1.5 text-xs text-text-secondary"
-                          title="开启后，仅在助手需要检索时调用云端 BGE 生成查询向量；不会自动建立索引"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={allowCloudQuery}
-                            onChange={(event) => setAllowCloudQuery(event.target.checked)}
-                            disabled={isGenerating}
-                          />
-                          <Cloud size={13} />
-                          <span className="sm:hidden">云检索（付费）</span>
-                          <span className="hidden sm:inline">云端检索（按次计费）</span>
-                        </label>
-                      )}
                     </div>
 
-                    {/* Send or Stop Button (Circular) */}
-                    {isGenerating ? (
-                      <button
-                        type="button"
-                        onClick={stopGeneration}
-                        className="w-8.5 h-8.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
-                        title="停止生成"
+                    {/* Thinking toggle (Pill shape) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
+                      className={`h-8 px-3 rounded-full border flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer ${
+                        isThinkingEnabled
+                          ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-accent font-semibold'
+                          : 'bg-bg-main border-border-color/80 text-text-secondary hover:bg-hover-bg'
+                      }`}
+                      title="切换 DeepSeek V4-Pro (深度思考) / V4 (标准模式)"
+                    >
+                      <BrainCircuit
+                        size={13}
+                        className={isThinkingEnabled ? 'animate-pulse' : ''}
+                      />
+                      <span>{isThinkingEnabled ? '深度思考 (V4-Pro)' : '标准模式 (V4)'}</span>
+                    </button>
+                    {hasLocalEmbeddingModel === false && (
+                      <label
+                        className="inline-flex h-8 items-center gap-1.5 text-xs text-text-secondary"
+                        title="开启后，仅在助手需要检索时调用云端 BGE 生成查询向量；不会自动建立索引"
                       >
-                        <Square size={12} className="fill-current" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSend}
-                        className="w-8.5 h-8.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
-                        title="发送消息"
-                      >
-                        <Send size={14} />
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={allowCloudQuery}
+                          onChange={(event) => setAllowCloudQuery(event.target.checked)}
+                          disabled={isGenerating}
+                        />
+                        <Cloud size={13} />
+                        <span className="sm:hidden">云检索（付费）</span>
+                        <span className="hidden sm:inline">云端检索（按次计费）</span>
+                      </label>
                     )}
                   </div>
+
+                  {/* Send or Stop Button (Circular) */}
+                  {isGenerating ? (
+                    <button
+                      type="button"
+                      onClick={stopGeneration}
+                      className="w-8.5 h-8.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                      title="停止生成"
+                    >
+                      <Square size={12} className="fill-current" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSend}
+                      className="w-8.5 h-8.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                      title="发送消息"
+                    >
+                      <Send size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Floating Scroll to Bottom Button */}
+          {showScrollBottom && (
+            <button
+              type="button"
+              onClick={() => scrollToBottom('smooth')}
+              className="absolute bottom-28 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-main/90 border border-border-color shadow-lg text-text-secondary hover:text-text-primary hover:border-accent/40 text-xs font-medium transition-all animate-dropdown-fade-in cursor-pointer backdrop-blur-md"
+              title="回到底部"
+            >
+              <ChevronDown size={14} />
+              <span>回到底部</span>
+              {isGenerating && (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping ml-0.5" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Right Sources Drawer */}
