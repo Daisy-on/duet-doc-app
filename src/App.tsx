@@ -9,6 +9,8 @@ import { useFavoritesStore } from './store/favoritesStore';
 import { useKnowledgeBaseStore } from './store/knowledgeBaseStore';
 import { useThemeStore } from './store/themeStore';
 
+import DocHistorySkeleton from './components/DocHistorySkeleton';
+
 const KnowledgeBaseHome = lazy(() => import('./pages/KnowledgeBaseHome'));
 const DocEdit = lazy(() => import('./pages/DocEdit'));
 const AIWriting = lazy(() => import('./pages/AIWriting'));
@@ -28,8 +30,8 @@ function RouteLoadingFallback() {
   );
 }
 
-function lazyRoute(element: ReactNode) {
-  return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
+function lazyRoute(element: ReactNode, fallback?: ReactNode) {
+  return <Suspense fallback={fallback || <RouteLoadingFallback />}>{element}</Suspense>;
 }
 
 function DataGuard() {
@@ -104,7 +106,10 @@ function App() {
               <Route path="memo/:memoId" element={lazyRoute(<MemoEdit />)} />
               <Route path="favorites" element={lazyRoute(<Favorites />)} />
             </Route>
-            <Route path="kb/:kbId/doc/:docId/history" element={lazyRoute(<DocHistory />)} />
+            <Route
+              path="kb/:kbId/doc/:docId/history"
+              element={lazyRoute(<DocHistory />, <DocHistorySkeleton />)}
+            />
             <Route path="dev/embedding-benchmark" element={lazyRoute(<EmbeddingBenchmark />)} />
             <Route path="dev/local-retrieval" element={lazyRoute(<LocalRetrievalSandbox />)} />
           </Route>

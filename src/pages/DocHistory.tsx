@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, History, Check } from 'lucide-react';
+import { ArrowLeft, Clock, History, Check, ChevronDown } from 'lucide-react';
 import { db, type DocumentVersion } from '../db';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { diffLines, jsonToLines, type DiffResult } from '../utils/diff';
+import DocHistorySkeleton from '../components/DocHistorySkeleton';
 
 export default function DocHistory() {
   const { kbId, docId } = useParams<{ kbId: string; docId: string }>();
@@ -18,6 +19,8 @@ export default function DocHistory() {
   const [compareId, setCompareId] = useState<string>(''); // Right panel (selected from dropdown)
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Split Panel Resize States
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +88,27 @@ export default function DocHistory() {
   const handleSelect = (vId: string) => {
     setSelectedId(vId);
   };
+
+  // Close comparison version dropdown on outside click or Escape
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isDropdownOpen]);
 
   // Run diffing when comparison targets change
   const diffResults = useMemo(() => {
@@ -172,6 +196,10 @@ export default function DocHistory() {
     }
   };
 
+  if (loading) {
+    return <DocHistorySkeleton />;
+  }
+
   if (!doc) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-bg-main text-text-primary">
@@ -249,7 +277,7 @@ export default function DocHistory() {
             </p>
           </div>
           <div className="ml-4 flex items-center gap-2">
-            <span className="bg-indigo-50 dark:bg-indigo-950 px-2.5 py-1 rounded text-xs text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-100 dark:border-indigo-800 flex items-center gap-1.5 shrink-0">
+            <span className="bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md text-xs text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/80 dark:border-blue-800/60 flex items-center gap-1.5 shrink-0">
               <History size={13} />
               对比视图
             </span>
@@ -257,26 +285,69 @@ export default function DocHistory() {
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
-          {/* Select comparison version dropdown */}
-          <div className="flex items-center gap-2 text-xs text-text-secondary overflow-x-auto whitespace-nowrap">
-            <span>当前选中版本与</span>
-            <select
-              value={compareId}
-              onChange={(e) => setCompareId(e.target.value)}
-              className="bg-bg-main border border-border-color rounded px-2.5 py-1 outline-none text-text-primary cursor-pointer focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors text-xs font-medium"
-            >
-              {versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {formatTime(v.createdAt)} (
-                  {v.saveType === 'auto'
-                    ? '自动保存'
-                    : v.saveType === 'manual'
-                      ? '手动保存'
-                      : '已发布'}
-                  )
-                </option>
-              ))}
-            </select>
+          {/* Select comparison version custom dropdown */}
+          <div className="flex items-center gap-2 text-xs text-text-secondary whitespace-nowrap">
+            <span>将当前选中版本与</span>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
+                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer bg-bg-main shadow-2xs ${
+                  isDropdownOpen
+                    ? 'border-blue-500 ring-2 ring-blue-500/20 text-text-primary'
+                    : 'border-border-color hover:border-text-secondary/50 text-text-primary hover:bg-hover-bg/60'
+                }`}
+                aria-haspopup="listbox"
+                aria-expanded={isDropdownOpen}
+              >
+                <Clock size={12} className="text-text-secondary shrink-0" />
+                <span>{rightVer ? formatTime(rightVer.createdAt) : '选择版本'}</span>
+                {rightVer && getTag(rightVer.saveType)}
+                <ChevronDown
+                  size={13}
+                  className={`text-text-secondary transition-transform duration-200 shrink-0 ${
+                    isDropdownOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+                  }`}
+                />
+              </button>
+
+              {/* Modern Dropdown Popover Menu */}
+              {isDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1.5 z-50 w-full bg-bg-main border border-border-color rounded-xl shadow-xl py-1 animate-dropdown-fade-in max-h-72 overflow-y-auto custom-scrollbar">
+                  <div className="px-2.5 py-1 text-[11px] font-semibold text-text-secondary/70 uppercase tracking-wider select-none border-b border-border-color/40 mb-1">
+                    选择对比版本 ({versions.length})
+                  </div>
+                  {versions.map((v) => {
+                    const isSelected = v.id === compareId;
+                    return (
+                      <div
+                        key={v.id}
+                        onClick={() => {
+                          setCompareId(v.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between px-2.5 py-1.5 mx-1 rounded-lg text-xs cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50/90 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                            : 'text-text-primary hover:bg-hover-bg'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Clock
+                            size={12}
+                            className={
+                              isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-text-ghost'
+                            }
+                          />
+                          <span className="truncate">{formatTime(v.createdAt)}</span>
+                        </div>
+                        <div className="shrink-0">{getTag(v.saveType)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <span>对比</span>
           </div>
 
@@ -296,10 +367,10 @@ export default function DocHistory() {
           <button
             onClick={handleRestore}
             disabled={!selectedId || restoring}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer text-white ${
+            className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer text-white ${
               !selectedId || restoring
                 ? 'bg-border-color text-text-ghost cursor-not-allowed shadow-none'
-                : 'bg-green-700 hover:bg-green-600 hover:shadow'
+                : 'bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 hover:shadow'
             }`}
           >
             {restoring ? '正在恢复...' : '恢复此记录'}
@@ -311,18 +382,6 @@ export default function DocHistory() {
       <div className="flex-1 flex overflow-hidden">
         {/* 1. Left Sidebar - Checklist of history snapshots (Narrowed to 240px) */}
         <aside className="w-[240px] border-r border-border-color bg-bg-sidebar flex flex-col shrink-0">
-          <div className="p-3 border-b border-border-color bg-bg-sidebar text-[11px] text-text-secondary space-y-1">
-            <label className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-hover-bg transition-colors">
-              <input
-                type="checkbox"
-                checked={true}
-                readOnly
-                className="accent-indigo-600 rounded"
-              />
-              <span>显示所有本地存储版本</span>
-            </label>
-          </div>
-
           {/* Scrollable list */}
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1.5">
             {loading ? (
@@ -338,8 +397,8 @@ export default function DocHistory() {
                     onClick={() => handleSelect(v.id)}
                     className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col gap-2 ${
                       active
-                        ? 'bg-indigo-50/60 dark:bg-indigo-950/60 border-indigo-400 text-indigo-900 dark:text-indigo-200 shadow-sm'
-                        : 'bg-bg-main border-transparent text-text-primary hover:bg-hover-bg hover:border-border-color shadow-sm'
+                        ? 'bg-blue-50/70 dark:bg-blue-950/50 border-blue-400/80 dark:border-blue-600/80 text-blue-950 dark:text-blue-200 shadow-xs'
+                        : 'bg-bg-main border-border-color/40 text-text-primary hover:bg-hover-bg hover:border-border-color shadow-xs'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -347,7 +406,7 @@ export default function DocHistory() {
                         <Clock
                           size={12}
                           className={
-                            active ? 'text-indigo-600 dark:text-indigo-400' : 'text-text-ghost'
+                            active ? 'text-blue-600 dark:text-blue-400' : 'text-text-ghost'
                           }
                         />
                         <span>{formatTime(v.createdAt)}</span>
@@ -357,10 +416,7 @@ export default function DocHistory() {
                     <div className="text-[11px] text-text-secondary truncate flex items-center justify-between">
                       <span className="truncate">修改者: Daisy</span>
                       {active && (
-                        <Check
-                          size={12}
-                          className="text-indigo-600 dark:text-indigo-400 shrink-0"
-                        />
+                        <Check size={12} className="text-blue-600 dark:text-blue-400 shrink-0" />
                       )}
                     </div>
                   </div>
@@ -392,13 +448,13 @@ export default function DocHistory() {
                 <div
                   ref={leftScrollRef}
                   onScroll={() => handleScroll('left')}
-                  className="border-r border-border-color overflow-auto custom-scrollbar bg-bg-sidebar/50 flex flex-col font-mono text-[13px] leading-relaxed select-text"
-                  style={{ width: `${splitPercent}%`, flexGrow: 0, flexShrink: 0 }}
+                  className="overflow-auto custom-scrollbar bg-bg-sidebar/50 flex flex-col font-mono text-[13px] leading-relaxed select-text min-w-0"
+                  style={{ width: `calc(${splitPercent}% - 2px)`, flexShrink: 0 }}
                 >
                   {/* Version Sticky Header (Source) */}
                   <div className="sticky top-0 z-10 bg-bg-sidebar/90 backdrop-blur-sm border-b border-border-color px-4 py-2.5 flex items-center justify-between text-xs text-text-secondary font-sans select-none shrink-0">
                     <div className="flex items-center gap-1.5 font-medium">
-                      <Clock size={12} className="text-indigo-600 dark:text-indigo-400" />
+                      <Clock size={12} className="text-blue-600 dark:text-blue-400" />
                       <span>源版本: {leftVer ? formatTime(leftVer.createdAt) : '无'}</span>
                     </div>
                     {leftVer && getTag(leftVer.saveType)}
@@ -443,7 +499,7 @@ export default function DocHistory() {
                 {/* Draggable Resizer Divider (拉风箱样式边界调整) */}
                 <div
                   onMouseDown={handleMouseDown}
-                  className="w-1 bg-border-color hover:bg-indigo-500 cursor-col-resize select-none shrink-0 transition-colors z-20 flex items-center justify-center group relative"
+                  className="w-1 bg-border-color hover:bg-blue-500 cursor-col-resize select-none shrink-0 transition-colors z-20 flex items-center justify-center group relative"
                   title="拖动调整分栏大小"
                 >
                   <div className="absolute w-3 h-full cursor-col-resize" />
@@ -454,8 +510,7 @@ export default function DocHistory() {
                 <div
                   ref={rightScrollRef}
                   onScroll={() => handleScroll('right')}
-                  className="overflow-auto custom-scrollbar bg-bg-main flex flex-col font-mono text-[13px] leading-relaxed select-text"
-                  style={{ width: `${100 - splitPercent}%`, flexGrow: 0, flexShrink: 0 }}
+                  className="flex-1 overflow-auto custom-scrollbar bg-bg-main flex flex-col font-mono text-[13px] leading-relaxed select-text min-w-0"
                 >
                   {/* Version Sticky Header (Target) */}
                   <div className="sticky top-0 z-10 bg-bg-main/90 backdrop-blur-sm border-b border-border-color px-4 py-2.5 flex items-center justify-between text-xs text-text-secondary font-sans select-none shrink-0">
