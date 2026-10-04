@@ -79,83 +79,89 @@ export default function SyncStatusPopover({
           maxWidth: '300px',
           width: 'max-content',
         }}
-        className="z-50 bg-bg-main border border-border-color/80 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.08)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.35)] p-3.5 animate-dropdown-fade-in flex flex-col gap-2"
+        className="z-50 bg-bg-main border border-border-color/80 rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.08)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.35)] p-3 animate-dropdown-fade-in flex flex-col gap-2.5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 whitespace-nowrap">
-          <div
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-              syncStatus === 'offline'
-                ? 'bg-gray-100 text-text-secondary dark:bg-gray-800'
-                : conflictsCount > 0 || errorCount > 0 || syncStatus === 'error'
-                  ? 'bg-red-50 text-red-500 dark:bg-red-950/60'
-                  : hasRemoteUpdates
-                    ? 'bg-indigo-50 text-accent dark:bg-indigo-950/60'
-                    : pendingCount > 0
-                      ? 'bg-amber-50 text-amber-500 dark:bg-amber-950/60'
-                      : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-            }`}
-          >
-            {syncStatus === 'offline' ? (
-              <CloudOff size={13} />
-            ) : conflictsCount > 0 || errorCount > 0 || syncStatus === 'error' ? (
-              <AlertCircle size={13} />
-            ) : hasRemoteUpdates ? (
-              <CloudDownload size={13} />
-            ) : pendingCount > 0 ? (
-              <CloudUpload size={13} />
-            ) : (
-              <CheckCircle2 size={13} />
-            )}
-          </div>
-          <span className="font-semibold text-text-primary text-[14px]">
-            {syncStatus === 'offline'
-              ? '离线模式'
-              : conflictsCount > 0
-                ? '存在版本冲突'
-                : errorCount > 0 || syncStatus === 'error'
-                  ? '同步异常'
-                  : hasRemoteUpdates
-                    ? '云端有新更新'
-                    : pendingCount > 0
-                      ? '有未上传的更改'
-                      : '已与云端数据对齐'}
-          </span>
-        </div>
-
-        <div className="text-[12px] text-text-secondary leading-relaxed">
-          {syncStatus === 'offline' ? (
-            <span className="whitespace-nowrap">当前网络不可用，修改安全保存在本地</span>
-          ) : conflictsCount > 0 ? (
-            <span className="whitespace-nowrap">发现 {conflictsCount} 项版本冲突，请手动解决</span>
-          ) : errorCount > 0 ? (
-            <div className="flex flex-col gap-1">
-              <span className="whitespace-nowrap">{errorCount} 项更改在上传时遇到问题</span>
-              {errorMessage && (
-                <span
-                  className="text-red-500 line-clamp-2 break-all whitespace-normal"
-                  title={errorMessage}
-                >
-                  {errorMessage}
-                </span>
+        {/* Top: Status Header & Description */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <div
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                syncStatus === 'offline'
+                  ? 'bg-gray-100 text-text-secondary dark:bg-gray-800'
+                  : conflictsCount > 0 || errorCount > 0 || syncStatus === 'error'
+                    ? 'bg-red-50 text-red-500 dark:bg-red-950/60'
+                    : hasRemoteUpdates
+                      ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400'
+                      : pendingCount > 0
+                        ? 'bg-amber-50 text-amber-500 dark:bg-amber-950/60'
+                        : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+              }`}
+            >
+              {syncStatus === 'offline' ? (
+                <CloudOff size={13} />
+              ) : conflictsCount > 0 || errorCount > 0 || syncStatus === 'error' ? (
+                <AlertCircle size={13} />
+              ) : hasRemoteUpdates ? (
+                <CloudDownload size={13} />
+              ) : pendingCount > 0 ? (
+                <CloudUpload size={13} />
+              ) : (
+                <CheckCircle2 size={13} />
               )}
             </div>
-          ) : syncStatus === 'error' ? (
-            <span className="break-all whitespace-normal">
-              {errorMessage || '同步过程中发生未知错误'}
+            <span className="font-semibold text-text-primary text-[13px]">
+              {syncStatus === 'offline'
+                ? '离线模式'
+                : conflictsCount > 0
+                  ? '存在版本冲突'
+                  : errorCount > 0 || syncStatus === 'error'
+                    ? '同步异常'
+                    : hasRemoteUpdates
+                      ? '云端有新更新'
+                      : pendingCount > 0
+                        ? '有未上传的更改'
+                        : '已与云端数据对齐'}
             </span>
-          ) : hasRemoteUpdates ? (
-            <span className="whitespace-nowrap">云端有新的数据更新，点击同步以获取</span>
-          ) : pendingCount > 0 ? (
-            <span className="whitespace-nowrap">有 {pendingCount} 项本地修改等待上传</span>
-          ) : (
-            <span className="whitespace-nowrap">所有本地修改已成功保存到云端</span>
-          )}
+          </div>
+
+          <div className="text-[12px] text-text-secondary leading-normal">
+            {syncStatus === 'offline' ? (
+              <span className="whitespace-nowrap">当前网络不可用，修改安全保存在本地</span>
+            ) : conflictsCount > 0 ? (
+              <span className="whitespace-nowrap">
+                发现 {conflictsCount} 项版本冲突，请手动解决
+              </span>
+            ) : errorCount > 0 ? (
+              <div className="flex flex-col gap-1">
+                <span className="whitespace-nowrap">{errorCount} 项更改在上传时遇到问题</span>
+                {errorMessage && (
+                  <span
+                    className="text-red-500 line-clamp-2 break-all whitespace-normal"
+                    title={errorMessage}
+                  >
+                    {errorMessage}
+                  </span>
+                )}
+              </div>
+            ) : syncStatus === 'error' ? (
+              <span className="break-all whitespace-normal">
+                {errorMessage || '同步过程中发生未知错误'}
+              </span>
+            ) : hasRemoteUpdates ? (
+              <span className="whitespace-nowrap">云端有新的数据更新，点击同步以获取</span>
+            ) : pendingCount > 0 ? (
+              <span className="whitespace-nowrap">有 {pendingCount} 项本地修改等待上传</span>
+            ) : (
+              <span className="whitespace-nowrap">所有本地修改已成功保存到云端</span>
+            )}
+          </div>
         </div>
 
+        {/* Bottom: Last sync time & actions */}
         <div className="flex items-center justify-between gap-3 pt-0.5 mt-0.5">
-          <span className="text-[12px] text-text-ghost flex items-center gap-1 whitespace-nowrap">
-            <Clock size={11} className="shrink-0" />
+          <span className="text-[11px] text-text-secondary flex items-center gap-1.5 whitespace-nowrap">
+            <Clock size={11} className="shrink-0 text-text-secondary/70" />
             {lastSyncAt ? `上次同步: ${new Date(lastSyncAt).toLocaleTimeString()}` : '尚未同步'}
           </span>
 
@@ -165,7 +171,7 @@ export default function SyncStatusPopover({
                 onClose();
                 onOpenConflicts();
               }}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40 transition-colors cursor-pointer"
             >
               处理冲突
             </button>
@@ -175,7 +181,7 @@ export default function SyncStatusPopover({
                 onRetry();
               }}
               disabled={syncStatus === 'syncing'}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:text-red-300 transition-colors disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:text-red-300 border border-red-200/60 dark:border-red-800/40 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RotateCcw size={11} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
               {syncStatus === 'syncing' ? '重试中' : '重试'}
@@ -186,7 +192,7 @@ export default function SyncStatusPopover({
                 onSync();
               }}
               disabled={syncStatus === 'syncing'}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-accent text-white hover:opacity-90 shadow-xs transition-opacity disabled:opacity-50 cursor-pointer"
+              className="px-2 py-1 rounded-lg text-[11px] font-medium bg-bg-main hover:bg-hover-bg text-text-primary border border-border-color shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
             >
               {syncStatus === 'syncing' ? '同步中' : '立即同步'}
             </button>
