@@ -66,12 +66,12 @@ function DocTreeItem({
   return (
     <div
       onClick={handleDocClick}
-      className={`text-[13px] py-1.5 px-1.5 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+      className={`text-[13px] py-1.5 px-2 rounded-lg cursor-pointer flex items-center justify-between group/row transition-colors ${
         isDocActive
-          ? 'text-active-fg font-semibold bg-active-bg shadow-sm border-l-2 border-active-border rounded-l-none'
-          : 'text-text-secondary'
+          ? 'text-text-primary font-semibold bg-bg-main shadow-xs border border-border-color/40'
+          : 'text-text-secondary hover:bg-hover-bg/70 border border-transparent'
       } ${activeDocActionMenuId === doc.id ? 'bg-hover-bg' : ''}`}
-      style={{ paddingLeft: isDocActive ? `${paddingLeft - 2}px` : `${paddingLeft}px` }}
+      style={{ paddingLeft: `${paddingLeft}px` }}
     >
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         <FileText

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Search, FileText, MoreHorizontal } from 'lucide-react';
 import { MEMO_KB_ID, useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
@@ -140,9 +140,82 @@ export default function MemoCatalogPanel() {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const listRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
+  const prevIndexRef = useRef<number | null>(null);
+  const isFirstMountRef = useRef(true);
+
   const filteredMemos = searchQuery.trim()
     ? memos.filter((m) => m.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : memos;
+
+  useLayoutEffect(() => {
+    const pill = pillRef.current;
+    const container = listRef.current;
+    if (!pill || !container) return;
+
+    if (!memoId) {
+      pill.style.opacity = '0';
+      prevIndexRef.current = null;
+      return;
+    }
+
+    const activeEl = container.querySelector<HTMLElement>(`[data-memo-id="${memoId}"]`);
+    if (!activeEl) {
+      pill.style.opacity = '0';
+      prevIndexRef.current = null;
+      return;
+    }
+
+    const currentIndex = filteredMemos.findIndex((m) => m.id === memoId);
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const isFirstTime =
+      prefersReducedMotion || isFirstMountRef.current || prevIndexRef.current === null;
+    const isFarJump =
+      prevIndexRef.current !== null && Math.abs(currentIndex - prevIndexRef.current) > 10;
+    const isOutOfView =
+      activeEl.offsetTop < container.scrollTop ||
+      activeEl.offsetTop + activeEl.offsetHeight > container.scrollTop + container.clientHeight;
+
+    prevIndexRef.current = currentIndex;
+
+    if (isFirstTime) {
+      isFirstMountRef.current = false;
+      pill.style.transition = 'none';
+      pill.style.top = `${activeEl.offsetTop}px`;
+      pill.style.height = `${activeEl.offsetHeight}px`;
+      pill.style.opacity = '1';
+      return;
+    }
+
+    if (isFarJump || isOutOfView) {
+      // Fade out at current location, then fade in at new location
+      pill.style.transition = 'opacity 90ms ease-out';
+      pill.style.opacity = '0';
+
+      const targetTop = `${activeEl.offsetTop}px`;
+      const targetHeight = `${activeEl.offsetHeight}px`;
+
+      const timer = window.setTimeout(() => {
+        pill.style.transition = 'none';
+        pill.style.top = targetTop;
+        pill.style.height = targetHeight;
+        void pill.offsetHeight; // force reflow
+        pill.style.transition = 'opacity 140ms ease-in';
+        pill.style.opacity = '1';
+      }, 90);
+
+      return () => clearTimeout(timer);
+    }
+
+    // Smooth physical slide for jumps within 10 items
+    pill.style.transition =
+      'top 220ms cubic-bezier(0.2, 0, 0, 1), height 220ms cubic-bezier(0.2, 0, 0, 1), opacity 150ms ease';
+    pill.style.top = `${activeEl.offsetTop}px`;
+    pill.style.height = `${activeEl.offsetHeight}px`;
+    pill.style.opacity = '1';
+  }, [memoId, filteredMemos]);
 
   return (
     <>
@@ -188,7 +261,21 @@ export default function MemoCatalogPanel() {
             </div>
 
             {/* Scroll List */}
-            <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
+            <div
+              ref={listRef}
+              className="flex-1 overflow-y-auto px-2 pb-4 flex flex-col gap-0.5 relative"
+            >
+              {/* Sliding Pill Indicator (Scheme 1: White Elevated Card) */}
+              <div
+                ref={pillRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute rounded-lg bg-bg-main shadow-xs border border-border-color/40 z-0 opacity-0"
+                style={{
+                  left: '0.5rem',
+                  right: '0.5rem',
+                }}
+              />
+
               {filteredMemos.length === 0 ? (
                 <div className="text-center py-8 text-xs text-text-secondary">
                   {searchQuery.trim() ? '没有找到相关小记' : '暂无小记，点击上方 + 新建'}
@@ -201,16 +288,17 @@ export default function MemoCatalogPanel() {
                   return (
                     <div
                       key={memo.id}
+                      data-memo-id={memo.id}
                       onClick={() => {
                         if (!isRenaming) {
                           navigate(`/memo/${memo.id}`);
                         }
                       }}
-                      className={`text-[13px] py-2 px-3 rounded-md cursor-pointer flex items-center justify-between group/row hover:bg-hover-bg transition-all ${
+                      className={`text-[13px] py-2 px-3 rounded-lg cursor-pointer flex items-center justify-between group/row transition-colors relative z-10 ${
                         isActive
-                          ? 'text-active-fg font-semibold bg-active-bg shadow-sm border-l-2 border-active-border rounded-l-none pl-[10px]'
-                          : 'text-text-secondary'
-                      } ${activeMenuId === memo.id ? 'bg-hover-bg' : ''}`}
+                          ? 'text-text-primary font-semibold'
+                          : 'text-text-secondary hover:bg-hover-bg/70'
+                      } ${activeMenuId === memo.id ? 'bg-hover-bg/70' : ''}`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <FileText

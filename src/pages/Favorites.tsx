@@ -46,26 +46,20 @@ function FolderCard({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`flex items-center justify-between px-3 h-[38px] rounded-xl border cursor-pointer select-none transition-shadow duration-150 ${
+      className={`flex items-center justify-between px-3 h-[38px] rounded-lg border cursor-pointer select-none transition-colors ${
         isSelected
-          ? 'border-active-border bg-active-bg shadow-xs'
-          : 'border-transparent hover:shadow-sm'
+          ? 'bg-bg-main shadow-xs border-border-color/40 text-text-primary font-semibold'
+          : 'border-transparent text-text-secondary hover:bg-hover-bg/70'
       }`}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <Star
-          size={13}
+          size={14}
           className={`shrink-0 transition-colors ${
             isSelected ? 'text-yellow-400 fill-yellow-400' : 'text-text-secondary'
           }`}
         />
-        <span
-          className={`text-xs font-medium truncate ${
-            isSelected ? 'text-active-fg' : 'text-text-primary'
-          }`}
-        >
-          {name}
-        </span>
+        <span className="text-[13px] truncate">{name}</span>
       </div>
 
       {/* Actions (rename / delete) — only on non-system folders when hovered */}
@@ -75,22 +69,22 @@ function FolderCard({
             <button
               onClick={onRename}
               title="重命名"
-              className="p-1 text-text-secondary hover:text-text-primary rounded transition-colors cursor-pointer"
+              className="p-1 text-text-secondary hover:text-text-primary hover:bg-black/5 rounded transition-colors cursor-pointer"
             >
               <Pencil size={13} />
             </button>
             <button
               onClick={onDelete}
               title="删除收藏夹"
-              className="p-1 text-text-secondary hover:text-red-500 rounded transition-colors cursor-pointer"
+              className="p-1 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
             >
               <Trash2 size={13} />
             </button>
           </div>
         ) : (
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-              isSelected ? 'bg-active-border/40 text-active-fg' : 'bg-hover-bg text-text-secondary'
+            className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors ${
+              isSelected ? 'bg-hover-bg text-text-primary' : 'bg-hover-bg/70 text-text-secondary'
             }`}
           >
             {count}
@@ -205,7 +199,10 @@ export default function Favorites() {
   // ── New folder create ──────────────────────────────────────────────────────
 
   const handleCreateFolder = () => {
-    if (newFolderName.trim()) createFolder(newFolderName.trim());
+    if (newFolderName.trim()) {
+      const newId = createFolder(newFolderName.trim());
+      setSelectedFolderId(newId);
+    }
     setNewFolderName('');
     setIsCreatingFolder(false);
   };
@@ -239,10 +236,48 @@ export default function Favorites() {
           )}
 
           {/* Section label */}
-          {userFolders.length > 0 && (
-            <p className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider px-2 pt-3 pb-1">
-              我的收藏夹
-            </p>
+          <p className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider px-2 pt-3 pb-1">
+            我的收藏夹
+          </p>
+
+          {/* Inline new-folder creation / New folder button */}
+          {isCreatingFolder ? (
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-bg-main border border-accent rounded-lg">
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateFolder();
+                  if (e.key === 'Escape') {
+                    setIsCreatingFolder(false);
+                    setNewFolderName('');
+                  }
+                }}
+                placeholder="输入收藏夹名称"
+                className="flex-1 text-xs outline-none bg-transparent text-text-primary placeholder-text-ghost"
+              />
+              <button onClick={handleCreateFolder} className="text-accent cursor-pointer shrink-0">
+                <Check size={13} />
+              </button>
+              <button
+                onClick={() => {
+                  setIsCreatingFolder(false);
+                  setNewFolderName('');
+                }}
+                className="text-text-secondary cursor-pointer shrink-0"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsCreatingFolder(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-hover-bg rounded-lg transition-colors cursor-pointer"
+            >
+              <BookmarkPlus size={13} />
+              新建收藏夹
+            </button>
           )}
 
           {/* User folders */}
@@ -254,7 +289,7 @@ export default function Favorites() {
               return (
                 <div
                   key={folder.id}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-bg-main border border-accent rounded-xl"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-bg-main border border-accent rounded-lg"
                 >
                   <input
                     autoFocus
@@ -292,46 +327,6 @@ export default function Favorites() {
               />
             );
           })}
-
-          {/* Inline new-folder creation */}
-          {isCreatingFolder ? (
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-bg-main border border-accent rounded-xl">
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateFolder();
-                  if (e.key === 'Escape') {
-                    setIsCreatingFolder(false);
-                    setNewFolderName('');
-                  }
-                }}
-                placeholder="输入收藏夹名称"
-                className="flex-1 text-xs outline-none bg-transparent text-text-primary placeholder-text-ghost"
-              />
-              <button onClick={handleCreateFolder} className="text-accent cursor-pointer shrink-0">
-                <Check size={13} />
-              </button>
-              <button
-                onClick={() => {
-                  setIsCreatingFolder(false);
-                  setNewFolderName('');
-                }}
-                className="text-text-secondary cursor-pointer shrink-0"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsCreatingFolder(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-hover-bg rounded-xl transition-colors cursor-pointer"
-            >
-              <BookmarkPlus size={13} />
-              新建收藏夹
-            </button>
-          )}
         </div>
       </aside>
 
