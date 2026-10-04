@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Check, Download, HardDrive, Loader2, RotateCcw, X } from 'lucide-react';
+import { Check, Download, Loader2, RotateCcw, X, Search, Sparkles } from 'lucide-react';
 import { formatBytes, MODEL_DEFINITIONS, type ModelId } from '../../models/catalog';
 import { useModelStore } from '../../store/modelStore';
 
@@ -43,25 +43,26 @@ export default function ModelManagerModal({ isOpen, onClose }: ModelManagerModal
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-[420px] max-w-full overflow-hidden rounded-xl border border-border-color bg-bg-main shadow-xl">
-        <div className="flex items-center justify-between border-b border-border-color px-5 py-3">
-          <div>
+      <div className="w-[414px] max-w-full overflow-hidden rounded-2xl border border-border-color/80 bg-bg-main shadow-2xl animate-dropdown-fade-in">
+        <div className="flex items-center justify-between px-4 pt-4 pb-2.5">
+          <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-text-primary">端侧模型</h2>
-            <p className="mt-0.5 text-xs text-text-secondary">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 border border-emerald-200/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/40">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               已安装 {installedCount}/{MODEL_DEFINITIONS.length}
-            </p>
+            </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1.5 text-text-ghost transition-colors hover:bg-hover-bg hover:text-text-primary"
+            className="rounded-lg p-1.5 text-text-ghost transition-colors hover:bg-hover-bg hover:text-text-primary cursor-pointer"
             aria-label="关闭"
           >
             <X size={17} />
           </button>
         </div>
 
-        <div className="divide-y divide-border-color px-5">
+        <div className="flex flex-col gap-2.5 px-4 pb-4 pt-1">
           {MODEL_DEFINITIONS.map((definition) => {
             const model = models[definition.id];
             const totalBytes = model.totalBytes || definition.estimatedSizeBytes;
@@ -69,18 +70,28 @@ export default function ModelManagerModal({ isOpen, onClose }: ModelManagerModal
               100,
               totalBytes > 0 ? Math.round((model.downloadedBytes / totalBytes) * 100) : 0,
             );
+            const isEmbedding = definition.id.includes('bge');
             return (
-              <div key={definition.id} className="py-4">
+              <div
+                key={definition.id}
+                className="rounded-xl border border-border-color/60 bg-hover-bg/30 p-3 transition-all hover:border-border-color/90 hover:bg-hover-bg/60"
+              >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-accent dark:bg-indigo-950/60">
-                    <HardDrive size={17} />
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      isEmbedding
+                        ? 'bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 border border-sky-100/80 dark:border-sky-900/40'
+                        : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-100/80 dark:border-indigo-900/40'
+                    }`}
+                  >
+                    {isEmbedding ? <Search size={16} /> : <Sparkles size={16} />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-semibold text-text-primary">
                         {definition.name}
                       </span>
-                      <span className="shrink-0 rounded bg-hover-bg px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
+                      <span className="shrink-0 rounded bg-bg-main border border-border-color/60 px-1.5 py-0.5 text-[10px] font-mono text-text-secondary">
                         {definition.precision}
                       </span>
                     </div>
@@ -90,41 +101,41 @@ export default function ModelManagerModal({ isOpen, onClose }: ModelManagerModal
                   </div>
 
                   {!initialized || model.status === 'checking' ? (
-                    <Loader2 size={17} className="animate-spin text-text-secondary" />
+                    <Loader2 size={16} className="animate-spin text-text-secondary" />
                   ) : model.status === 'installed' ? (
-                    <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                      <Check size={14} /> 已安装
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50/80 px-2.5 py-1 text-xs font-medium text-emerald-600 border border-emerald-200/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/40">
+                      <Check size={13} className="shrink-0" /> 已安装
                     </span>
                   ) : model.status === 'downloading' ? (
                     <button
                       type="button"
                       onClick={() => cancel(definition.id)}
-                      className="flex h-8 items-center gap-1.5 rounded-md border border-border-color px-2.5 text-xs font-medium text-text-primary hover:bg-hover-bg"
+                      className="flex h-7 items-center gap-1.5 rounded-lg border border-border-color bg-bg-main px-2.5 text-xs font-medium text-text-primary hover:bg-hover-bg transition-colors cursor-pointer"
                     >
-                      <X size={14} /> 取消
+                      <X size={13} /> 取消
                     </button>
                   ) : (
                     <button
                       type="button"
                       disabled={activeModelId !== null || !navigator.onLine}
                       onClick={() => installModel(definition.id)}
-                      className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-7 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white shadow-xs transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                     >
-                      {model.status === 'error' ? <RotateCcw size={14} /> : <Download size={14} />}
+                      {model.status === 'error' ? <RotateCcw size={13} /> : <Download size={13} />}
                       {model.status === 'error' ? '重试' : '下载'}
                     </button>
                   )}
                 </div>
 
                 {model.status === 'downloading' && (
-                  <div className="ml-12 mt-3">
-                    <div className="h-1.5 overflow-hidden rounded-full bg-hover-bg">
+                  <div className="ml-11 mt-2.5">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-border-color/40">
                       <div
                         className="h-full rounded-full bg-accent transition-[width] duration-150"
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-                    <div className="mt-1.5 flex justify-between text-[11px] text-text-secondary">
+                    <div className="mt-1.5 flex justify-between font-mono text-[11px] text-text-secondary">
                       <span>
                         {formatBytes(model.downloadedBytes)} / {formatBytes(totalBytes)}
                       </span>
@@ -133,7 +144,7 @@ export default function ModelManagerModal({ isOpen, onClose }: ModelManagerModal
                   </div>
                 )}
                 {model.error && model.status === 'error' && (
-                  <p className="ml-12 mt-2 text-xs text-red-500">{model.error}</p>
+                  <p className="ml-11 mt-2 text-xs text-red-500">{model.error}</p>
                 )}
               </div>
             );

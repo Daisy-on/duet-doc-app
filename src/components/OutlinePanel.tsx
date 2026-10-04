@@ -35,7 +35,7 @@ export default function OutlinePanel() {
   };
 
   return (
-    <aside className="w-[200px] min-w-[200px] border-l border-border-color bg-bg-panel flex flex-col h-full shrink-0 select-none overflow-hidden">
+    <aside className="w-[200px] min-w-[200px] border-l border-border-color bg-bg-panel/60 flex flex-col h-full shrink-0 select-none overflow-hidden">
       {/* 顶部固定大纲标题 */}
       <div className="p-5 pb-3 text-[13px] font-semibold text-text-primary shrink-0">大纲</div>
 
