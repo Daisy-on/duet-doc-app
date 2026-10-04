@@ -574,9 +574,7 @@ export default function KBTreePickerModal({
             disabled={isConfirmDisabled}
             onClick={handleConfirm}
             className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-sm transition-all cursor-pointer ${
-              isConfirmDisabled
-                ? 'bg-indigo-300 cursor-not-allowed'
-                : 'bg-accent hover:bg-indigo-700'
+              isConfirmDisabled ? 'bg-accent/40 cursor-not-allowed' : 'bg-accent hover:opacity-90'
             }`}
           >
             {confirmText}

@@ -10,7 +10,7 @@
   --sys-text-primary: #111827;
   --sys-text-secondary: #6b7280;
   --sys-text-ghost: #9ca3af;
-  --sys-accent: #6366f1;
+  --sys-accent: #2563eb;
   --sys-active-fg: #2563eb;
   --sys-active-bg: #eff6ff;
   --sys-active-border: #bfdbfe;
@@ -21,20 +21,20 @@
 }
 
 [data-theme='dark'] {
-  --sys-bg-main: #111827;
-  --sys-bg-sidebar: #182234;
-  --sys-bg-panel: #1f293d;
-  --sys-text-primary: #f9fafb;
-  --sys-text-secondary: #9ca3af;
-  --sys-text-ghost: #6b7280;
-  --sys-accent: #818cf8;
-  --sys-active-fg: #93c5fd;
-  --sys-active-bg: #172554;
-  --sys-active-border: #1e40af;
-  --sys-hover-bg: #1f293d;
-  --sys-border-color: #374151;
-  --sys-success-color: #34d399;
-  --sys-selection-bg: #312e81;
+  --sys-bg-main: #141416;
+  --sys-bg-sidebar: #18181b;
+  --sys-bg-panel: #1e1e22;
+  --sys-text-primary: #f4f4f5;
+  --sys-text-secondary: #a1a1aa;
+  --sys-text-ghost: #71717a;
+  --sys-accent: #3b82f6;
+  --sys-active-fg: #60a5fa;
+  --sys-active-bg: rgba(59, 130, 246, 0.12);
+  --sys-active-border: rgba(59, 130, 246, 0.25);
+  --sys-hover-bg: #27272a;
+  --sys-border-color: #27272a;
+  --sys-success-color: #10b981;
+  --sys-selection-bg: rgba(59, 130, 246, 0.25);
 }
 
 @theme {

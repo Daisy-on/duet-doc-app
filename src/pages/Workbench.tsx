@@ -66,7 +66,7 @@ export default function Workbench() {
           className="bg-bg-main border border-border-color p-4 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/40 transition-colors shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors shrink-0">
               <FileText size={17} />
             </div>
             <div className="text-[14.5px] font-semibold text-text-primary">新建文档</div>
@@ -82,7 +82,7 @@ export default function Workbench() {
           className="bg-bg-main border border-border-color p-4 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:bg-amber-100 dark:group-hover:bg-amber-900/30 transition-colors shrink-0">
               <FolderPlus size={17} />
             </div>
             <div className="text-[14.5px] font-semibold text-text-primary">新建知识库</div>
@@ -98,7 +98,7 @@ export default function Workbench() {
           className="bg-bg-main border border-border-color p-4 rounded-xl cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all flex flex-col gap-2 group"
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:bg-purple-100 dark:group-hover:bg-purple-900/40 transition-colors shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30 transition-colors shrink-0">
               <Sparkles size={17} />
             </div>
             <div className="text-[14.5px] font-semibold text-text-primary">AI 帮你写</div>
@@ -114,12 +114,12 @@ export default function Workbench() {
           title="模板中心即将上线"
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
               <Copy size={17} />
             </div>
             <div className="text-[14.5px] font-semibold text-text-primary flex items-center gap-1.5">
               <span>模板中心</span>
-              <span className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60 px-1 py-0.5 rounded font-bold">
+              <span className="text-[9px] bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200/80 dark:border-sky-800/60 px-1 py-0.5 rounded font-bold">
                 即将上线
               </span>
             </div>
@@ -176,11 +176,11 @@ export default function Workbench() {
                   <tr
                     key={doc.id}
                     onClick={() => navigate(`/kb/${doc.kbId}/doc/${doc.id}`)}
-                    className="hover:bg-gray-50/75 cursor-pointer group border-b border-gray-50 transition-colors"
+                    className="hover:bg-hover-bg/60 cursor-pointer group border-b border-border-color/40 transition-colors"
                   >
                     <td className="py-3.5 px-2">
                       <div className="flex items-center gap-2.5 font-semibold text-[13.5px] text-text-primary group-hover:text-accent transition-colors">
-                        <div className="w-[20px] h-[20px] bg-gray-100 rounded flex items-center justify-center text-text-secondary group-hover:bg-indigo-50 group-hover:text-accent transition-colors">
+                        <div className="w-[20px] h-[20px] bg-hover-bg rounded flex items-center justify-center text-text-secondary group-hover:bg-active-bg group-hover:text-active-fg transition-colors">
                           <FileLineChart size={12} />
                         </div>
                         <span className="truncate max-w-md">{doc.title}</span>

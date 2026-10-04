@@ -168,7 +168,7 @@ export default function DocEdit() {
           <h2 className="text-lg font-bold text-text-primary mb-2">文档不存在</h2>
           <button
             onClick={() => navigate('/')}
-            className="px-4 py-2 bg-accent hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+            className="px-4 py-2 bg-accent hover:opacity-90 text-white rounded-lg text-xs font-semibold shadow-sm transition-opacity cursor-pointer"
           >
             返回开始页
           </button>

@@ -184,7 +184,7 @@ export default function CreateDocModal({ isOpen, onClose, onCreateKBClick }: Cre
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-accent hover:bg-indigo-700 text-white rounded-xl text-[13px] font-semibold shadow-sm transition-colors cursor-pointer"
+                className="px-5 py-2 bg-accent hover:opacity-90 text-white rounded-xl text-[13px] font-semibold shadow-sm transition-opacity cursor-pointer"
               >
                 创建文档
               </button>

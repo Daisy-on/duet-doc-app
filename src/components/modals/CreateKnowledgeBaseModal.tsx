@@ -120,8 +120,8 @@ export default function CreateKnowledgeBaseModal({
               disabled={!name.trim()}
               className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-sm transition-all ${
                 name.trim()
-                  ? 'bg-accent hover:bg-indigo-700 cursor-pointer'
-                  : 'bg-indigo-300 cursor-not-allowed'
+                  ? 'bg-accent hover:opacity-90 cursor-pointer'
+                  : 'bg-accent/40 cursor-not-allowed'
               }`}
             >
               新建知识库

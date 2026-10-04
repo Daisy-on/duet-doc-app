@@ -133,7 +133,7 @@ export default function MemoEdit() {
           <h2 className="text-lg font-bold text-text-primary mb-2">小记不存在</h2>
           <button
             onClick={() => navigate('/memo')}
-            className="px-4 py-2 bg-accent hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+            className="px-4 py-2 bg-accent hover:opacity-90 text-white rounded-lg text-xs font-semibold shadow-sm transition-opacity cursor-pointer"
           >
             返回小记主页
           </button>

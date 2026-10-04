@@ -207,7 +207,7 @@ export default function DocHistory() {
           <h2 className="text-lg font-bold mb-2 text-text-primary">文档不存在</h2>
           <button
             onClick={() => navigate('/')}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs"
+            className="px-4 py-2 bg-accent hover:opacity-90 text-white rounded-lg text-xs font-semibold shadow-sm transition-opacity cursor-pointer"
           >
             返回首页
           </button>
