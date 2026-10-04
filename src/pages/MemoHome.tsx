@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PanelLeft,
@@ -8,6 +8,7 @@ import {
   Users,
   ArrowUpRight,
   CornerDownLeft,
+  Feather,
 } from 'lucide-react';
 import MemoCatalogPanel from '../components/MemoCatalogPanel';
 import { MEMO_KB_ID, useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
@@ -62,6 +63,63 @@ function formatMemoTime(timestamp: number): string {
   return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
+const MEMO_PROMPTS = [
+  '随时捕捉闪念、待办与灵感碎片...',
+  '记录今天最重要的 3 件事...',
+  '随手摘录刚刚读到的金句与设计灵感...',
+  '记录突然冒出的绝妙想法与点子...',
+];
+
+function MemoTypewriter({ isPaused }: { isPaused: boolean }) {
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [displayText, setDisplayText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentPrompt = MEMO_PROMPTS[promptIndex];
+    let timer: number;
+
+    if (!isDeleting) {
+      if (displayText.length < currentPrompt.length) {
+        timer = window.setTimeout(() => {
+          setDisplayText(currentPrompt.slice(0, displayText.length + 1));
+        }, 65);
+      } else if (!isPaused) {
+        // Paused on full text before deleting
+        timer = window.setTimeout(() => {
+          setIsDeleting(true);
+        }, 2600);
+      }
+    } else {
+      if (displayText.length > 0) {
+        timer = window.setTimeout(() => {
+          setDisplayText((prev) => prev.slice(0, -1));
+        }, 28);
+      } else {
+        // Brief pause after deleting before typing next prompt
+        timer = window.setTimeout(() => {
+          setIsDeleting(false);
+          setPromptIndex((prev) => (prev + 1) % MEMO_PROMPTS.length);
+        }, 300);
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [displayText, isDeleting, promptIndex, isPaused]);
+
+  return (
+    <div className="flex items-center gap-2 text-sm sm:text-[15px] font-medium text-text-secondary select-none min-h-[26px] px-1">
+      <Feather size={16} className="text-amber-500 shrink-0" />
+      <span className="tracking-wide text-text-primary/90">{displayText}</span>
+      <span
+        className={`w-0.5 h-4 bg-blue-500 inline-block transition-opacity duration-200 ${
+          isPaused ? 'opacity-0' : 'animate-pulse'
+        }`}
+      />
+    </div>
+  );
+}
+
 export default function MemoHome() {
   const navigate = useNavigate();
   const documents = useKnowledgeBaseStore((state) => state.documents);
@@ -71,6 +129,7 @@ export default function MemoHome() {
 
   const [quickInput, setQuickInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   const memos = documents.filter((d) => d.kbId === MEMO_KB_ID);
   const sortedMemos = [...memos].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -161,9 +220,6 @@ export default function MemoHome() {
               <h1 className="text-[16px] font-bold text-text-primary shrink-0 tracking-tight">
                 我的小记
               </h1>
-              <span className="text-xs text-text-secondary truncate hidden md:inline ml-1">
-                随时捕捉闪念、待办与灵感碎片
-              </span>
             </div>
           </div>
 
@@ -177,31 +233,37 @@ export default function MemoHome() {
 
         {/* Workspace Body - Focus Flow Layout */}
         <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 py-8 max-w-4xl mx-auto w-full space-y-6 my-auto">
-          {/* Quick Scratchpad Input Box (Full Width Aligned) */}
-          <div className="w-full bg-bg-main border border-border-color/80 focus-within:border-emerald-200/50 focus-within:ring-2 focus-within:ring-emerald-200/20 focus-within:shadow-[0_0_16px_rgba(16,185,129,0.16)] dark:focus-within:border-emerald-400/50 dark:focus-within:ring-emerald-400/20 dark:focus-within:shadow-[0_0_20px_rgba(16,185,129,0.2)] rounded-2xl shadow-xs transition-all overflow-hidden p-3 flex flex-col gap-2.5">
-            <textarea
-              value={quickInput}
-              onChange={(e) => setQuickInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="在此随手写下闪念、待办或临时摘录... (按 ⌘+Enter 快速存为小记)"
-              className="w-full bg-transparent text-xs sm:text-sm text-text-primary placeholder:text-text-ghost outline-none resize-none min-h-[68px] max-h-48 leading-relaxed"
-              rows={3}
-            />
+          {/* Quick Scratchpad Container with Typewriter Prompt */}
+          <div className="w-full space-y-2.5">
+            <MemoTypewriter isPaused={isInputFocused || Boolean(quickInput.trim())} />
 
-            <div className="flex items-center justify-end select-none">
-              <button
-                type="button"
-                onClick={handleSaveQuickMemo}
-                disabled={!quickInput.trim() || isSaving}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer ${
-                  quickInput.trim() && !isSaving
-                    ? 'bg-blue-500 hover:bg-blue-400 active:bg-blue-400 text-white hover:shadow'
-                    : 'bg-hover-bg text-text-ghost cursor-not-allowed border border-border-color/40 shadow-none'
-                }`}
-              >
-                <CornerDownLeft size={13} />
-                <span>{isSaving ? '保存中...' : '保存'}</span>
-              </button>
+            <div className="w-full bg-bg-main border border-border-color/80 focus-within:border-emerald-200/50 focus-within:ring-2 focus-within:ring-emerald-200/20 focus-within:shadow-[0_0_16px_rgba(16,185,129,0.16)] dark:focus-within:border-emerald-400/50 dark:focus-within:ring-emerald-400/20 dark:focus-within:shadow-[0_0_20px_rgba(16,185,129,0.2)] rounded-2xl shadow-xs transition-all overflow-hidden p-3 flex flex-col gap-2.5">
+              <textarea
+                value={quickInput}
+                onChange={(e) => setQuickInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
+                placeholder="在此随手写下闪念、待办或临时摘录... (按 ⌘+Enter 快速存为小记)"
+                className="w-full bg-transparent text-xs sm:text-sm text-text-primary placeholder:text-text-ghost outline-none resize-none min-h-[68px] max-h-48 leading-relaxed"
+                rows={3}
+              />
+
+              <div className="flex items-center justify-end select-none">
+                <button
+                  type="button"
+                  onClick={handleSaveQuickMemo}
+                  disabled={!quickInput.trim() || isSaving}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer ${
+                    quickInput.trim() && !isSaving
+                      ? 'bg-blue-500 hover:bg-blue-400 active:bg-blue-400 text-white hover:shadow'
+                      : 'bg-hover-bg text-text-ghost cursor-not-allowed border border-border-color/40 shadow-none'
+                  }`}
+                >
+                  <CornerDownLeft size={13} />
+                  <span>{isSaving ? '保存中...' : '保存'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
