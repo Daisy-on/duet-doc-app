@@ -14,6 +14,7 @@ import {
 import CatalogPanel from '../components/CatalogPanel';
 import { useKnowledgeBaseStore } from '../store/knowledgeBaseStore';
 import { useLayoutStore } from '../store';
+import { useAuthStore } from '../store/authStore';
 import { getKnowledgeBaseColor } from '../utils/knowledgeBaseColor';
 
 // Helper to format date relative to today/yesterday or absolute
@@ -54,6 +55,10 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
     useKnowledgeBaseStore();
 
   const { isCatalogCollapsed, setIsCatalogCollapsed } = useLayoutStore();
+
+  const currentUser = useAuthStore((state) => state.user);
+  const displayName =
+    currentUser?.display_name?.trim() || currentUser?.username || currentUser?.id || '用户';
 
   const kb = kbId ? getKnowledgeBase(kbId) : undefined;
 
@@ -332,16 +337,16 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                     </button>
                   )}
                 </div>
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse table-fixed">
                   <thead>
                     <tr className="border-b border-border-color">
-                      <th className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider py-3 px-6 w-[45%]">
+                      <th className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider py-3 px-6 w-[50%]">
                         文档标题
                       </th>
-                      <th className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider py-3 px-6 w-[30%]">
+                      <th className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider py-3 px-6 w-[20%]">
                         所属分组
                       </th>
-                      <th className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider py-3 px-6 w-[25%]">
+                      <th className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider py-3 px-6 w-[30%]">
                         更新时间
                       </th>
                     </tr>
@@ -356,11 +361,14 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                           className="hover:bg-hover-bg border-b border-border-color last:border-0 cursor-pointer transition-colors"
                         >
                           <td className="py-4 px-6">
-                            <div className="flex items-center gap-3 font-semibold text-[14px] text-text-primary">
-                              <div className="w-[22px] h-[22px] bg-hover-bg rounded-md flex items-center justify-center text-text-secondary">
+                            <div className="flex items-center gap-3 font-semibold text-[14px] text-text-primary min-w-0">
+                              <div className="w-[22px] h-[22px] bg-hover-bg rounded-md flex items-center justify-center text-text-secondary shrink-0">
                                 <FileText size={13} />
                               </div>
-                              <span className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-sm">
+                              <span
+                                title={doc.title}
+                                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate min-w-0 flex-1"
+                              >
                                 {doc.title}
                               </span>
                             </div>
@@ -368,7 +376,8 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                           <td className="py-4 px-6 text-[13px] text-text-secondary">
                             {group ? (
                               <span
-                                className="border px-2 py-0.5 rounded-md font-medium text-[12px]"
+                                title={group.name.replace(/^\d+\.\s*/, '')}
+                                className="border px-2 py-0.5 rounded-md font-medium text-[12px] truncate max-w-full inline-block align-middle"
                                 style={{
                                   backgroundColor: `${kbColor}15`,
                                   color: kbColor,
@@ -381,9 +390,20 @@ function KnowledgeBaseHomeContent({ kbId }: { kbId?: string }) {
                               <span className="text-text-ghost">无分组</span>
                             )}
                           </td>
-                          <td className="py-4 px-6 text-[13px] text-text-secondary flex items-center gap-1.5 mt-0.5">
-                            <User size={13} className="text-text-ghost" />
-                            <span>管理员 · {formatRelativeTime(doc.updatedAt)}</span>
+                          <td className="py-4 px-6 text-[13px] text-text-secondary">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <User size={13} className="text-text-ghost shrink-0" />
+                              <span
+                                title={displayName}
+                                className="truncate max-w-[120px] shrink min-w-0"
+                              >
+                                {displayName}
+                              </span>
+                              <span className="text-text-ghost shrink-0">·</span>
+                              <span className="shrink-0 whitespace-nowrap text-text-secondary">
+                                {formatRelativeTime(doc.updatedAt)}
+                              </span>
+                            </div>
                           </td>
                         </tr>
                       );
