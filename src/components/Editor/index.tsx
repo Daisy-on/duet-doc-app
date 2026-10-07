@@ -17,6 +17,7 @@ import { useEditorStore } from '../../store';
 import { getOutlineHeadings } from './outlineHeadings';
 import { locateCitation, type CitationTarget } from './citationLocator';
 import { CitationHighlightExtension, citationHighlightKey } from './CitationHighlightExtension';
+import { EditorPerfExtension, recordDocLoadEvent } from './EditorPerfExtension';
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Sparkles, MoreVertical } from 'lucide-react';
@@ -431,21 +432,54 @@ export default function Editor() {
       }),
       assistantSelectionHighlightExtension,
       CitationHighlightExtension,
+      EditorPerfExtension,
     ],
     [],
   );
+
+  const initialContent = useMemo(() => {
+    if (!doc?.content) return '';
+    const isJson = doc.content.trim().startsWith('{');
+    if (!isJson) return doc.content;
+    try {
+      return JSON.parse(doc.content) as unknown;
+    } catch (e) {
+      console.error('Failed to parse doc.content as JSON', e);
+      return doc.content;
+    }
+  }, [doc]);
 
   const editor = useEditor(
     {
       immediatelyRender: false,
       extensions,
-      content: doc
-        ? doc.content.trim().startsWith('{')
-          ? JSON.parse(doc.content)
-          : doc.content
-        : '',
+      content: initialContent as Parameters<typeof useEditor>[0]['content'],
       onCreate: ({ editor }) => {
+        const mountTime = performance.now();
+        const headingStart = performance.now();
         syncHeadings(editor, true);
+        const headingExtractMs = performance.now() - headingStart;
+
+        requestAnimationFrame(() => {
+          const totalMountToPaintMs = performance.now() - mountTime;
+          const charCount = editor.state.doc.textContent.length;
+          const nodeCount = editor.state.doc.nodeSize;
+          const headings = getOutlineHeadings(editor.state.doc);
+          if (charCount > 0 || doc?.content) {
+            recordDocLoadEvent({
+              docTitle: doc?.title || '未命名文档',
+              charCount,
+              nodeCount,
+              headingCount: headings.length,
+              loadType: '初次初始化挂载',
+              jsonParseMs: 0,
+              astBuildMs: 0,
+              headingExtractMs,
+              totalMountToPaintMs,
+              timestamp: Date.now(),
+            });
+          }
+        });
       },
       onUpdate: ({ editor }) => {
         scheduleDocumentUpdate(editor);
@@ -895,17 +929,60 @@ export default function Editor() {
         return;
       }
 
+      const switchStart = performance.now();
       const isJson = latestContent.trim().startsWith('{');
+      const parseStart = performance.now();
+      let parsedContent: unknown = latestContent;
+      try {
+        parsedContent = isJson ? JSON.parse(latestContent) : latestContent;
+      } catch (e) {
+        console.error('Failed to parse doc.content as JSON', e);
+      }
+      const jsonParseMs = performance.now() - parseStart;
+
       editor.commands.clearGhostText();
       AIDispatcher.clearGhostTextRequest();
-      editor.commands.setContent(isJson ? JSON.parse(latestContent) : latestContent, {
-        emitUpdate: false,
-      });
+
+      const astStart = performance.now();
+      editor.commands.setContent(
+        parsedContent as Parameters<typeof editor.commands.setContent>[0],
+        {
+          emitUpdate: false,
+        },
+      );
+      const astBuildMs = performance.now() - astStart;
+
       lastAppliedDocumentContentRef.current = {
         documentId: latestDocumentId,
         content: latestContent,
       };
+
+      const headingStart = performance.now();
       syncHeadings(editor, true);
+      const headingExtractMs = performance.now() - headingStart;
+
+      requestAnimationFrame(() => {
+        const totalMountToPaintMs = performance.now() - switchStart;
+        const charCount = editor.state.doc.textContent.length;
+        const nodeCount = editor.state.doc.nodeSize;
+        const headings = getOutlineHeadings(editor.state.doc);
+        const latestDocItem = useKnowledgeBaseStore
+          .getState()
+          .documents.find((item) => item.id === latestDocumentId);
+
+        recordDocLoadEvent({
+          docTitle: latestDocItem?.title || '未命名文档',
+          charCount,
+          nodeCount,
+          headingCount: headings.length,
+          loadType: '文档路由切换',
+          jsonParseMs,
+          astBuildMs,
+          headingExtractMs,
+          totalMountToPaintMs,
+          timestamp: Date.now(),
+        });
+      });
     });
   }, [docContent, editor, flushPendingDocumentUpdate, syncHeadings]);
 
