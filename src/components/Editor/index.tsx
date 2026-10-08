@@ -455,30 +455,34 @@ export default function Editor() {
       extensions,
       content: initialContent as Parameters<typeof useEditor>[0]['content'],
       onCreate: ({ editor }) => {
-        const mountTime = performance.now();
+        const mountStartTime = performance.now();
         const headingStart = performance.now();
         syncHeadings(editor, true);
         const headingExtractMs = performance.now() - headingStart;
 
         requestAnimationFrame(() => {
-          const totalMountToPaintMs = performance.now() - mountTime;
-          const charCount = editor.state.doc.textContent.length;
-          const nodeCount = editor.state.doc.nodeSize;
-          const headings = getOutlineHeadings(editor.state.doc);
-          if (charCount > 0 || doc?.content) {
-            recordDocLoadEvent({
-              docTitle: doc?.title || '未命名文档',
-              charCount,
-              nodeCount,
-              headingCount: headings.length,
-              loadType: '初次初始化挂载',
-              jsonParseMs: 0,
-              astBuildMs: 0,
-              headingExtractMs,
-              totalMountToPaintMs,
-              timestamp: Date.now(),
-            });
-          }
+          requestAnimationFrame(() => {
+            const totalMountToPaintMs = performance.now() - mountStartTime;
+            const charCount = editor.state.doc.textContent.length;
+            const nodeSizeSpan = editor.state.doc.nodeSize;
+            const blockCount = editor.state.doc.childCount;
+            const headings = getOutlineHeadings(editor.state.doc);
+            if (charCount > 0 || doc?.content) {
+              recordDocLoadEvent({
+                docTitle: doc?.title || '未命名文档',
+                charCount,
+                nodeSizeSpan,
+                blockCount,
+                headingCount: headings.length,
+                loadType: '初次初始化挂载',
+                jsonParseMs: 0,
+                astBuildMs: 0,
+                headingExtractMs,
+                totalMountToPaintMs,
+                timestamp: Date.now(),
+              });
+            }
+          });
         });
       },
       onUpdate: ({ editor }) => {
@@ -962,25 +966,29 @@ export default function Editor() {
       const headingExtractMs = performance.now() - headingStart;
 
       requestAnimationFrame(() => {
-        const totalMountToPaintMs = performance.now() - switchStart;
-        const charCount = editor.state.doc.textContent.length;
-        const nodeCount = editor.state.doc.nodeSize;
-        const headings = getOutlineHeadings(editor.state.doc);
-        const latestDocItem = useKnowledgeBaseStore
-          .getState()
-          .documents.find((item) => item.id === latestDocumentId);
+        requestAnimationFrame(() => {
+          const totalMountToPaintMs = performance.now() - switchStart;
+          const charCount = editor.state.doc.textContent.length;
+          const nodeSizeSpan = editor.state.doc.nodeSize;
+          const blockCount = editor.state.doc.childCount;
+          const headings = getOutlineHeadings(editor.state.doc);
+          const latestDocItem = useKnowledgeBaseStore
+            .getState()
+            .documents.find((item) => item.id === latestDocumentId);
 
-        recordDocLoadEvent({
-          docTitle: latestDocItem?.title || '未命名文档',
-          charCount,
-          nodeCount,
-          headingCount: headings.length,
-          loadType: '文档路由切换',
-          jsonParseMs,
-          astBuildMs,
-          headingExtractMs,
-          totalMountToPaintMs,
-          timestamp: Date.now(),
+          recordDocLoadEvent({
+            docTitle: latestDocItem?.title || '未命名文档',
+            charCount,
+            nodeSizeSpan,
+            blockCount,
+            headingCount: headings.length,
+            loadType: '文档路由切换',
+            jsonParseMs,
+            astBuildMs,
+            headingExtractMs,
+            totalMountToPaintMs,
+            timestamp: Date.now(),
+          });
         });
       });
     });
