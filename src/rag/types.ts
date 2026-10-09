@@ -4,7 +4,7 @@ export const DOCUMENT_CHUNKER_VERSION = 'v3';
 
 export type DocumentSourceType = 'document' | 'memo';
 export type DocumentIndexStatus = 'indexed' | 'indexing' | 'error';
-export type LocalRetrievalStrategy = 'vector' | 'hybrid';
+export type LocalRetrievalStrategy = 'vector' | 'hybrid' | 'hybrid-no-diversity';
 
 export interface IndexableDocument {
   id: string;

@@ -618,19 +618,25 @@ export default function LocalRetrievalSandbox() {
             <div className="text-xs font-medium text-text-secondary">
               检索策略
               <div className="mt-1 flex h-9 overflow-hidden rounded-md border border-border-color">
-                {(['vector', 'hybrid'] as const).map((strategy) => (
+                {(
+                  [
+                    { key: 'vector', label: '纯向量' },
+                    { key: 'hybrid', label: '混合检索' },
+                    { key: 'hybrid-no-diversity', label: '纯融合(关多样性)' },
+                  ] as const
+                ).map(({ key, label }) => (
                   <button
-                    key={strategy}
+                    key={key}
                     type="button"
-                    onClick={() => setRetrievalStrategy(strategy)}
+                    onClick={() => setRetrievalStrategy(key)}
                     disabled={isEvaluating}
                     className={`px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                      retrievalStrategy === strategy
+                      retrievalStrategy === key
                         ? 'bg-accent text-white'
                         : 'bg-white text-text-primary hover:bg-hover-bg'
                     }`}
                   >
-                    {strategy === 'vector' ? '纯向量' : '混合检索'}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -748,7 +754,11 @@ export default function LocalRetrievalSandbox() {
                       ? `已在 ${evaluationRun.summary.completedCases} 条用例后停止。`
                       : `已完成 ${evaluationRun.summary.completedCases} 条用例。`}
                     {' · '}
-                    {evaluationRun.strategy === 'hybrid' ? '混合检索' : '纯向量'}
+                    {evaluationRun.strategy === 'hybrid'
+                      ? '混合检索'
+                      : evaluationRun.strategy === 'hybrid-no-diversity'
+                        ? '纯融合(关多样性)'
+                        : '纯向量'}
                   </p>
                 </div>
                 {report && (
@@ -798,11 +808,23 @@ export default function LocalRetrievalSandbox() {
                   }
                 />
                 <Metric
-                  label="平均耗时"
-                  value={formatDuration(evaluationRun.summary.averageDurationMs)}
+                  label="首题耗时"
+                  value={formatDuration(evaluationRun.cases[0]?.durationMs ?? 0)}
+                />
+                <Metric
+                  label="最大耗时"
+                  value={formatDuration(
+                    evaluationRun.cases.length > 0
+                      ? Math.max(...evaluationRun.cases.map((c) => c.durationMs))
+                      : 0,
+                  )}
                 />
                 <Metric label="P50" value={formatDuration(evaluationRun.summary.p50DurationMs)} />
                 <Metric label="P95" value={formatDuration(evaluationRun.summary.p95DurationMs)} />
+                <Metric
+                  label="平均耗时"
+                  value={formatDuration(evaluationRun.summary.averageDurationMs)}
+                />
               </div>
 
               <div className="mt-5 overflow-x-auto border border-border-color">

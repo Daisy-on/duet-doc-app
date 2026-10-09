@@ -142,6 +142,7 @@ async function searchByHybrid(
   chunks: DocumentChunk[],
   limit: number,
   queryEmbedding?: Float32Array,
+  disableDiversity = false,
 ): Promise<RetrievedChunk[]> {
   const candidateLimit = Math.min(
     chunks.length,
@@ -158,7 +159,7 @@ async function searchByHybrid(
       const chunk = chunksById.get(match.id);
       if (!chunk) return null;
       return toRetrievedChunk(chunk, match.score, {
-        retrievalStrategy: 'hybrid',
+        retrievalStrategy: disableDiversity ? 'hybrid-no-diversity' : 'hybrid',
         vectorRank: match.vectorRank,
         vectorScore: match.vectorScore,
         lexicalRank: match.lexicalRank,
@@ -171,6 +172,9 @@ async function searchByHybrid(
     })
     .filter((result): result is RetrievedChunk => result !== null);
 
+  if (disableDiversity) {
+    return results.slice(0, limit);
+  }
   return takeDiverseResults(results, limit);
 }
 
@@ -203,10 +207,20 @@ async function searchLocalKnowledgeInternal(
         return true;
       })
       .slice(0, limit)
-      .map((chunk) => toRetrievedChunk(chunk, 1));
+      .map((chunk) =>
+        toRetrievedChunk(chunk, 1, {
+          retrievalStrategy: strategy,
+        }),
+      );
   }
 
-  return strategy === 'hybrid'
-    ? searchByHybrid(query, chunks, limit, options.queryEmbedding)
-    : searchByVector(query, chunks, limit, options.queryEmbedding);
+  if (strategy === 'hybrid') {
+    return searchByHybrid(query, chunks, limit, options.queryEmbedding, false);
+  }
+
+  if (strategy === 'hybrid-no-diversity') {
+    return searchByHybrid(query, chunks, limit, options.queryEmbedding, true);
+  }
+
+  return searchByVector(query, chunks, limit, options.queryEmbedding);
 }
