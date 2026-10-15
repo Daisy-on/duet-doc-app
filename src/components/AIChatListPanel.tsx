@@ -261,7 +261,9 @@ export default function AIChatListPanel() {
                         setActiveSessionId(session.id);
                         navigate(`/ai-writing/${session.id}`);
                       }}
-                      className={`text-[13px] py-2 px-3 rounded-lg cursor-pointer flex items-center justify-between group/row transition-colors relative z-10 ${
+                      className={`text-[13px] py-2 px-3 rounded-lg cursor-pointer flex items-center justify-between group/row transition-colors relative ${
+                        popoverOpenId === session.id ? 'z-30' : 'z-10'
+                      } ${
                         isActive
                           ? 'text-text-primary font-semibold'
                           : 'text-text-secondary hover:bg-hover-bg/70'
