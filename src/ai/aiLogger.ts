@@ -41,7 +41,8 @@ export interface AITrace {
     | 'selection_changed'
     | 'cursor_changed'
     | 'empty_after_clean'
-    | 'command_rejected';
+    | 'command_rejected'
+    | 'editor_composing';
 
   usage?: {
     inputTokens?: number;

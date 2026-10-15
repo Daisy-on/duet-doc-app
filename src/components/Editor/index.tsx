@@ -241,6 +241,11 @@ export default function Editor() {
           return;
         }
 
+        // 若当前处于中文输入法拼音组字阶段，拦截不触发补全
+        if (editor.view.composing) {
+          return;
+        }
+
         // 仅在用户停止输入、定时器真正触发时读取最新的编辑器上下文，
         // 避免每次 onUpdate 都遍历文档并创建临时 Prompt 数据。
         const promptInput = buildGhostTextPrompt(editor);
@@ -271,6 +276,13 @@ export default function Editor() {
         if (editor.isDestroyed) {
           logGhostTextUIOutcome(result.requestId, 'discarded', {
             discardReason: 'editor_destroyed',
+            outputChars: result.text.length,
+          });
+          return;
+        }
+        if (editor.view.composing) {
+          logGhostTextUIOutcome(result.requestId, 'discarded', {
+            discardReason: 'editor_composing',
             outputChars: result.text.length,
           });
           return;
